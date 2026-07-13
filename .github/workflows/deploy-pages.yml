@@ -1,0 +1,68 @@
+name: Deploy app to GitHub Pages
+
+# Builds @mood-swings/app and publishes packages/app/dist to GitHub Pages.
+#
+# Runs on every push to the default branch and can be triggered by hand from the
+# Actions tab (workflow_dispatch). The app currently lives on the feature branch
+# `claude/mood-swings-tabletop-mvp-qgcbsy`; this workflow will start deploying
+# automatically once that branch is merged into `main`, or immediately via a
+# manual "Run workflow" dispatch from any branch that contains this file.
+#
+# One-time repo setup (human): Settings -> Pages -> Build and deployment ->
+# Source: "GitHub Actions". Site URL: https://didymusbenson.github.io/mood-swings-vtt/
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least-privilege token plus the OIDC id-token the deploy-pages action needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment at a time; let an in-progress run finish rather than
+# cancelling it (avoids leaving Pages in a half-deployed state).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies (repo root, all workspaces)
+        run: npm ci
+
+      - name: Build @mood-swings/app
+        # vite.config.ts sets base to /mood-swings-vtt/ for production builds.
+        run: npm run build --workspace @mood-swings/app
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/app/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

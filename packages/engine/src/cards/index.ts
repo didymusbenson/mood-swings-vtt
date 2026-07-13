@@ -1,15 +1,11 @@
-// Card effect modules. As data/cards.json lands, one module per card is added
-// here and registered via registerEffects(number, effects).
-//
-// Known-text cards encoded so far (reference implementations):
-//   #92 Glee   — round-scoped self value
-//   #134 Love  — "all five colours" board query
-//
-// The remaining ~125 effects are a systematic follow-up now that
-// data/cards.json is available (see REQUIREMENTS.md / task list).
+// Card effect modules — one file per colour, each registering effects by
+// collector number via registerEffects(). Importing this module wires up the
+// whole set. See docs/CARD_AUTHORING.md.
 
 import './white.js'; // #1–#26
-import './known/glee.js'; // #92 (red — pending red.ts)
-import './known/love.js'; // #134 (green — pending green.ts)
+import './blue.js'; // #27–#52
+import './black.js'; // #53–#79
+import './red.js'; // #80–#106 (incl. #92 Glee)
+import './green.js'; // #107–#134 (incl. #127/#134 Love)
 
 export { registerEffects, effectsFor, CardDB } from './registry.js';

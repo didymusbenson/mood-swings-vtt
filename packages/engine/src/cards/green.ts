@@ -1,0 +1,319 @@
+// Green cards (#107–#134). Encoded from data/cards.json rules text + docs/card-notes.md.
+// Mirrors cards/white.ts: player decisions arrive on ctx.choices (moods = uids,
+// players = ids, cards = card numbers in hand, option/number/colors = misc).
+// "May" effects are opt-in: if the required choice is absent, nothing happens.
+//
+// GAPS FLAGGED (see report): the engine has no primitive for (a) skipping a
+// round's scoring (Awe), (b) playing an additional mood *from the discard pile*
+// (Grace, Harmony), (c) recurring per-turn extra plays (Grace, Hope), (d)
+// granting another player / your future turn an extra play (Generosity, Joy),
+// (e) an "additional mood must share a colour with your moods" constraint
+// (Eagerness), (f) round-scoped discard tracking (Vulnerability), (g) an
+// extra-scoring hook (Bliss, Enthusiasm — approximated by adjusting roundScores
+// in afterScoring). Each is implemented best-effort below and called out.
+import type { CardEffects } from '../effects.js';
+import type { Color, Mood, PlayerId } from '../types.js';
+import type { ReadContext } from '../effects.js';
+import { registerEffects } from './registry.js';
+
+const FIVE: Color[] = ['white', 'blue', 'black', 'red', 'green'];
+const ALL_COLORS: Color[] = ['white', 'blue', 'black', 'red', 'green', 'colorless'];
+
+/** Distinct colours among a player's moods (resolving copyOf). */
+const distinctColors = (ctx: ReadContext, pid: PlayerId): number =>
+  new Set(ctx.moodsOf(pid).map((m) => ctx.card(m).color)).size;
+
+// #107 Awe — "No scoring this round; you choose who goes first next round."
+// GAP: the engine always scores a round, picks a winner, and has losers draw;
+// there is no hook to cancel scoring or to set only *next* round's leader
+// (forcesFirstPlayer would force EVERY round, which is wrong). Best effort: log
+// the intent and record the chosen leader. Faithful support needs a new engine
+// primitive ("skip scoring this round").
+registerEffects(107, {
+  afterPlaying: (ctx) => {
+    const p = ctx.choices.players?.[0];
+    ctx.self.data.aweFirstPlayer = p ?? null;
+    ctx.log(
+      `Awe: no-scoring-this-round is unsupported by the engine; round will still score. Chosen next leader: ${p ?? '(none)'}`,
+    );
+  },
+});
+
+// #108 Bliss — [2]. To play: discard a card from hand. While in play: score each
+// of your moods sharing the discarded card's colour two extra times.
+// The extra scoring is applied in afterScoring by adding to roundScores (the
+// engine has no dedicated extra-scoring hook, but roundScores still decides the
+// winner). Bliss itself is always [2].
+registerEffects(108, {
+  canPlay: (ctx) => (ctx.state.hands[ctx.me]?.length ?? 0) >= 2, // Bliss + ≥1 other card
+  payCost: (ctx) => {
+    const hand = ctx.state.hands[ctx.me]!;
+    const chosen = ctx.choices.cards?.[0];
+    const c = chosen != null && chosen !== 108 ? chosen : hand.find((n) => n !== 108);
+    if (c == null) return;
+    ctx.self.data.blissColor = ctx.cardData(c).color;
+    ctx.discardFromHand(ctx.me, c);
+  },
+  afterScoring: (ctx) => {
+    const col = ctx.self.data.blissColor as Color | undefined;
+    if (!col) return;
+    let extra = 0;
+    for (const m of ctx.moodsOf(ctx.me)) if (ctx.card(m).color === col) extra += 2 * m.currentValue;
+    if (extra) ctx.state.roundScores[ctx.me] = (ctx.state.roundScores[ctx.me] ?? 0) + extra;
+  },
+});
+
+// #109 Celebration — [3]/[6][1]=7 if more colours among your moods than among
+// each other player's moods (strictly more than every opponent).
+registerEffects(109, {
+  intrinsicValue: (ctx) => {
+    const me = ctx.self.owner;
+    const mine = distinctColors(ctx, me);
+    return ctx.opponentsOf(me).every((o) => mine > distinctColors(ctx, o)) ? 7 : 3;
+  },
+});
+
+// #110 Cheer — [3]/[5]. Discard a hand card printed [0]–[3] (top-right) to make
+// this [5]. (data/cards.json rulesText says [0],[1],[2],[3]; note: card-notes.md
+// quotes [0],[2],[4],[6] — following the cards.json rulesText per task.)
+registerEffects(110, {
+  intrinsicValue: (ctx) => (ctx.self.data.boost ? 5 : 3),
+  afterPlaying: (ctx) => {
+    const c = ctx.choices.cards?.[0];
+    if (c == null || ![0, 2, 4, 6].includes(ctx.cardData(c).value)) return;
+    ctx.discardFromHand(ctx.me, c);
+    ctx.self.data.boost = true;
+  },
+});
+
+// #111 Delight — [3]/[5]. Discard a hand card printed [1]–[3] (top-right) to make
+// this [5]. (data/cards.json rulesText says [1],[2],[3]; note: card-notes.md
+// quotes [1],[3],[5] — following the cards.json rulesText per task.)
+registerEffects(111, {
+  intrinsicValue: (ctx) => (ctx.self.data.boost ? 5 : 3),
+  afterPlaying: (ctx) => {
+    const c = ctx.choices.cards?.[0];
+    if (c == null || ![1, 3, 5].includes(ctx.cardData(c).value)) return;
+    ctx.discardFromHand(ctx.me, c);
+    ctx.self.data.boost = true;
+  },
+});
+
+// #112 Determination — [3]/[6]=6 if three or more moods (anywhere) share a colour.
+registerEffects(112, {
+  intrinsicValue: (ctx) => (ALL_COLORS.some((c) => ctx.countColor(c) >= 3) ? 6 : 3),
+});
+
+// #113 Disregard — [6]/[3]=3 if two or more blue and/or black moods are in play.
+registerEffects(113, {
+  intrinsicValue: (ctx) => (ctx.countColor('blue') + ctx.countColor('black') >= 2 ? 3 : 6),
+});
+
+// #114 Eagerness — [2]. Play an additional mood if it shares a colour with one of
+// your moods. GAP: there is no PlayConstraint for "colour SHARED with your moods"
+// (only the inverse, colorNotSharedWithControllerMoods, exists). Best effort:
+// grant an unconstrained extra play; the colour requirement is NOT enforced.
+registerEffects(114, {
+  afterPlaying: (ctx) => ctx.grantAdditionalMood(1),
+});
+
+// #115 Enjoyment — [3]/[6]=6 if two or more red and/or white moods are in play.
+registerEffects(115, {
+  intrinsicValue: (ctx) => (ctx.countColor('red') + ctx.countColor('white') >= 2 ? 6 : 3),
+});
+
+// #116 Enthusiasm — [0]. While scoring, you may score one of your moods an extra
+// time. GAP: no extra-scoring hook and afterScoring receives no choices, so this
+// auto-scores your highest-value mood again (optimal for a "may"), applied via
+// roundScores.
+registerEffects(116, {
+  afterScoring: (ctx) => {
+    const mine = ctx.moodsOf(ctx.me);
+    if (mine.length === 0) return;
+    const best = Math.max(...mine.map((m) => m.currentValue));
+    if (best > 0) ctx.state.roundScores[ctx.me] = (ctx.state.roundScores[ctx.me] ?? 0) + best;
+  },
+});
+
+// #117 Euphoria — [0], +[1] for each mood in play (including itself and others).
+// (Suppression forces 0, handled by the engine.)
+registerEffects(117, {
+  intrinsicValue: (ctx) => ctx.allMoods().length,
+});
+
+// #118 Fascination — [3]/[6][1]=7. Reveal a blue/black card from hand and give it
+// to another player to make this [7].
+registerEffects(118, {
+  intrinsicValue: (ctx) => (ctx.self.data.boost ? 7 : 3),
+  afterPlaying: (ctx) => {
+    const c = ctx.choices.cards?.[0];
+    const p = ctx.choices.players?.[0];
+    if (c == null || !p) return;
+    const col = ctx.cardData(c).color;
+    if (col !== 'blue' && col !== 'black') return;
+    const hand = ctx.state.hands[ctx.me]!;
+    const i = hand.indexOf(c);
+    if (i < 0) return;
+    hand.splice(i, 1);
+    (ctx.state.hands[p] ??= []).push(c);
+    ctx.self.data.boost = true;
+  },
+});
+
+// #119 Fondness — [0]/[6][1]=7 if each player has three or more moods.
+registerEffects(119, {
+  intrinsicValue: (ctx) => (ctx.state.players.every((p) => ctx.moodsOf(p.id).length >= 3) ? 7 : 0),
+});
+
+// #120 Generosity — [6]. Choose an opponent; they may play an additional mood on
+// their next turn. GAP: no primitive to grant another player a future-turn extra
+// play (playsRemaining is current-turn/current-player only). Best effort: log it.
+registerEffects(120, {
+  afterPlaying: (ctx) => {
+    const p = ctx.choices.players?.[0];
+    if (p) ctx.log(`Generosity: ${p} may play an additional mood next turn (unsupported cross-turn grant).`);
+  },
+});
+
+// #121 Grace — [0]. Each of your turns you may play an additional mood FROM THE
+// DISCARD PILE if it shares a colour with one of your moods. GAP: the engine has
+// no "play from discard" primitive and no recurring per-turn grant. Best effort:
+// only on the turn Grace is played, stage a chosen colour-matching discard card
+// into hand and grant one extra play (so it can be played from hand).
+registerEffects(121, {
+  afterPlaying: (ctx) => stageDiscardPlay(ctx, true),
+});
+
+// #122 Happiness — [2]/[6][2]=8 if a single player has both a red mood and a
+// white mood.
+registerEffects(122, {
+  intrinsicValue: (ctx) => {
+    const has = ctx.state.players.some((p) => {
+      const cols = new Set(ctx.moodsOf(p.id).map((m) => ctx.card(m).color));
+      return cols.has('red') && cols.has('white');
+    });
+    return has ? 8 : 2;
+  },
+});
+
+// #123 Harmony — [2]. Play an additional mood this turn FROM THE DISCARD PILE.
+// GAP: no "play from discard" primitive. Best effort: stage a chosen discard card
+// into hand and grant one extra play.
+registerEffects(123, {
+  afterPlaying: (ctx) => stageDiscardPlay(ctx, false),
+});
+
+// #124 Hope — [0]. You may play an additional mood during each of your turns.
+// GAP: no recurring per-turn grant hook. Best effort: grant one extra play on the
+// turn Hope is played only.
+registerEffects(124, {
+  afterPlaying: (ctx) => ctx.grantAdditionalMood(1),
+});
+
+// #125 Joy — [3]. You may play an additional mood on your next turn. GAP: no
+// primitive to grant a future-turn extra play. Best effort: log it.
+registerEffects(125, {
+  afterPlaying: (ctx) => ctx.log('Joy: controller may play an additional mood next turn (unsupported cross-turn grant).'),
+});
+
+// #126 Laziness — vanilla (no rules text). The engine scores its printed [4]; no
+// entry needed.
+
+// #127 Love (mythic) — [4]/[6][6]=12 if a white, blue, black, red, and green mood
+// are all in play (including this one). Same effect as the #134 headliner below.
+registerEffects(127, {
+  intrinsicValue: (ctx) => (FIVE.every((c) => ctx.countColor(c) >= 1) ? 12 : 4),
+});
+
+// #128 Nostalgia — [0]. You may put a card from the discard pile into your hand;
+// you may play an additional mood this turn (the additional mood is played from
+// hand, so this is fully supported).
+registerEffects(128, {
+  afterPlaying: (ctx) => {
+    const c = ctx.choices.cards?.[0];
+    if (c != null) {
+      const i = ctx.state.discard.indexOf(c);
+      if (i >= 0) {
+        ctx.state.discard.splice(i, 1);
+        ctx.state.hands[ctx.me]!.push(c);
+      }
+    }
+    ctx.grantAdditionalMood(1);
+  },
+});
+
+// #129 Serenity — [3]/[6]=6 if you have an even number of moods (including this).
+registerEffects(129, {
+  intrinsicValue: (ctx) => (ctx.moodsOf(ctx.self.owner).length % 2 === 0 ? 6 : 3),
+});
+
+// #130 Sloth — [3], +[1] for each card in your hand. (Suppression forces 0.)
+registerEffects(130, {
+  intrinsicValue: (ctx) => 3 + (ctx.state.hands[ctx.self.owner]?.length ?? 0),
+});
+
+// #131 Tranquility — [3]/[6]=6 if you have an odd number of moods (including this).
+registerEffects(131, {
+  intrinsicValue: (ctx) => (ctx.moodsOf(ctx.self.owner).length % 2 === 1 ? 6 : 3),
+});
+
+// #132 Vulnerability — [1]/[6][1]=7 if a card was put into the discard pile THIS
+// ROUND. GAP: no round-scoped discard tracking exists. Best effort: [7] whenever
+// the discard pile is non-empty (over-counts across rounds if the pile carries
+// cards from prior rounds).
+registerEffects(132, {
+  intrinsicValue: (ctx) => (ctx.state.discard.length > 0 ? 7 : 1),
+});
+
+// #133 Wonder — [0]. Choose a colour; +N for each mood of that colour and each
+// card in the discard pile of that colour. (data/cards.json rulesText says +[1]
+// per; note: card-notes.md says +[2] per — following the cards.json rulesText.)
+registerEffects(133, {
+  afterPlaying: (ctx) => {
+    const c = (ctx.choices.colors as Color[] | undefined)?.[0];
+    if (c) ctx.self.data.wonderColor = c;
+  },
+  intrinsicValue: (ctx) => {
+    const col = ctx.self.data.wonderColor as Color | undefined;
+    if (!col) return 0;
+    const discardN = ctx.state.discard.filter((n) => ctx.cardData(n).color === col).length;
+    return (ctx.countColor(col) + discardN) * 2; // +[2] each (authoritative)
+  },
+});
+
+// #134 Love (headliner foil) — [4]/[6][6]=12 if a white, blue, black, red, and
+// green mood are all in play (including this one). Re-encoded here from the old
+// cards/known/love.ts (which is removed during integration).
+registerEffects(134, {
+  intrinsicValue: (ctx) => (FIVE.every((c) => ctx.countColor(c) >= 1) ? 12 : 4),
+});
+
+// #135 Hurt Feelings — intentionally NOT encoded: it is the special 3+-player,
+// non-scoring helper (value null) and is out of scope for this file.
+
+// ---- shared best-effort helper ------------------------------------------
+
+/**
+ * Best-effort "play an additional mood from the discard pile": stage a chosen
+ * discard card into the acting player's hand and grant one extra play, so the
+ * engine (which can only play from hand) can play it.
+ * @param requireColorMatch when true (Grace), only stage a card whose colour is
+ *   shared by one of the player's moods.
+ */
+function stageDiscardPlay(
+  ctx: Parameters<NonNullable<CardEffects['afterPlaying']>>[0],
+  requireColorMatch: boolean,
+): void {
+  const c = ctx.choices.cards?.[0];
+  if (c == null) return; // "may" declined
+  const i = ctx.state.discard.indexOf(c);
+  if (i < 0) return;
+  if (requireColorMatch) {
+    const col = ctx.cardData(c).color;
+    const shares = ctx.moodsOf(ctx.me).some((m: Mood) => ctx.card(m).color === col);
+    if (!shares) return;
+  }
+  ctx.state.discard.splice(i, 1);
+  ctx.state.hands[ctx.me]!.push(c);
+  ctx.grantAdditionalMood(1);
+}

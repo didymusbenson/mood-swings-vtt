@@ -59,7 +59,7 @@ registerEffects(6, {
 registerEffects(7, {
   afterPlaying: (ctx) => {
     for (const pid of (ctx.choices.players ?? []).slice(0, 2)) {
-      const targets = ctx.moodsOf(pid).filter((m) => ctx.valueOf(m) >= 1);
+      const targets = ctx.moodsOf(pid).filter((m) => ctx.valueOf(m) >= 5);
       const chosen = targets.find((m) => (ctx.choices.moods ?? []).includes(m.uid)) ?? targets[0];
       if (chosen) ctx.discardMoodToPile(chosen);
     }
@@ -123,7 +123,7 @@ registerEffects(12, {
 
 // #13 Friendliness — additional mood if it's printed [0]–[3].
 registerEffects(13, {
-  afterPlaying: (ctx) => ctx.grantConditionalMood({ kind: 'primaryValueIn', values: [0, 1, 2, 3] }),
+  afterPlaying: (ctx) => ctx.grantConditionalMood({ kind: 'primaryValueIn', values: [0, 2, 4, 6] }),
 });
 
 // #14 Guilt — suppress one black/red mood, or all of them (sustained).
@@ -163,7 +163,7 @@ registerEffects(16, {
 
 // #17 Kindness — additional mood if it's printed [1]–[3].
 registerEffects(17, {
-  afterPlaying: (ctx) => ctx.grantConditionalMood({ kind: 'primaryValueIn', values: [1, 2, 3] }),
+  afterPlaying: (ctx) => ctx.grantConditionalMood({ kind: 'primaryValueIn', values: [1, 3, 5] }),
 });
 
 // #18 Loyalty — [3], but [6] if two or more green and/or blue moods are in play.
@@ -174,7 +174,7 @@ registerEffects(18, {
 // #19 Meekness — suppress all moods worth [2]+ (sustained).
 registerEffects(19, {
   afterPlaying: (ctx) => {
-    for (const m of ctx.allMoods()) if (m.uid !== ctx.self.uid && ctx.valueOf(m) >= 2) ctx.suppress(m, 'sustained', true);
+    for (const m of ctx.allMoods()) if (m.uid !== ctx.self.uid && ctx.valueOf(m) >= 5) ctx.suppress(m, 'sustained', true);
   },
 });
 

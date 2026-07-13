@@ -33,16 +33,16 @@ describe('white cards', () => {
     expect(g.activePlayer).toBe('p2'); // no more plays -> turn passed
   });
 
-  it('#13 Friendliness only lets you play a low-value extra mood', () => {
-    // Friendliness(2). Extra must be printed [0]-[3]. Complacency is [4] -> illegal.
-    const { e, s } = game(rig([13, 5], [5]));
+  it('#13 Friendliness only lets you play an even-value extra mood', () => {
+    // Friendliness(2). Extra must be printed [0],[2],[4],[6]. Charity is [1] -> illegal.
+    const { e, s } = game(rig([13, 3], [5]));
     const g = e.apply(s, { type: 'play', player: 'p1', card: 13 });
-    expect(() => e.apply(g, { type: 'play', player: 'p1', card: 5 })).toThrow(); // [4] not allowed
-    // but a Charity(1) would be allowed (printed [1]); swap deck to prove:
-    const g2 = game(rig([13, 3], [5]));
+    expect(() => e.apply(g, { type: 'play', player: 'p1', card: 3 })).toThrow(); // [1] not allowed
+    // Complacency is [4] -> allowed:
+    const g2 = game(rig([13, 5], [5]));
     let x = g2.e.apply(g2.s, { type: 'play', player: 'p1', card: 13 });
-    x = g2.e.apply(x, { type: 'play', player: 'p1', card: 3 }); // Charity is [1] -> ok
-    expect(x.moods.p1!.map((m) => m.card).sort((a, b) => a - b)).toEqual([3, 13]);
+    x = g2.e.apply(x, { type: 'play', player: 'p1', card: 5 }); // Complacency is [4] -> ok
+    expect(x.moods.p1!.map((m) => m.card).sort((a, b) => a - b)).toEqual([5, 13]);
   });
 
   it('#9 Discipline is [3] when two black/red moods are in play, else [6]', () => {
@@ -81,14 +81,16 @@ describe('white cards', () => {
     expect(g.hands.p1!.length).toBe(handBefore); // played Conviction (-1) then drew (+1)
   });
 
-  it('#19 Meekness suppresses all moods worth [2]+ while it stays in play', () => {
-    // p1 plays Complacency(5, value4) r1; p2 pass; r2 p1 plays Meekness(19).
-    const { e, s } = game(rig([5, 19], [5]));
-    let g = e.apply(s, { type: 'play', player: 'p1', card: 5 });
+  it('#19 Meekness suppresses all moods worth [5]+ while it stays in play', () => {
+    // p1 plays Disgust(63, [6]) r1; p2 pass; r2 p1 plays Meekness(19) -> Disgust suppressed.
+    // (A [4] mood like Complacency would be below the threshold and unaffected.)
+    const { e, s } = game(rig([63, 19], [5]));
+    let g = e.apply(s, { type: 'play', player: 'p1', card: 63 });
+    expect(g.moods.p1![0]!.currentValue).toBe(6);
     g = e.apply(g, { type: 'pass', player: 'p2' });
     g = e.apply(g, { type: 'play', player: 'p1', card: 19 });
-    const comp = g.moods.p1!.find((m) => m.card === 5)!;
-    expect(comp.currentValue).toBe(0); // suppressed (was 4)
-    expect(comp.suppressed).toBe('sustained');
+    const disgust = g.moods.p1!.find((m) => m.card === 63)!;
+    expect(disgust.currentValue).toBe(0); // suppressed (was 6)
+    expect(disgust.suppressed).toBe('sustained');
   });
 });
