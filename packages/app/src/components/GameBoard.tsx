@@ -3,9 +3,10 @@ import type React from 'react';
 import type { Action, GameState, Mood, PlayerState } from '@mood-swings/engine';
 import { ROUNDS_TO_WIN } from '@mood-swings/engine';
 import { db } from '../game/db.js';
-import { Card } from './Card.js';
+import { Card, CardBack, Die } from './Card.js';
 import { PreviewPane, type PreviewTarget } from './PreviewPane.js';
 import { ActivityLog } from './ActivityLog.js';
+import { Starburst } from './Starburst.js';
 import { usePlayInteraction, type PlayController } from '../hooks/usePlayInteraction.js';
 import { useHandOrder } from '../hooks/useHandOrder.js';
 import { useHandDrag, type HandDragApi } from '../hooks/useHandDrag.js';
@@ -16,7 +17,9 @@ interface GameBoardProps {
   onNewGame: () => void;
 }
 
-/** Everything a PlayerPanel needs beyond the raw player/state. */
+type SeatVariant = 'active' | 'opponent';
+
+/** Everything a seat needs beyond the raw player/state. */
 interface PanelCtx {
   pc: PlayController;
   handDrag: HandDragApi;
@@ -30,27 +33,96 @@ function liveScore(state: GameState, pid: string): number {
   return (state.moods[pid] ?? []).reduce((s, m) => s + m.currentValue, 0);
 }
 
+/** Rounds-won shown as collected little dice (a first-to-N tracker). */
 function RoundPips({ won }: { won: number }) {
   return (
     <span className="pips" title={`${won} / ${ROUNDS_TO_WIN} rounds`}>
-      {Array.from({ length: ROUNDS_TO_WIN }, (_, i) => (
-        <span key={i} className={i < won ? 'pip is-on' : 'pip'} />
-      ))}
+      {Array.from({ length: ROUNDS_TO_WIN }, (_, i) =>
+        i < won ? (
+          <Die key={i} value={i + 1} dieColor="black" className="die--pip" />
+        ) : (
+          <span key={i} className="pip pip--ghost" aria-hidden />
+        ),
+      )}
     </span>
   );
 }
 
-function PlayerPanel({ player, state, ctx }: { player: PlayerState; state: GameState; ctx: PanelCtx }) {
+/** CSS-var fan transform for a card at index `i` of `n` in a hand. */
+function fanVars(i: number, n: number, active: boolean): React.CSSProperties {
+  if (n <= 1) return { ['--rot']: '0deg', ['--ty']: '0px', ['--i']: String(i) } as React.CSSProperties;
+  const mid = (n - 1) / 2;
+  const step = active ? Math.min(6, 44 / n) : Math.min(3.5, 24 / n);
+  const off = Math.abs(i - mid);
+  const rot = (i - mid) * step;
+  const ty = active ? off * off * 1.1 : off * 1.0;
+  return {
+    ['--rot']: `${rot.toFixed(2)}deg`,
+    ['--ty']: `${ty.toFixed(1)}px`,
+    ['--i']: String(i),
+  } as React.CSSProperties;
+}
+
+function SeatHeader({ player, state, isActive }: { player: PlayerState; state: GameState; isActive: boolean }) {
+  return (
+    <header className="seat__head">
+      <div className="seat__id">
+        <h2 className="seat__name">{player.name}</h2>
+        <RoundPips won={player.roundsWon} />
+      </div>
+      <div className="seat__score">
+        <span className="seat__score-num">{liveScore(state, player.id)}</span>
+        <span className="seat__score-lbl">score</span>
+      </div>
+      {isActive && <span className="turn-badge">Your turn</span>}
+    </header>
+  );
+}
+
+/** A player's moods laid out on the table (drop targets during a play). */
+function MoodTableau({ player, state, ctx, variant }: { player: PlayerState; state: GameState; ctx: PanelCtx; variant: SeatVariant }) {
+  const { pc, setPreview } = ctx;
+  const pid = player.id;
+  const moods: Mood[] = state.moods[pid] ?? [];
+  const dragging = pc.dragCard != null;
+
+  return (
+    <div className={`tableau tableau--${variant}`}>
+      <h3 className="zone__label">Moods in play ({moods.length})</h3>
+      <div className="tableau__cards">
+        {moods.length === 0 && <p className="muted tableau__empty">No moods yet.</p>}
+        {moods.map((m) => {
+          const legal = pc.moodHighlighted(m.uid);
+          const clickable = legal && pc.dragCard == null; // clicking picks a flow target
+          return (
+            <div key={m.uid} className="mood-drop" data-drop="mood" data-mood-uid={m.uid}>
+              <Card
+                card={db.get(m.card)}
+                mood={m}
+                value={m.currentValue}
+                highlighted={legal}
+                targetSelected={pc.moodSelected(m.uid)}
+                dimmed={dragging && !legal}
+                onPointerEnter={() => setPreview({ card: db.get(m.card), mood: m, value: m.currentValue })}
+                onFocus={() => setPreview({ card: db.get(m.card), mood: m, value: m.currentValue })}
+                onClick={clickable ? () => pc.onMoodClick(m.uid) : undefined}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** A player's hand, fanned in an arc. The active hand is the focal drag surface. */
+function HandRow({ player, state, ctx, variant }: { player: PlayerState; state: GameState; ctx: PanelCtx; variant: SeatVariant }) {
   const { pc, handDrag, orderedHand, setPreview } = ctx;
   const pid = player.id;
   const isActive = state.activePlayer === pid && state.phase === 'awaitingPlay';
   const isMe = isActive && pid === pc.me;
-  const moods: Mood[] = state.moods[pid] ?? [];
   const order = orderedHand(pid);
-
-  const dragging = pc.dragCard != null;
-  const playerIsLegal = pc.playerHighlighted(pid);
-  const playerIsSelected = pc.playerSelected(pid);
+  const active = variant === 'active';
 
   // Active drag pop-out state (only for the dragging player's own hand).
   const drag = handDrag.drag;
@@ -62,23 +134,15 @@ function PlayerPanel({ player, state, ctx }: { player: PlayerState; state: GameS
   // tapped to select (manual) or dragged to play/reorder.
   const canDragHand = isMe && pc.flow == null;
 
-  const panelClasses = [
-    'player',
-    isActive ? 'player--active' : '',
-    playerIsLegal ? 'player--target' : '',
-    playerIsSelected ? 'player--target-selected' : '',
-    dragging && !playerIsLegal ? 'player--dim' : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
-
   const handChildren: React.ReactNode[] = [];
   order.forEach((card, idx) => {
     if (insertion === idx) {
       handChildren.push(<span key={`ins-${idx}`} className="hand__insert" aria-hidden />);
     }
     if (idx === draggingFrom) {
-      handChildren.push(<div key={`ph-${idx}`} className="hand__slot hand__placeholder" data-hand-index={idx} aria-hidden />);
+      handChildren.push(
+        <div key={`ph-${idx}`} className="hand__slot hand__placeholder" data-hand-index={idx} style={fanVars(idx, order.length, active)} aria-hidden />,
+      );
       return;
     }
     const flowHandSlot = pc.flow != null && pc.currentSlot?.kind === 'handCard';
@@ -89,7 +153,7 @@ function PlayerPanel({ player, state, ctx }: { player: PlayerState; state: GameS
     // no onClick here (avoids a double select-then-play).
     const clickable = interactive && pc.flow != null;
     handChildren.push(
-      <div key={`${card}-${idx}`} className="hand__slot" data-hand-index={idx}>
+      <div key={`${card}-${idx}`} className="hand__slot" data-hand-index={idx} style={fanVars(idx, order.length, active)}>
         <Card
           card={db.get(card)}
           disabled={!interactive}
@@ -110,59 +174,21 @@ function PlayerPanel({ player, state, ctx }: { player: PlayerState; state: GameS
   }
 
   return (
-    <section className={panelClasses} data-drop="player" data-player-id={pid}>
-      <header className="player__head">
-        <div className="player__id">
-          <h2>{player.name}</h2>
-          <RoundPips won={player.roundsWon} />
-        </div>
-        <div className="player__score">
-          <span className="player__score-num">{liveScore(state, pid)}</span>
-          <span className="player__score-lbl">score</span>
-        </div>
-        {isActive && <span className="turn-badge">Your turn</span>}
-      </header>
+    <div className={`hand hand--${variant}`}>
+      <h3 className="zone__label">
+        Hand ({order.length})
+        {isActive && !pc.flow && (
+          <button className="btn btn--pass" onClick={() => pc.onPass()}>
+            Pass
+          </button>
+        )}
+      </h3>
 
-      <div className="zone">
-        <h3 className="zone__label">Moods in play ({moods.length})</h3>
-        <div className="zone__cards">
-          {moods.length === 0 && <p className="muted">No moods yet.</p>}
-          {moods.map((m) => {
-            const legal = pc.moodHighlighted(m.uid);
-            const clickable = legal && pc.dragCard == null; // clicking picks a flow target
-            return (
-              <div key={m.uid} className="mood-drop" data-drop="mood" data-mood-uid={m.uid}>
-                <Card
-                  card={db.get(m.card)}
-                  mood={m}
-                  value={m.currentValue}
-                  highlighted={legal}
-                  targetSelected={pc.moodSelected(m.uid)}
-                  dimmed={dragging && !legal}
-                  onPointerEnter={() => setPreview({ card: db.get(m.card), mood: m, value: m.currentValue })}
-                  onFocus={() => setPreview({ card: db.get(m.card), mood: m, value: m.currentValue })}
-                  onClick={clickable ? () => pc.onMoodClick(m.uid) : undefined}
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {isActive && <ActiveHandControls pc={pc} state={state} />}
 
-      <div className="zone">
-        <h3 className="zone__label">
-          Hand ({order.length})
-          {isActive && !pc.flow && (
-            <button className="btn btn--pass" onClick={() => pc.onPass()}>
-              Pass
-            </button>
-          )}
-        </h3>
-
-        {isActive && <ActiveHandControls pc={pc} state={state} />}
-
+      <div className="hand__scroll">
         <div
-          className={`zone__cards hand__cards ${draggingHere ? 'is-dragging' : ''}`}
+          className={`hand__cards ${draggingHere ? 'is-dragging' : ''}`}
           data-drop={isMe && pc.flow == null ? 'hand' : undefined}
           data-hand-owner={pid}
         >
@@ -170,6 +196,35 @@ function PlayerPanel({ player, state, ctx }: { player: PlayerState; state: GameS
           {handChildren}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A whole seat: header, mood tableau, and (for the opponent) their hand. */
+function Seat({ player, state, ctx, variant }: { player: PlayerState; state: GameState; ctx: PanelCtx; variant: SeatVariant }) {
+  const { pc } = ctx;
+  const pid = player.id;
+  const isActive = state.activePlayer === pid && state.phase === 'awaitingPlay';
+  const dragging = pc.dragCard != null;
+  const playerIsLegal = pc.playerHighlighted(pid);
+  const playerIsSelected = pc.playerSelected(pid);
+
+  const classes = [
+    'seat',
+    `seat--${variant}`,
+    isActive ? 'seat--turn' : '',
+    playerIsLegal ? 'seat--target' : '',
+    playerIsSelected ? 'seat--target-selected' : '',
+    dragging && !playerIsLegal ? 'seat--dim' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <section className={classes} data-drop="player" data-player-id={pid}>
+      <SeatHeader player={player} state={state} isActive={isActive} />
+      <MoodTableau player={player} state={state} ctx={ctx} variant={variant} />
+      {variant === 'opponent' && <HandRow player={player} state={state} ctx={ctx} variant={variant} />}
     </section>
   );
 }
@@ -306,16 +361,84 @@ function DragGhost({ handDrag }: { handDrag: HandDragApi }) {
   );
 }
 
+/** The shared centre of the table: deck stack + discard fan + play-field drop. */
+function PlayField({
+  state,
+  dragging,
+  fieldOver,
+  gameOver,
+  setPreview,
+}: {
+  state: GameState;
+  dragging: boolean;
+  fieldOver: boolean;
+  gameOver: boolean;
+  setPreview: (t: PreviewTarget | null) => void;
+}) {
+  const discardTop = state.discard.slice(-8);
+  const startIdx = state.discard.length - discardTop.length;
+
+  return (
+    <div className={`field ${dragging ? 'is-armed' : ''} ${fieldOver ? 'is-over' : ''}`} data-drop={gameOver ? undefined : 'field'}>
+      <div className="field__pile field__deck">
+        <div className="deck-stack" aria-hidden>
+          {Array.from({ length: Math.min(4, Math.max(1, state.deck.length)) }, (_, i) => (
+            <div key={i} className="deck-stack__card" style={{ ['--d']: String(i) } as React.CSSProperties}>
+              <CardBack />
+            </div>
+          ))}
+        </div>
+        <span className="field__count">Deck · {state.deck.length}</span>
+      </div>
+
+      <div className="field__drop" aria-hidden={!dragging}>
+        <span className="field__drop-msg">
+          {dragging ? 'Release to play' : gameOver ? 'Game over' : 'Drag a card here to play'}
+        </span>
+      </div>
+
+      <div className="field__pile field__discard">
+        <div className="discard-fan">
+          {discardTop.length === 0 && <span className="discard-fan__empty muted">empty</span>}
+          {discardTop.map((n, i) => {
+            const card = db.get(n);
+            const total = discardTop.length;
+            const rot = total > 1 ? (i - (total - 1) / 2) * 6 : 0;
+            return (
+              <button
+                type="button"
+                key={`${n}-${startIdx + i}`}
+                className={`discard-card discard-card--${card.color}`}
+                style={{ ['--rot']: `${rot}deg`, ['--i']: String(i) } as React.CSSProperties}
+                onPointerEnter={() => setPreview({ card })}
+                onFocus={() => setPreview({ card })}
+                title={card.name}
+              >
+                <span className="discard-card__mono">{card.name.charAt(0)}</span>
+              </button>
+            );
+          })}
+        </div>
+        <span className="field__count">Discard · {state.discard.length}</span>
+      </div>
+    </div>
+  );
+}
+
 export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
   const pc = usePlayInteraction(state, onAction);
   const { orderedHand, reorder } = useHandOrder(state);
   const handDrag = useHandDrag(pc, (from, to) => reorder(pc.me, from, to));
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
 
-  const active = state.players.find((p) => p.id === state.activePlayer);
   const gameOver = state.phase === 'gameOver';
   const winnerName = state.players.find((p) => p.id === state.winner)?.name;
   const dragging = pc.dragCard != null;
+
+  // The active player sits at the bottom of the table; their opponent up top.
+  const bottomPid = state.activePlayer ?? state.players[0]?.id;
+  const bottom = state.players.find((p) => p.id === bottomPid) ?? state.players[0];
+  const top = state.players.find((p) => p.id !== bottomPid) ?? state.players[1] ?? bottom;
 
   // While dragging, the preview always shows the dragged card.
   const previewTarget = useMemo<PreviewTarget | null>(
@@ -324,22 +447,25 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
   );
 
   const ctx: PanelCtx = { pc, handDrag, orderedHand, setPreview };
-  const fieldOver = handDrag.drag?.active && handDrag.drag.over.kind === 'field';
+  const fieldOver = !!(handDrag.drag?.active && handDrag.drag.over.kind === 'field');
 
   return (
-    <div className="board">
-      <header className="board__banner">
-        <div className="board__round">
-          <strong>Round {state.round}</strong>
-          <span className="board__phase">{state.phase}</span>
+    <div className="table">
+      <header className="table__banner">
+        <div className="banner__title">
+          <Starburst className="banner__burst" label={`Round ${state.round}`} />
+          <div className="banner__meta">
+            <strong className="banner__game">Mood Swings</strong>
+            <span className="banner__phase">{state.phase}</span>
+          </div>
         </div>
-        {!gameOver && active && (
-          <div className="board__turn">
-            Turn: <strong>{active.name}</strong>
+        {!gameOver && bottom && (
+          <div className="banner__turn">
+            Turn: <strong>{bottom.name}</strong>
           </div>
         )}
         {gameOver && (
-          <div className="board__gameover">
+          <div className="banner__gameover">
             <strong>{winnerName} wins the game!</strong>
             <button className="btn btn--primary" onClick={onNewGame}>
               New game
@@ -350,47 +476,22 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
 
       <PreviewPane target={previewTarget} />
 
-      <main className="board__center">
-        {/* General "play field" drop zone (drag mode). Releasing here plays with
-            no specific target (immediate, or opens the flow at slot 0). */}
-        {!gameOver && pc.mode === 'drag' && (
-          <div
-            className={`playfield ${dragging ? 'is-armed' : ''} ${fieldOver ? 'is-over' : ''}`}
-            data-drop="field"
-          >
-            {dragging ? 'Release here to play (choose targets next)' : 'Drag a card here to play it'}
-          </div>
+      <main className="table__center">
+        {top && <Seat player={top} state={state} ctx={ctx} variant="opponent" />}
+
+        <PlayField state={state} dragging={dragging} fieldOver={fieldOver} gameOver={gameOver} setPreview={setPreview} />
+
+        {bottom && (
+          <>
+            <Seat player={bottom} state={state} ctx={ctx} variant="active" />
+            <div className="hand-dock">
+              <HandRow player={bottom} state={state} ctx={ctx} variant="active" />
+            </div>
+          </>
         )}
-
-        <div className="board__players">
-          {state.players.map((p) => (
-            <PlayerPanel key={p.id} player={p} state={state} ctx={ctx} />
-          ))}
-        </div>
-
-        <div className="panel shared">
-          <h3>Shared</h3>
-          <div className="shared__row">
-            <span className="chip">Deck: {state.deck.length}</span>
-            <span className="chip">Discard: {state.discard.length}</span>
-          </div>
-          <h4 className="shared__label">Discard pile</h4>
-          <div className="shared__discard">
-            {state.discard.length === 0 && <span className="muted">empty</span>}
-            {state.discard.map((n, i) => (
-              <span
-                key={`${n}-${i}`}
-                className="discard__item"
-                onPointerEnter={() => setPreview({ card: db.get(n) })}
-              >
-                {db.get(n).name}
-              </span>
-            ))}
-          </div>
-        </div>
       </main>
 
-      <aside className="board__log">
+      <aside className="table__log">
         <ActivityLog log={state.log} />
       </aside>
 

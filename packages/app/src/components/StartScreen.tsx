@@ -3,6 +3,7 @@ import type { CardData, Color } from '@mood-swings/engine';
 import { randomBoxDeck, validateCustomDeck, minDeckSize } from '@mood-swings/engine';
 import { db } from '../game/db.js';
 import { Card } from './Card.js';
+import { Starburst } from './Starburst.js';
 
 export interface StartConfig {
   players: { id: string; name: string }[];
@@ -79,6 +80,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
   return (
     <div className="start">
       <header className="start__header">
+        <Starburst className="start__burst" label="1st Ed." />
         <h1>Mood Swings</h1>
         <p className="start__tag">Hotseat — two players, one screen</p>
       </header>

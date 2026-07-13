@@ -30,14 +30,140 @@ interface CardProps {
   onFocus?: () => void;
   /** Large, non-interactive rendering for the preview pane. */
   large?: boolean;
+  /** Render the sketch card back instead of the face (hidden hands, deck). */
+  faceDown?: boolean;
+}
+
+type DieColor = 'white' | 'black';
+
+/** Pip coordinates on a 100x100 die face for values 0..6. */
+const PIP_LAYOUT: Record<number, Array<[number, number]>> = {
+  0: [],
+  1: [[50, 50]],
+  2: [[30, 30], [70, 70]],
+  3: [[30, 30], [50, 50], [70, 70]],
+  4: [[30, 30], [70, 30], [30, 70], [70, 70]],
+  5: [[30, 30], [70, 30], [50, 50], [30, 70], [70, 70]],
+  6: [[30, 30], [70, 30], [30, 50], [70, 50], [30, 70], [70, 70]],
+};
+
+/** A single sketch pip-die (values 0..6). White die = light face; black die = dark face. */
+export function Die({ value, dieColor, className }: { value: number; dieColor: DieColor; className?: string }) {
+  const pips = PIP_LAYOUT[Math.max(0, Math.min(6, value))] ?? [];
+  const isBlack = dieColor === 'black';
+  const face = isBlack ? 'var(--die-black-face)' : 'var(--die-white-face)';
+  const edge = isBlack ? 'var(--die-black-edge)' : 'var(--die-white-edge)';
+  const pipFill = isBlack ? 'var(--die-white-face)' : 'var(--die-black-pip)';
+  return (
+    <svg
+      className={`die die--${dieColor}${className ? ` ${className}` : ''}`}
+      viewBox="0 0 100 100"
+      role="img"
+      aria-label={`${dieColor} die showing ${value}`}
+    >
+      {/* Hand-drawn rounded square: a second faint offset stroke fakes a sketchy edge. */}
+      <rect x="8" y="8" width="84" height="84" rx="20" ry="20" fill={face} stroke={edge} strokeWidth="5" />
+      <rect x="8" y="8" width="84" height="84" rx="20" ry="20" fill="none" stroke={edge} strokeWidth="1.5" opacity="0.5" transform="rotate(0.7 50 50)" />
+      {pips.map(([cx, cy], i) => (
+        <circle key={i} cx={cx} cy={cy} r="9" fill={pipFill} />
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * Render a card value as one or two pip-dice. Printed values 7..12 show as two
+ * dice added together (a 6 plus the remainder), matching the physical cards.
+ */
+export function DiceValue({ value, dieColor, className }: { value: number; dieColor: DieColor; className?: string }) {
+  if (value > 6) {
+    return (
+      <span className={`dice${className ? ` ${className}` : ''}`}>
+        <Die value={6} dieColor={dieColor} />
+        <span className="dice__plus" aria-hidden>+</span>
+        <Die value={value - 6} dieColor={dieColor} />
+      </span>
+    );
+  }
+  return (
+    <span className={`dice${className ? ` ${className}` : ''}`}>
+      <Die value={value} dieColor={dieColor} />
+    </span>
+  );
+}
+
+/** The sketch card back: black frame, white centre, wordmark, colour-wave corners. */
+export function CardBack({ className }: { className?: string }) {
+  return (
+    <div className={`cardback${className ? ` ${className}` : ''}`} aria-hidden>
+      <svg className="cardback__waves" viewBox="0 0 120 168" preserveAspectRatio="none">
+        {/* Colour-wave corner accents (four of the five card colours). */}
+        <path d="M0 0 H48 Q30 20 46 40 Q26 54 40 78 L0 60 Z" fill="var(--c-blue)" opacity="0.9" />
+        <path d="M120 0 H72 Q92 22 76 44 Q98 58 82 82 L120 62 Z" fill="var(--c-red)" opacity="0.9" />
+        <path d="M0 168 H46 Q28 148 44 126 Q24 112 38 90 L0 108 Z" fill="var(--c-green)" opacity="0.9" />
+        <path d="M120 168 H74 Q94 146 78 124 Q100 110 84 88 L120 106 Z" fill="var(--c-white)" opacity="0.9" />
+      </svg>
+      <div className="cardback__center">
+        <span className="cardback__mark">Mood</span>
+        <span className="cardback__mark cardback__mark--alt">Swings</span>
+      </div>
+    </div>
+  );
+}
+
+/** The CSS/SVG fallback face — a recreation of the printed frame (no CDN art). */
+function FallbackFace({ card, headline, mood }: { card: CardData; headline: number; mood?: Mood }) {
+  const secondaryActive = mood?.usingSecondary ?? false;
+  return (
+    <>
+      <header className="card__head">
+        <span className="card__name">{card.name}</span>
+        <span className="card__die" title={`${card.dieColor} die`}>
+          <DiceValue value={headline} dieColor={card.dieColor} />
+        </span>
+      </header>
+
+      <div className="card__art card__art--placeholder" aria-hidden>
+        <svg className="card__doodle" viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
+          <path
+            d="M8 46 Q20 14 34 32 Q42 44 52 24 Q62 6 74 30 Q82 46 92 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+          <circle cx="26" cy="20" r="4" fill="currentColor" opacity="0.5" />
+          <circle cx="70" cy="44" r="3" fill="currentColor" opacity="0.4" />
+        </svg>
+        <span className="card__monogram">{card.name.charAt(0)}</span>
+      </div>
+
+      {card.rulesText ? (
+        <p className="card__rules">{card.rulesText}</p>
+      ) : (
+        <p className="card__rules card__rules--vanilla">—</p>
+      )}
+
+      <footer className="card__foot">
+        <span className="card__rarity">{card.rarity}</span>
+        <span className="card__meta">
+          {card.secondaryValue && (
+            <span className={`card__secondary ${secondaryActive ? 'is-active' : ''}`} title="secondary value">
+              <span className="card__secondary-lbl">alt</span>
+              <Die value={Math.min(6, card.secondaryValue.value)} dieColor={card.secondaryValue.dieColor} className="die--mini" />
+            </span>
+          )}
+          {mood && mood.suppressed !== 'none' && <span className="card__flag">suppressed</span>}
+          {secondaryActive && <span className="card__flag">flipped</span>}
+        </span>
+      </footer>
+    </>
+  );
 }
 
 function dieLabel(v: number): string {
-  // Values 7–12 are printed as two dice added together.
   if (v <= 6) return String(v);
-  const a = 6;
-  const b = v - 6;
-  return `${a}+${b}`;
+  return `6+${v - 6}`;
 }
 
 export function Card({
@@ -57,15 +183,19 @@ export function Card({
   onPointerEnter,
   onFocus,
   large,
+  faceDown,
 }: CardProps) {
   const { src, onError } = useCardImage(card);
   const headline = value ?? card.value;
   const suppressed = mood && mood.suppressed !== 'none';
   const secondaryActive = mood?.usingSecondary ?? false;
+  const hasArt = showArt && !!src && !faceDown;
 
   const classes = [
     'card',
     `card--${card.color}`,
+    hasArt ? 'card--art' : 'card--frame',
+    faceDown ? 'card--back' : '',
     compact ? 'card--compact' : '',
     large ? 'card--large' : '',
     selected ? 'card--selected' : '',
@@ -97,37 +227,21 @@ export function Card({
 
   return (
     <button type="button" className={classes} onClick={onClick} disabled={disabled} {...interactionProps}>
-      <header className="card__head">
-        <span className="card__name">{card.name}</span>
-        <span className={`card__value card__value--${card.dieColor}`} title={`${card.dieColor} die`}>
-          {dieLabel(headline)}
-        </span>
-      </header>
-
-      {showArt && src ? (
-        <div className="card__art">
-          <img src={src} alt="" loading="lazy" onError={onError} />
+      {faceDown ? (
+        <CardBack />
+      ) : hasArt ? (
+        <div className="card__photo">
+          <img src={src!} alt={card.name} loading="lazy" onError={onError} />
+          {/* A pip-die overlay keeps the value legible even over the official art. */}
+          <span className="card__die card__die--overlay" title={`${card.dieColor} die`}>
+            <DiceValue value={headline} dieColor={card.dieColor} />
+          </span>
+          {suppressed && <span className="card__art-flag">suppressed</span>}
+          {secondaryActive && <span className="card__art-flag card__art-flag--alt">flipped</span>}
         </div>
       ) : (
-        <div className="card__art card__art--placeholder" aria-hidden>
-          {card.name.charAt(0)}
-        </div>
+        <FallbackFace card={card} headline={headline} mood={mood} />
       )}
-
-      {card.rulesText ? <p className="card__rules">{card.rulesText}</p> : <p className="card__rules card__rules--vanilla">—</p>}
-
-      <footer className="card__foot">
-        <span className="card__rarity">{card.rarity}</span>
-        <span className="card__meta">
-          {card.secondaryValue && (
-            <span className={`card__secondary ${secondaryActive ? 'is-active' : ''}`} title="secondary value">
-              alt {dieLabel(card.secondaryValue.value)}
-            </span>
-          )}
-          {suppressed && <span className="card__flag">suppressed</span>}
-          {secondaryActive && <span className="card__flag">flipped</span>}
-        </span>
-      </footer>
     </button>
   );
 }
