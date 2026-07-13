@@ -1,5 +1,5 @@
 import type { CardData, Mood } from '@mood-swings/engine';
-import { Card } from './Card.js';
+import { Card, DiceValue } from './Card.js';
 
 export interface PreviewTarget {
   card: CardData;
@@ -8,19 +8,17 @@ export interface PreviewTarget {
   value?: number;
 }
 
-function dieLabel(v: number): string {
-  if (v <= 6) return String(v);
-  return `6+${v - 6}`;
-}
-
 /**
- * Fixed left-hand preview zone. Shows whatever card is currently hovered,
- * focused, selected, or being dragged — large, with its full printed text.
- * Keyboard-focusable so the pane itself is reachable for accessibility.
+ * Fixed left-hand preview zone, styled as a taped index card / notebook page.
+ * Shows whatever card is currently hovered, focused, selected, or being dragged
+ * — large, with its full printed text. Keyboard-focusable so the pane itself is
+ * reachable for accessibility.
  */
 export function PreviewPane({ target }: { target: PreviewTarget | null }) {
   return (
     <aside className="preview" tabIndex={0} aria-label="Card preview">
+      <span className="preview__tape preview__tape--l" aria-hidden />
+      <span className="preview__tape preview__tape--r" aria-hidden />
       <h3 className="preview__label">Preview</h3>
       {target ? (
         <div className="preview__body">
@@ -32,15 +30,16 @@ export function PreviewPane({ target }: { target: PreviewTarget | null }) {
             </div>
             <div>
               <dt>Value</dt>
-              <dd>
-                {dieLabel(target.card.value)} <span className="muted">({target.card.dieColor} die)</span>
+              <dd className="preview__diceline">
+                <DiceValue value={target.card.value} dieColor={target.card.dieColor} className="dice--mini" />
+                <span className="muted">({target.card.dieColor} die)</span>
               </dd>
             </div>
             {target.card.secondaryValue && (
               <div>
                 <dt>Secondary</dt>
-                <dd>
-                  {dieLabel(target.card.secondaryValue.value)}{' '}
+                <dd className="preview__diceline">
+                  <DiceValue value={target.card.secondaryValue.value} dieColor={target.card.secondaryValue.dieColor} className="dice--mini" />
                   <span className="muted">({target.card.secondaryValue.dieColor} die)</span>
                 </dd>
               </div>

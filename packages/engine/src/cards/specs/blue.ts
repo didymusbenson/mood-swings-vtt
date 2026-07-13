@@ -3,9 +3,6 @@
 // auto/intrinsic-value cards (#27, #30, #37, #39, #44, #45, #47) play immediately.
 // Slots mirror exactly the choices fields each effect in ../blue.ts consumes.
 //
-// NOTE: #32 Creativity reads ctx.choices.option as an arbitrary card number to
-// copy — "any card" is not expressible with the fixed slot kinds (mood/player/
-// handCard/color/number/choice), so it gets no spec (see report).
 import { registerSpec } from '../choice-spec.js';
 
 // #28 Anxiety — up to two players each return one of their odd-value moods.
@@ -31,6 +28,13 @@ registerSpec(31, {
     { key: 'option', kind: 'choice', min: 1, max: 1, options: ['left', 'right'], label: 'Pass cards left or right' },
     { key: 'cards', kind: 'handCard', min: 0, max: 1, label: 'Choose which card to pass', optional: true },
   ],
+});
+
+// #32 Creativity — may play as a copy of any mood in play (choices.moods[0] = the
+// copied mood). Further moods[1..] feed the copied card's own targets, so max is
+// generous. Optional: declining leaves a plain [0] blue mood.
+registerSpec(32, {
+  slots: [{ key: 'moods', kind: 'mood', min: 0, max: 3, mood: { from: 'any' }, label: 'Copy a mood (optional)', optional: true }],
 });
 
 // #33 Curiosity — may choose a player to reveal a random hand card.

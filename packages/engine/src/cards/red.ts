@@ -46,7 +46,7 @@ registerEffects(82, {
   afterPlaying: (ctx) => {
     const m = byUid(ctx, ctx.choices.moods?.[0]);
     if (!m || m.owner === ctx.me) return; // must be an opponent's mood
-    const col = ctx.card(m).color;
+    const col = ctx.colorOf(m);
     if (col !== 'white' && col !== 'blue') return;
     ctx.steal(m, ctx.me);
     ctx.self.data.tookUid = m.uid;
@@ -188,7 +188,7 @@ registerEffects(94, {
     const uids = ctx.choices.moods ?? [];
     const sac = byUid(ctx, uids[0]);
     if (!sac || sac.owner !== ctx.me) return;
-    const col = ctx.card(sac).color;
+    const col = ctx.colorOf(sac);
     if (col !== 'black' && col !== 'green') return;
     ctx.discardMoodToPile(sac);
     for (const uid of uids.slice(1, 3)) {

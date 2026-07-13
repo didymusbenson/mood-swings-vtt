@@ -20,7 +20,15 @@ export interface ReadContext {
   moodsOf(player: PlayerId): Mood[];
   /** Players other than the given one. */
   opponentsOf(player: PlayerId): PlayerId[];
-  /** Count of moods in play of a given colour (suppressed cards still count). */
+  /**
+   * A mood's current in-play colour, honouring an active colour override
+   * (Imagination #42). Use this for any "shares a colour / colour in play"
+   * check on a mood in play. For the printed/identity colour of a card (in hand,
+   * in the discard pile, or a card number), read `card(mood).color` /
+   * `cardData(n).color` instead — those zones are not recoloured.
+   */
+  colorOf(mood: Mood): Color;
+  /** Count of moods in play of a given colour (honours overrides; suppressed cards still count). */
   countColor(color: Color): number;
   /** Colour(s) with the most moods in play (ties → all of them). */
   mostCommonColors(): Color[];
@@ -58,6 +66,11 @@ export interface MutationApi {
   rotateToSecondary(mood: Mood, on?: boolean): void;
   /** Grant N unconditional extra plays this turn (the player may decline). */
   grantAdditionalMood(n?: number): void;
+  /**
+   * Grant N extra plays this turn that must be played FROM THE DISCARD PILE
+   * (Angst, Grief, Harmony, Grace). Consumed by a `{ from: 'discard' }` play.
+   */
+  grantDiscardMood(n?: number): void;
   /** Grant an extra play this turn, usable only on a card matching the constraint. */
   grantConditionalMood(constraint: PlayConstraint): void;
   /** Deterministic random integer in [0, maxExclusive) (advances the game seed). */
@@ -113,6 +126,24 @@ export interface CardEffects {
   intrinsicValue?(ctx: ValueContext): number;
   /** Modifiers this mood imposes on moods in play while it's in play. */
   whileInPlay?(ctx: ValueContext): ValueModifier[];
+
+  /**
+   * While in play, forces EVERY mood (including this one) to a single colour
+   * (Imagination #42: "All moods are the chosen colour and no other colours").
+   * Returns the forced colour, or null for no override. If several moods return a
+   * colour, the most recently played one wins (a later Imagination overrides an
+   * earlier one). Recomputed continuously, so moods played after it are recoloured
+   * too and everything reverts when the source leaves play.
+   */
+  colorOverride?(ctx: ReadContext): Color | null;
+
+  /**
+   * While in play, lets its controller play moods from the discard pile using a
+   * normal play (Melancholy #69: "you may play moods from the discard pile as
+   * though they were in your hand"). Unlike `grantDiscardMood`, this grants no
+   * extra play — it only permits `{ from: 'discard' }` to consume a normal play.
+   */
+  permitsPlayFromDiscard?(ctx: ReadContext): boolean;
 }
 
 export const NO_EFFECTS: CardEffects = {};

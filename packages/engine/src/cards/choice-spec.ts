@@ -103,7 +103,8 @@ export function legalTargets(
         if (f.minValue != null && m.currentValue < f.minValue) return false;
         if (f.maxValue != null && m.currentValue > f.maxValue) return false;
         const data = card(resolveCardNumber(m));
-        if (f.colorIn && !f.colorIn.includes(data.color)) return false;
+        // Honour an active colour override (Imagination) for in-play colour filters.
+        if (f.colorIn && !f.colorIn.includes(m.colorOverride ?? data.color)) return false;
         if (f.hasSecondary && !data.secondaryValue) return false;
         return true;
       });

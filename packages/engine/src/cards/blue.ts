@@ -101,22 +101,48 @@ registerEffects(31, {
   },
 });
 
-// #32 Creativity — [0]; may play as a copy of any mood (choices.option = card number).
-// copyOf makes value/colour/identity resolve through the copied card, and we fire the
-// copied card's "after playing" effect. LIMITATION: the copied card's "To play this card"
-// cost (canPlay/payCost) is NOT paid, and the copy-before-cost ordering is unsupported
-// (the engine resolves this play's hooks from card #32). See report.
+// #32 Creativity — [0]; "You may play this card as a copy of any mood." The copy
+// target is a mood in play named via choices.moods[0]; the copy adopts its base
+// printed card (dice, colour, abilities) by resolving `copyOf` to that card's
+// number (copying a Creativity copies what *it* copies — resolveCardNumber chases
+// the chain). Because copyOf is set in canPlay (before the mood enters play), the
+// copied card's value/colour are live from the first stabilisation, and its
+// "To play this card" cost is honoured: Creativity delegates canPlay/payCost/
+// afterPlaying to the copied card. The copied card's own mood targets come from
+// choices.moods[1..] (index 0 is the copy target), while cards/players/colors/
+// option pass straight through. RESIDUAL: cards whose cost/effect needs a second
+// distinct mood-target list can't be disambiguated (rare); see report.
+const copyTarget = (ctx: PlayContext): number | undefined => {
+  const uid = ctx.choices.moods?.[0];
+  if (uid == null) return undefined; // "may": decline the copy → plain [0] blue
+  const target = ctx.allMoods().find((m) => m.uid === uid && m.uid !== ctx.self.uid);
+  return target ? resolveCardNumber(target) : undefined;
+};
+// Context for the copied card's own hooks: drop the copy-target uid so the copied
+// effect reads its targets from the remaining moods.
+const copiedCtx = (ctx: PlayContext): PlayContext => ({
+  ...ctx,
+  choices: { ...ctx.choices, moods: (ctx.choices.moods ?? []).slice(1) },
+});
 registerEffects(32, {
-  afterPlaying: (ctx) => {
-    const n = ctx.choices.option;
-    if (typeof n !== 'number') return; // "may": decline when no card is named
-    try {
-      ctx.cardData(n);
-    } catch {
-      return; // unknown card number
-    }
+  canPlay: (ctx) => {
+    const n = copyTarget(ctx);
+    if (n == null) return true;
+    ctx.self.copyOf = n; // adopt identity before any cost/value resolves
+    const eff = effectsFor(n);
+    return eff.canPlay ? eff.canPlay(copiedCtx(ctx)) : true;
+  },
+  payCost: (ctx) => {
+    const n = copyTarget(ctx);
+    if (n == null) return;
     ctx.self.copyOf = n;
-    effectsFor(n).afterPlaying?.({ ...ctx, self: ctx.self });
+    effectsFor(n).payCost?.(copiedCtx(ctx));
+  },
+  afterPlaying: (ctx) => {
+    const n = copyTarget(ctx);
+    if (n == null) return;
+    ctx.self.copyOf = n;
+    effectsFor(n).afterPlaying?.(copiedCtx(ctx));
   },
 });
 
@@ -130,8 +156,10 @@ registerEffects(33, {
     const hand = ctx.state.hands[pid] ?? [];
     if (hand.length === 0) return;
     const revealed = hand[ctx.random(hand.length)]!;
+    // The revealed card is in hand → printed colour (Imagination doesn't touch hands).
+    // The moods in play use their in-play colour (colorOf) so Imagination is honoured.
     const col = ctx.cardData(revealed).color;
-    if (ctx.allMoods().some((m) => ctx.card(m).color === col)) ctx.self.data.boost = true;
+    if (ctx.allMoods().some((m) => ctx.colorOf(m) === col)) ctx.self.data.boost = true;
   },
 });
 
@@ -143,7 +171,7 @@ registerEffects(34, {
     const a = byUid(ctx, uids[0]);
     const b = byUid(ctx, uids[1]);
     if (!a || !b || a.uid === b.uid || a.uid === ctx.self.uid || b.uid === ctx.self.uid) return;
-    const sameColor = ctx.card(a).color === ctx.card(b).color;
+    const sameColor = ctx.colorOf(a) === ctx.colorOf(b);
     const sameValue = ctx.valueOf(a) === ctx.valueOf(b);
     if (sameColor || sameValue) {
       ctx.returnMoodToHand(a);
@@ -208,7 +236,7 @@ registerEffects(39, {
   afterPlaying: (ctx) => {
     const colors = ctx.mostCommonColors();
     for (const m of [...ctx.allMoods()]) {
-      if (m.uid !== ctx.self.uid && colors.includes(ctx.card(m).color)) ctx.returnMoodToHand(m);
+      if (m.uid !== ctx.self.uid && colors.includes(ctx.colorOf(m))) ctx.returnMoodToHand(m);
     }
   },
 });
@@ -241,7 +269,7 @@ registerEffects(40, {
 // #41 Hesitation — [2]; may choose one: return a red/green mood, or all red/green moods.
 registerEffects(41, {
   afterPlaying: (ctx) => {
-    const isRG = (m: Mood) => ['red', 'green'].includes(ctx.card(m).color);
+    const isRG = (m: Mood) => ['red', 'green'].includes(ctx.colorOf(m));
     if (ctx.choices.option === 'all') {
       for (const m of [...ctx.allMoods()]) if (isRG(m)) ctx.returnMoodToHand(m);
     } else {
@@ -251,18 +279,18 @@ registerEffects(41, {
   },
 });
 
-// #42 Imagination — [3]; choose a colour; while in play all moods are that colour.
-// LIMITATION: no colour-override primitive — the engine derives colour from card data,
-// so the global recolour cannot be applied (it would affect countColor / mostCommonColors
-// / every colour check). We record the choice and log it. See report.
+// #42 Imagination — [3]; "After playing this mood — Choose a colour. While in play —
+// All moods are the chosen colour and no other colours." Continuous: the engine's
+// colour-override pass reads `colorOverride` every stabilisation, so all moods
+// (including this one, and any played later) become the chosen colour and revert
+// when Imagination leaves. A later Imagination overrides an earlier one (the pass
+// keeps the most recently played source). The chosen colour is stored on the mood.
 registerEffects(42, {
   afterPlaying: (ctx) => {
     const col = (ctx.choices.colors as Color[] | undefined)?.[0] ?? (ctx.choices.option as Color | undefined);
-    if (col) {
-      ctx.self.data.imaginedColor = col;
-      ctx.log(`Imagination: all moods should become ${col} (recolour not enforced by engine)`);
-    }
+    if (col) ctx.self.data.imaginedColor = col;
   },
+  colorOverride: (ctx) => (ctx.self.data.imaginedColor as Color | undefined) ?? null,
 });
 
 // #43 Indecisiveness — [3]; any number of opponents with 2+ moods each return a random one.
@@ -393,7 +421,7 @@ registerEffects(52, {
   afterPlaying: (ctx) => {
     const uids = ctx.choices.moods ?? [];
     const cost = byUid(ctx, uids[0]);
-    if (!cost || cost.owner !== ctx.me || !['white', 'black'].includes(ctx.card(cost).color)) return;
+    if (!cost || cost.owner !== ctx.me || !['white', 'black'].includes(ctx.colorOf(cost))) return;
     ctx.returnMoodToHand(cost);
     let placed = 0;
     for (const uid of uids.slice(1)) {
