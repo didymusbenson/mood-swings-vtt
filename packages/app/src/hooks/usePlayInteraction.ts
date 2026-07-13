@@ -94,16 +94,24 @@ export interface PlayController {
   handCardSelected: (card: number) => boolean;
   onHandCardClick: (card: number) => void;
 
-  // ----- Drag & drop -----
+  // ----- Drag & drop (pointer-driven; see useHandDrag) -----
   dragCard: number | null;
+  /** Arm drag affordances (highlight legal targets, dim the rest). */
   beginDrag: (card: number) => void;
+  /** Clear the drag with no play (snap back). */
   endDrag: () => void;
-  dropOnField: () => void;
-  dropOnMood: (uid: string) => void;
-  dropOnPlayer: (pid: string) => void;
-  /** While dragging: is this board object a legal drop for the dragged card? */
+  /** Play with no specific target: immediate, or open the flow at slot 0. */
+  playToField: (card: number) => void;
+  /** Play onto a specific mood (single-target immediate, else flow pre-selected). */
+  playToMood: (card: number, uid: string) => void;
+  /** Play onto a specific player panel. */
+  playToPlayer: (card: number, pid: string) => void;
+  /** While dragging: is this board object a legal drop for the *current* drag? */
   dragLegalMood: (uid: string) => boolean;
   dragLegalPlayer: (pid: string) => boolean;
+  /** Card-explicit legality (independent of async dragCard state). */
+  canDropMood: (card: number, uid: string) => boolean;
+  canDropPlayer: (card: number, pid: string) => boolean;
 }
 
 function countForSlot(slot: ChoiceSlot, sel: Selections): number {
@@ -322,17 +330,18 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
   );
   const endDrag = useCallback(() => setDragCard(null), []);
 
-  const dropOnField = useCallback(() => {
-    if (dragCard == null) return;
-    const card = dragCard;
-    setDragCard(null);
-    beginPlay(card); // no specific target → immediate or open flow at slot 0
-  }, [dragCard, beginPlay]);
+  // Drop resolvers take the card explicitly (not the async `dragCard` state) so
+  // the pointer hook's captured closure resolves the drop even mid-render.
+  const playToField = useCallback(
+    (card: number) => {
+      setDragCard(null);
+      beginPlay(card); // no specific target → immediate or open flow at slot 0
+    },
+    [beginPlay],
+  );
 
-  const dropOnMood = useCallback(
-    (uid: string) => {
-      if (dragCard == null) return;
-      const card = dragCard;
+  const playToMood = useCallback(
+    (card: number, uid: string) => {
       setDragCard(null);
       if (!isLegalDrop(card, uid, 'mood', state, me, cardLookup)) return; // snap back
       const spec = specFor(card)!;
@@ -342,13 +351,11 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
         beginPlay(card, { key: 'moods', value: uid });
       }
     },
-    [dragCard, state, me, onAction, beginPlay],
+    [state, me, onAction, beginPlay],
   );
 
-  const dropOnPlayer = useCallback(
-    (pid: string) => {
-      if (dragCard == null) return;
-      const card = dragCard;
+  const playToPlayer = useCallback(
+    (card: number, pid: string) => {
       setDragCard(null);
       if (!isLegalDrop(card, pid, 'player', state, me, cardLookup)) return; // snap back
       const spec = specFor(card)!;
@@ -358,7 +365,16 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
         beginPlay(card, { key: 'players', value: pid });
       }
     },
-    [dragCard, state, me, onAction, beginPlay],
+    [state, me, onAction, beginPlay],
+  );
+
+  const canDropMood = useCallback(
+    (card: number, uid: string) => dragLegalMoodImpl(card, uid, state, me),
+    [state, me],
+  );
+  const canDropPlayer = useCallback(
+    (card: number, pid: string) => dragLegalPlayerImpl(card, pid, state, me),
+    [state, me],
   );
 
   const dragLegalMood = useCallback(
@@ -408,11 +424,13 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
     dragCard,
     beginDrag,
     endDrag,
-    dropOnField,
-    dropOnMood,
-    dropOnPlayer,
+    playToField,
+    playToMood,
+    playToPlayer,
     dragLegalMood,
     dragLegalPlayer,
+    canDropMood,
+    canDropPlayer,
   };
 }
 

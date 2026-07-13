@@ -1,14 +1,27 @@
+import { useMemo, useState } from 'react';
 import type React from 'react';
 import type { Action, GameState, Mood, PlayerState } from '@mood-swings/engine';
 import { ROUNDS_TO_WIN } from '@mood-swings/engine';
 import { db } from '../game/db.js';
 import { Card } from './Card.js';
+import { PreviewPane, type PreviewTarget } from './PreviewPane.js';
+import { ActivityLog } from './ActivityLog.js';
 import { usePlayInteraction, type PlayController } from '../hooks/usePlayInteraction.js';
+import { useHandOrder } from '../hooks/useHandOrder.js';
+import { useHandDrag, type HandDragApi } from '../hooks/useHandDrag.js';
 
 interface GameBoardProps {
   state: GameState;
   onAction: (action: Action) => void;
   onNewGame: () => void;
+}
+
+/** Everything a PlayerPanel needs beyond the raw player/state. */
+interface PanelCtx {
+  pc: PlayController;
+  handDrag: HandDragApi;
+  orderedHand: (pid: string) => number[];
+  setPreview: (t: PreviewTarget | null) => void;
 }
 
 function liveScore(state: GameState, pid: string): number {
@@ -27,29 +40,25 @@ function RoundPips({ won }: { won: number }) {
   );
 }
 
-/** Suppress default so a drop is allowed on this element. */
-function allowDrop(e: React.DragEvent) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-}
-
-function PlayerPanel({
-  player,
-  state,
-  pc,
-}: {
-  player: PlayerState;
-  state: GameState;
-  pc: PlayController;
-}) {
+function PlayerPanel({ player, state, ctx }: { player: PlayerState; state: GameState; ctx: PanelCtx }) {
+  const { pc, handDrag, orderedHand, setPreview } = ctx;
   const pid = player.id;
   const isActive = state.activePlayer === pid && state.phase === 'awaitingPlay';
+  const isMe = isActive && pid === pc.me;
   const moods: Mood[] = state.moods[pid] ?? [];
-  const hand = state.hands[pid] ?? [];
+  const order = orderedHand(pid);
 
   const dragging = pc.dragCard != null;
   const playerIsLegal = pc.playerHighlighted(pid);
   const playerIsSelected = pc.playerSelected(pid);
+
+  // Active drag pop-out state (only for the dragging player's own hand).
+  const drag = handDrag.drag;
+  const draggingHere = !!(drag?.active && isMe);
+  const draggingFrom = draggingHere ? drag!.fromIndex : null;
+  const insertion = draggingHere && drag!.over.kind === 'hand' ? drag!.over.index : null;
+
+  const canDragHand = isMe && pc.mode === 'drag' && pc.flow == null;
 
   const panelClasses = [
     'player',
@@ -61,13 +70,44 @@ function PlayerPanel({
     .filter(Boolean)
     .join(' ');
 
+  const handChildren: React.ReactNode[] = [];
+  order.forEach((card, idx) => {
+    if (insertion === idx) {
+      handChildren.push(<span key={`ins-${idx}`} className="hand__insert" aria-hidden />);
+    }
+    if (idx === draggingFrom) {
+      handChildren.push(<div key={`ph-${idx}`} className="hand__slot hand__placeholder" data-hand-index={idx} aria-hidden />);
+      return;
+    }
+    const flowHandSlot = pc.flow != null && pc.currentSlot?.kind === 'handCard';
+    const targetLegal = flowHandSlot && pc.handCardHighlighted(card);
+    const interactive = isActive && (pc.flow == null ? true : flowHandSlot && targetLegal);
+    // Click selects only in manual mode or when picking a hand-card flow target;
+    // in drag mode the gesture is the drag itself.
+    const clickable = interactive && (pc.flow != null || pc.mode === 'manual');
+    handChildren.push(
+      <div key={`${card}-${idx}`} className="hand__slot" data-hand-index={idx}>
+        <Card
+          card={db.get(card)}
+          disabled={!interactive}
+          selected={isActive && pc.isSelected(card)}
+          highlighted={!!targetLegal}
+          targetSelected={flowHandSlot && pc.handCardSelected(card)}
+          pointerDraggable={canDragHand}
+          onPointerDown={canDragHand ? (e) => handDrag.onCardPointerDown(e, card, idx) : undefined}
+          onPointerEnter={() => setPreview({ card: db.get(card) })}
+          onFocus={() => setPreview({ card: db.get(card) })}
+          onClick={clickable ? () => pc.onHandCardClick(card) : undefined}
+        />
+      </div>,
+    );
+  });
+  if (insertion === order.length) {
+    handChildren.push(<span key="ins-end" className="hand__insert" aria-hidden />);
+  }
+
   return (
-    <section
-      className={panelClasses}
-      onDragOver={dragging ? allowDrop : undefined}
-      onDrop={dragging ? () => pc.dropOnPlayer(pid) : undefined}
-      onClick={playerIsLegal ? () => pc.onPlayerClick(pid) : undefined}
-    >
+    <section className={panelClasses} data-drop="player" data-player-id={pid}>
       <header className="player__head">
         <div className="player__id">
           <h2>{player.name}</h2>
@@ -88,19 +128,7 @@ function PlayerPanel({
             const legal = pc.moodHighlighted(m.uid);
             const clickable = legal && pc.dragCard == null; // clicking picks a flow target
             return (
-              <div
-                key={m.uid}
-                className="mood-drop"
-                onDragOver={dragging ? allowDrop : undefined}
-                onDrop={
-                  dragging
-                    ? (e) => {
-                        e.stopPropagation();
-                        pc.dropOnMood(m.uid);
-                      }
-                    : undefined
-                }
-              >
+              <div key={m.uid} className="mood-drop" data-drop="mood" data-mood-uid={m.uid}>
                 <Card
                   card={db.get(m.card)}
                   mood={m}
@@ -108,6 +136,8 @@ function PlayerPanel({
                   highlighted={legal}
                   targetSelected={pc.moodSelected(m.uid)}
                   dimmed={dragging && !legal}
+                  onPointerEnter={() => setPreview({ card: db.get(m.card), mood: m, value: m.currentValue })}
+                  onFocus={() => setPreview({ card: db.get(m.card), mood: m, value: m.currentValue })}
                   onClick={clickable ? () => pc.onMoodClick(m.uid) : undefined}
                 />
               </div>
@@ -118,7 +148,7 @@ function PlayerPanel({
 
       <div className="zone">
         <h3 className="zone__label">
-          Hand ({hand.length})
+          Hand ({order.length})
           {isActive && !pc.flow && (
             <button className="btn btn--pass" onClick={() => pc.onPass()}>
               Pass
@@ -128,31 +158,13 @@ function PlayerPanel({
 
         {isActive && <ActiveHandControls pc={pc} state={state} />}
 
-        <div className="zone__cards">
-          {hand.length === 0 && <p className="muted">Empty hand.</p>}
-          {hand.map((card, idx) => {
-            const flowHandSlot = pc.flow != null && pc.currentSlot?.kind === 'handCard';
-            const targetLegal = flowHandSlot && pc.handCardHighlighted(card);
-            const interactive =
-              isActive &&
-              (pc.flow == null
-                ? true
-                : flowHandSlot && targetLegal); // during other slots, hand is inert
-            return (
-              <Card
-                key={`${card}-${idx}`}
-                card={db.get(card)}
-                disabled={!interactive}
-                selected={isActive && pc.isSelected(card)}
-                highlighted={!!targetLegal}
-                targetSelected={flowHandSlot && pc.handCardSelected(card)}
-                draggable={isActive && pc.mode === 'drag' && pc.flow == null}
-                onDragStart={() => pc.beginDrag(card)}
-                onDragEnd={() => pc.endDrag()}
-                onClick={interactive ? () => pc.onHandCardClick(card) : undefined}
-              />
-            );
-          })}
+        <div
+          className={`zone__cards hand__cards ${draggingHere ? 'is-dragging' : ''}`}
+          data-drop={isMe && pc.flow == null ? 'hand' : undefined}
+          data-hand-owner={pid}
+        >
+          {order.length === 0 && <p className="muted">Empty hand.</p>}
+          {handChildren}
         </div>
       </div>
     </section>
@@ -185,7 +197,9 @@ function ActiveHandControls({ pc, state }: { pc: PlayController; state: GameStat
         </span>
       ) : (
         <span className="handbar__hint muted">
-          {pc.mode === 'manual' ? 'Click a card to select it, then press Play.' : 'Drag a card to the field or a target to play it.'}
+          {pc.mode === 'manual'
+            ? 'Click a card to select it, then press Play.'
+            : 'Drag a card to the field or a target to play it — or drag within your hand to reorder.'}
         </span>
       )}
     </div>
@@ -213,8 +227,6 @@ function TargetingBar({ pc }: { pc: PlayController }) {
         )}
       </div>
 
-      {/* In-panel controls for non-board slots. Board slots (mood/player/handCard)
-          are chosen by clicking the highlighted objects on the board. */}
       {slot.kind === 'color' && (
         <div className="targetbar__opts">
           {(legal?.colors ?? []).map((c) => (
@@ -256,7 +268,9 @@ function TargetingBar({ pc }: { pc: PlayController }) {
         </div>
       )}
       {(slot.kind === 'mood' || slot.kind === 'player' || slot.kind === 'handCard') && (
-        <p className="targetbar__hint muted">Click the highlighted {slot.kind === 'handCard' ? 'hand card' : slot.kind} target(s) above.</p>
+        <p className="targetbar__hint muted">
+          Click the highlighted {slot.kind === 'handCard' ? 'hand card' : slot.kind} target(s) above.
+        </p>
       )}
 
       <div className="targetbar__actions">
@@ -276,12 +290,40 @@ function TargetingBar({ pc }: { pc: PlayController }) {
   );
 }
 
+/** The card that physically follows the pointer during a drag. */
+function DragGhost({ handDrag }: { handDrag: HandDragApi }) {
+  const drag = handDrag.drag;
+  if (!drag?.active) return null;
+  return (
+    <div
+      className={`drag-ghost ${handDrag.wouldPlay ? 'drag-ghost--armed' : ''}`}
+      style={{ left: drag.x, top: drag.y }}
+      aria-hidden
+    >
+      <Card card={db.get(drag.card)} />
+    </div>
+  );
+}
+
 export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
   const pc = usePlayInteraction(state, onAction);
+  const { orderedHand, reorder } = useHandOrder(state);
+  const handDrag = useHandDrag(pc, (from, to) => reorder(pc.me, from, to));
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
+
   const active = state.players.find((p) => p.id === state.activePlayer);
   const gameOver = state.phase === 'gameOver';
   const winnerName = state.players.find((p) => p.id === state.winner)?.name;
   const dragging = pc.dragCard != null;
+
+  // While dragging, the preview always shows the dragged card.
+  const previewTarget = useMemo<PreviewTarget | null>(
+    () => (handDrag.drag?.active ? { card: db.get(handDrag.drag.card) } : preview),
+    [handDrag.drag, preview],
+  );
+
+  const ctx: PanelCtx = { pc, handDrag, orderedHand, setPreview };
+  const fieldOver = handDrag.drag?.active && handDrag.drag.over.kind === 'field';
 
   return (
     <div className="board">
@@ -298,16 +340,10 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
         {!gameOver && (
           <div className="mode-toggle" role="group" aria-label="Play mode">
             <span className="mode-toggle__lbl">Play mode</span>
-            <button
-              className={`tab ${pc.mode === 'manual' ? 'is-active' : ''}`}
-              onClick={() => pc.setMode('manual')}
-            >
+            <button className={`tab ${pc.mode === 'manual' ? 'is-active' : ''}`} onClick={() => pc.setMode('manual')}>
               Click
             </button>
-            <button
-              className={`tab ${pc.mode === 'drag' ? 'is-active' : ''}`}
-              onClick={() => pc.setMode('drag')}
-            >
+            <button className={`tab ${pc.mode === 'drag' ? 'is-active' : ''}`} onClick={() => pc.setMode('drag')}>
               Drag
             </button>
           </div>
@@ -322,25 +358,26 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
         )}
       </header>
 
-      {/* General "play field" drop zone — visible in drag mode. Dropping here
-          plays with no specific target (immediate, or opens the flow at slot 0). */}
-      {!gameOver && pc.mode === 'drag' && (
-        <div
-          className={`playfield ${dragging ? 'is-armed' : ''}`}
-          onDragOver={dragging ? allowDrop : undefined}
-          onDrop={dragging ? () => pc.dropOnField() : undefined}
-        >
-          {dragging ? 'Drop here to play (choose targets next)' : 'Drag a card here to play it'}
+      <PreviewPane target={previewTarget} />
+
+      <main className="board__center">
+        {/* General "play field" drop zone (drag mode). Releasing here plays with
+            no specific target (immediate, or opens the flow at slot 0). */}
+        {!gameOver && pc.mode === 'drag' && (
+          <div
+            className={`playfield ${dragging ? 'is-armed' : ''} ${fieldOver ? 'is-over' : ''}`}
+            data-drop="field"
+          >
+            {dragging ? 'Release here to play (choose targets next)' : 'Drag a card here to play it'}
+          </div>
+        )}
+
+        <div className="board__players">
+          {state.players.map((p) => (
+            <PlayerPanel key={p.id} player={p} state={state} ctx={ctx} />
+          ))}
         </div>
-      )}
 
-      <div className="board__players">
-        {state.players.map((p) => (
-          <PlayerPanel key={p.id} player={p} state={state} pc={pc} />
-        ))}
-      </div>
-
-      <aside className="board__side">
         <div className="panel shared">
           <h3>Shared</h3>
           <div className="shared__row">
@@ -351,29 +388,24 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
           <div className="shared__discard">
             {state.discard.length === 0 && <span className="muted">empty</span>}
             {state.discard.map((n, i) => (
-              <span key={`${n}-${i}`} className="discard__item">
+              <span
+                key={`${n}-${i}`}
+                className="discard__item"
+                onPointerEnter={() => setPreview({ card: db.get(n) })}
+              >
                 {db.get(n).name}
               </span>
             ))}
           </div>
         </div>
+      </main>
 
-        <div className="panel log">
-          <h3>Activity log</h3>
-          <ol className="log__list">
-            {[...state.log]
-              .slice()
-              .reverse()
-              .map((entry, i) => (
-                <li key={state.log.length - i}>
-                  <span className="log__round">R{entry.round}</span> {entry.message}
-                </li>
-              ))}
-          </ol>
-        </div>
+      <aside className="board__log">
+        <ActivityLog log={state.log} />
       </aside>
 
       <TargetingBar pc={pc} />
+      <DragGhost handDrag={handDrag} />
     </div>
   );
 }
