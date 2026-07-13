@@ -44,15 +44,9 @@ registerSpec(120, {
   slots: [{ key: 'players', kind: 'player', min: 1, max: 1, players: 'opponents', label: 'Choose an opponent' }],
 });
 
-// #121 Grace — may play an additional colour-matching mood from the discard pile.
-registerSpec(121, {
-  slots: [{ key: 'cards', kind: 'handCard', min: 0, max: 1, label: 'Choose a discard card (optional)', optional: true }],
-});
-
-// #123 Harmony — may play an additional mood from the discard pile.
-registerSpec(123, {
-  slots: [{ key: 'cards', kind: 'handCard', min: 0, max: 1, label: 'Choose a discard card (optional)', optional: true }],
-});
+// #121 Grace / #123 Harmony — play with no targets; they grant a discard-play that
+// is surfaced as a separate { from: 'discard' } action (UI hookup out of scope), so
+// they need no play-time target spec.
 
 // #128 Nostalgia — may put a discard card into your hand, then play an additional mood.
 registerSpec(128, {

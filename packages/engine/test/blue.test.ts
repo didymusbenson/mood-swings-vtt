@@ -5,6 +5,7 @@ import { Engine } from '../src/engine.js';
 import { loadCardDB, type RawCard } from '../src/data.js';
 import type { CardDB } from '../src/cards/registry.js';
 import type { GameState } from '../src/types.js';
+import { colorOf } from '../src/queries.js';
 import '../src/cards/blue.js';
 
 const path = fileURLToPath(new URL('../../../data/cards.json', import.meta.url));
@@ -135,5 +136,52 @@ describe('blue cards', () => {
     expect(g.moods.p2!.length).toBe(0);
     expect(g.hands.p2!).toContain(83);
     expect(g.moods.p1!.some((m) => m.card === 48)).toBe(true); // Panic stays in play
+  });
+
+  it('#42 Imagination recolours all moods (counted by a colour-carer) and reverts when it leaves', () => {
+    // p1 hand: Ambivalence(27, blue), Imagination(42), Fear(38). p2 always passes.
+    const { e, s } = game(rig([27, 42, 38], [5]));
+    // r1: Ambivalence alone → [6] (no red/green moods).
+    let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 27 });
+    expect(g.moods.p1![0]!.currentValue).toBe(6);
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 (6) leads r2
+    // r2: Imagination names red → Ambivalence + Imagination both count as red → [3].
+    g = e.apply(g, { type: 'play', player: 'p1', card: 42, choices: { colors: ['red'] } });
+    expect(g.moods.p1!.find((m) => m.card === 27)!.currentValue).toBe(3);
+    expect(colorOf(g.moods.p1!.find((m) => m.card === 27)!, db)).toBe('red'); // in-play colour overridden
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 leads r3
+    // r3: Fear returns Imagination to hand → override clears → Ambivalence back to [6].
+    const imag = g.moods.p1!.find((m) => m.card === 42)!.uid;
+    g = e.apply(g, { type: 'play', player: 'p1', card: 38, choices: { moods: [imag] } });
+    expect(g.moods.p1!.some((m) => m.card === 42)).toBe(false); // Imagination left play
+    expect(g.moods.p1!.find((m) => m.card === 27)!.currentValue).toBe(6); // reverted
+    expect(colorOf(g.moods.p1!.find((m) => m.card === 27)!, db)).toBe('blue');
+  });
+
+  it('#32 Creativity copies a mood in play — value, colour, and identity adopted', () => {
+    // r1: p1 plays a red Boredom(83, [4]); r2: Creativity copies it.
+    const { e, s } = game(rig([83, 32], [5]));
+    let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 83 });
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 (4) leads r2
+    const target = g.moods.p1!.find((m) => m.card === 83)!.uid;
+    g = e.apply(g, { type: 'play', player: 'p1', card: 32, choices: { moods: [target] } });
+    const copy = g.moods.p1!.find((m) => m.card === 32)!;
+    expect(copy.copyOf).toBe(83); // identity adopted
+    expect(copy.currentValue).toBe(4); // Boredom's printed value, not Creativity's [0]
+    expect(colorOf(copy, db)).toBe('red'); // Boredom's colour
+  });
+
+  it('#32 Creativity copies a card\'s abilities (value responds to board like the original)', () => {
+    // Filler red Boredom(83) so red moods accumulate. Copy Ambivalence(27): [3] with 2 red/green.
+    const { e, s } = game(rig([27, 32], [83], 83));
+    let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 27 }); // Ambivalence [6]
+    g = e.apply(g, { type: 'play', player: 'p2', card: 83 }); // one red; r1 ends, p1 (6) leads
+    const amb = g.moods.p1!.find((m) => m.card === 27)!.uid;
+    g = e.apply(g, { type: 'play', player: 'p1', card: 32, choices: { moods: [amb] } }); // copy Ambivalence
+    // p2 plays a second red → two red moods → both Ambivalence-like cards drop to [3].
+    g = e.apply(g, { type: 'play', player: 'p2', card: 83 });
+    expect(g.moods.p1!.find((m) => m.card === 27)!.currentValue).toBe(3);
+    expect(g.moods.p1!.find((m) => m.card === 32)!.currentValue).toBe(3); // copy adopted the ability
+    expect(colorOf(g.moods.p1!.find((m) => m.card === 32)!, db)).toBe('blue'); // Ambivalence's colour
   });
 });

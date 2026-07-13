@@ -11,17 +11,16 @@
 // (Eagerness), (f) round-scoped discard tracking (Vulnerability), (g) an
 // extra-scoring hook (Bliss, Enthusiasm — approximated by adjusting roundScores
 // in afterScoring). Each is implemented best-effort below and called out.
-import type { CardEffects } from '../effects.js';
-import type { Color, Mood, PlayerId } from '../types.js';
+import type { Color, PlayerId } from '../types.js';
 import type { ReadContext } from '../effects.js';
 import { registerEffects } from './registry.js';
 
 const FIVE: Color[] = ['white', 'blue', 'black', 'red', 'green'];
 const ALL_COLORS: Color[] = ['white', 'blue', 'black', 'red', 'green', 'colorless'];
 
-/** Distinct colours among a player's moods (resolving copyOf). */
+/** Distinct in-play colours among a player's moods (honours Imagination via colorOf). */
 const distinctColors = (ctx: ReadContext, pid: PlayerId): number =>
-  new Set(ctx.moodsOf(pid).map((m) => ctx.card(m).color)).size;
+  new Set(ctx.moodsOf(pid).map((m) => ctx.colorOf(m))).size;
 
 // #107 Awe — "No scoring this round; you choose who goes first next round."
 // GAP: the engine always scores a round, picks a winner, and has losers draw;
@@ -58,7 +57,8 @@ registerEffects(108, {
     const col = ctx.self.data.blissColor as Color | undefined;
     if (!col) return;
     let extra = 0;
-    for (const m of ctx.moodsOf(ctx.me)) if (ctx.card(m).color === col) extra += 2 * m.currentValue;
+    // blissColor is the discarded card's printed colour; moods use in-play colour.
+    for (const m of ctx.moodsOf(ctx.me)) if (ctx.colorOf(m) === col) extra += 2 * m.currentValue;
     if (extra) ctx.state.roundScores[ctx.me] = (ctx.state.roundScores[ctx.me] ?? 0) + extra;
   },
 });
@@ -175,13 +175,15 @@ registerEffects(120, {
   },
 });
 
-// #121 Grace — [0]. Each of your turns you may play an additional mood FROM THE
-// DISCARD PILE if it shares a colour with one of your moods. GAP: the engine has
-// no "play from discard" primitive and no recurring per-turn grant. Best effort:
-// only on the turn Grace is played, stage a chosen colour-matching discard card
-// into hand and grant one extra play (so it can be played from hand).
+// #121 Grace — [0]. "While in play — During each of your turns you may play an
+// additional mood from the discard pile if it shares a colour with one of your
+// moods." Grants one discard-play (resolved via a { from: 'discard' } action).
+// RESIDUALS: (1) the per-turn recurrence needs a start-of-turn hook the engine
+// lacks, so this grants only on the turn Grace is played; (2) the colour-match
+// constraint isn't encodable on the plain discard-play counter, so it is not
+// enforced by the engine. See report.
 registerEffects(121, {
-  afterPlaying: (ctx) => stageDiscardPlay(ctx, true),
+  afterPlaying: (ctx) => ctx.grantDiscardMood(1),
 });
 
 // #122 Happiness — [2]/[6][2]=8 if a single player has both a red mood and a
@@ -189,18 +191,17 @@ registerEffects(121, {
 registerEffects(122, {
   intrinsicValue: (ctx) => {
     const has = ctx.state.players.some((p) => {
-      const cols = new Set(ctx.moodsOf(p.id).map((m) => ctx.card(m).color));
+      const cols = new Set(ctx.moodsOf(p.id).map((m) => ctx.colorOf(m)));
       return cols.has('red') && cols.has('white');
     });
     return has ? 8 : 2;
   },
 });
 
-// #123 Harmony — [2]. Play an additional mood this turn FROM THE DISCARD PILE.
-// GAP: no "play from discard" primitive. Best effort: stage a chosen discard card
-// into hand and grant one extra play.
+// #123 Harmony — [2]. "You may play an additional mood this turn FROM THE DISCARD
+// PILE." Grants one discard-play (resolved via a { from: 'discard' } action).
 registerEffects(123, {
-  afterPlaying: (ctx) => stageDiscardPlay(ctx, false),
+  afterPlaying: (ctx) => ctx.grantDiscardMood(1),
 });
 
 // #124 Hope — [0]. You may play an additional mood during each of your turns.
@@ -290,30 +291,3 @@ registerEffects(134, {
 
 // #135 Hurt Feelings — intentionally NOT encoded: it is the special 3+-player,
 // non-scoring helper (value null) and is out of scope for this file.
-
-// ---- shared best-effort helper ------------------------------------------
-
-/**
- * Best-effort "play an additional mood from the discard pile": stage a chosen
- * discard card into the acting player's hand and grant one extra play, so the
- * engine (which can only play from hand) can play it.
- * @param requireColorMatch when true (Grace), only stage a card whose colour is
- *   shared by one of the player's moods.
- */
-function stageDiscardPlay(
-  ctx: Parameters<NonNullable<CardEffects['afterPlaying']>>[0],
-  requireColorMatch: boolean,
-): void {
-  const c = ctx.choices.cards?.[0];
-  if (c == null) return; // "may" declined
-  const i = ctx.state.discard.indexOf(c);
-  if (i < 0) return;
-  if (requireColorMatch) {
-    const col = ctx.cardData(c).color;
-    const shares = ctx.moodsOf(ctx.me).some((m: Mood) => ctx.card(m).color === col);
-    if (!shares) return;
-  }
-  ctx.state.discard.splice(i, 1);
-  ctx.state.hands[ctx.me]!.push(c);
-  ctx.grantAdditionalMood(1);
-}

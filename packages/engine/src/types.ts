@@ -61,6 +61,13 @@ export interface Mood {
   suppressedBy: string | null;
   /** If this mood is copying another card, that card's number. */
   copyOf: CardNumber | null;
+  /**
+   * Overriding in-play colour (Imagination #42: "all moods are the chosen colour").
+   * Null/undefined means "use the printed colour". Recomputed by the engine's
+   * colour-override pass whenever the board changes, so it stays a derived cache
+   * (serialisable — survives structuredClone). Read via queries.colorOf / ctx.colorOf.
+   */
+  colorOverride?: Color | null;
   /** Filled by the value-stabilisation pass; read by scoring/queries. */
   currentValue: number;
   /** Per-instance scratch space for card effects. */
@@ -137,6 +144,11 @@ export interface GameState {
   activePlayer: PlayerId;
   /** Unconditional plays left in the active player's current turn (starts at 1). */
   playsRemaining: number;
+  /**
+   * Extra plays this turn that must be sourced from the discard pile (Angst #54,
+   * Grief #65, Harmony #123, Grace #121). Consumed by a `{ from: 'discard' }` play.
+   */
+  discardPlaysRemaining: number;
   /** Conditional extra plays granted this turn (each usable once, if it matches). */
   conditionalGrants: ConditionalGrant[];
   /** uids of moods the active player has played so far this turn. */

@@ -88,7 +88,7 @@ registerEffects(10, {
     const colors = (ctx.choices.colors as Color[] | undefined) ?? [];
     if (!colors.length) return;
     for (const m of [...ctx.allMoods()]) {
-      if (m.uid !== ctx.self.uid && colors.includes(ctx.card(m).color)) ctx.discardMoodToPile(m);
+      if (m.uid !== ctx.self.uid && colors.includes(ctx.colorOf(m))) ctx.discardMoodToPile(m);
     }
   },
 });
@@ -129,7 +129,7 @@ registerEffects(13, {
 // #14 Guilt — suppress one black/red mood, or all of them (sustained).
 registerEffects(14, {
   afterPlaying: (ctx) => {
-    const isBR = (m: Mood) => ['black', 'red'].includes(ctx.card(m).color);
+    const isBR = (m: Mood) => ['black', 'red'].includes(ctx.colorOf(m));
     if (ctx.choices.option === 'all') {
       for (const m of ctx.allMoods()) if (isBR(m)) ctx.suppress(m, 'sustained', true);
     } else {
@@ -220,10 +220,10 @@ registerEffects(24, {
     if (m) ctx.suppress(m, 'round', true);
   },
   onOtherMoodPlayed: (ctx, played) => {
-    const col = ctx.card(played).color;
+    const col = ctx.colorOf(played);
     const t = ctx
       .allMoods()
-      .find((m) => m.uid !== played.uid && m.uid !== ctx.self.uid && ctx.card(m).color === col && m.suppressed === 'none');
+      .find((m) => m.uid !== played.uid && m.uid !== ctx.self.uid && ctx.colorOf(m) === col && m.suppressed === 'none');
     if (t) ctx.suppress(t, 'round', true);
   },
 });
@@ -233,9 +233,10 @@ registerEffects(25, {
   afterPlaying: (ctx) => {
     const c = ctx.choices.cards?.[0];
     if (c == null) return;
+    // The discarded card's colour is printed (hand → not recoloured); moods use in-play colour.
     const col = ctx.cardData(c).color;
     ctx.discardFromHand(ctx.me, c);
-    for (const m of ctx.allMoods()) if (m.uid !== ctx.self.uid && ctx.card(m).color === col) ctx.suppress(m, 'sustained', true);
+    for (const m of ctx.allMoods()) if (m.uid !== ctx.self.uid && ctx.colorOf(m) === col) ctx.suppress(m, 'sustained', true);
   },
 });
 

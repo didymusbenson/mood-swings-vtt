@@ -11,8 +11,14 @@ export function resolveCardNumber(mood: Mood): number {
   return mood.copyOf ?? mood.card;
 }
 
+/**
+ * A mood's current in-play colour. Honours an active colour override
+ * (Imagination #42) if one has been applied to the mood; otherwise falls back to
+ * the printed colour of the card (resolving `copyOf`). Cards not in play keep
+ * their printed colour, so this must only be used for moods in play.
+ */
 export function colorOf(mood: Mood, db: CardDB): Color {
-  return db.get(resolveCardNumber(mood)).color;
+  return mood.colorOverride ?? db.get(resolveCardNumber(mood)).color;
 }
 
 /** Printed value for a mood, honouring secondary-value rotation and copying. */

@@ -26,6 +26,7 @@ import { CardDB, effectsFor } from './cards/registry.js';
 import { nextRandom, shuffle } from './rng.js';
 import {
   allMoods,
+  colorOf,
   countColor,
   moodiest,
   mostCommonColors,
@@ -36,7 +37,19 @@ import {
 const MAX_STABILISE_ITERATIONS = 64;
 
 export type Action =
-  | { type: 'play'; player: PlayerId; card: CardNumber; choices?: Choices }
+  | {
+      type: 'play';
+      player: PlayerId;
+      card: CardNumber;
+      choices?: Choices;
+      /**
+       * Where the played card comes from. 'hand' (default) plays a card from the
+       * player's hand; 'discard' plays a mood from the shared discard pile and
+       * requires a discard-play permission (a `grantDiscardMood` grant, or a
+       * Melancholy #69 in play). See docs/RULES.md "Play a mood from the discard pile".
+       */
+      from?: 'hand' | 'discard';
+    }
   | { type: 'pass'; player: PlayerId };
 
 export interface SetupOptions {
@@ -92,6 +105,7 @@ export class Engine {
       round: 1,
       activePlayer: firstPlayer,
       playsRemaining: 1,
+      discardPlaysRemaining: 0,
       conditionalGrants: [],
       playedThisTurn: [],
       firstPlayer,
@@ -116,6 +130,11 @@ export class Engine {
    * you have stable values").
    */
   stabilise(state: GameState): void {
+    // Colour overrides (Imagination) depend only on board membership, not on
+    // values, so resolve them once up front — before any colour-caring value
+    // computation reads countColor / mostCommonColors / ctx.colorOf.
+    this.applyColorOverrides(state);
+
     const moods = allMoods(state);
     let prev = new Map<string, number>(moods.map((m) => [m.uid, m.currentValue]));
 
@@ -169,6 +188,31 @@ export class Engine {
     for (const m of moods) m.currentValue = prev.get(m.uid) ?? 0;
   }
 
+  /**
+   * Recompute every mood's `colorOverride` from the moods in play. If any mood
+   * forces a global colour (Imagination #42's `colorOverride` hook), the most
+   * recently played such mood wins and recolours EVERY mood (itself included);
+   * otherwise all overrides clear. Purely membership-driven, so a mood entering
+   * play is recoloured and everything reverts when the source leaves play.
+   */
+  private applyColorOverrides(state: GameState): void {
+    const moods = allMoods(state);
+    let chosen: Color | null = null;
+    let winner = -1;
+    for (const m of moods) {
+      const hook = effectsFor(resolveCardNumber(m)).colorOverride;
+      if (!hook) continue;
+      const c = hook(this.readContext(state, m, snapshot(state)));
+      if (c == null) continue;
+      const order = uidOrder(m.uid);
+      if (order >= winner) {
+        winner = order;
+        chosen = c;
+      }
+    }
+    for (const m of moods) m.colorOverride = chosen;
+  }
+
   // ---- contexts ---------------------------------------------------------
 
   private readContext(state: GameState, self: Mood, prev: Map<string, number>): ReadContext {
@@ -182,6 +226,7 @@ export class Engine {
       allMoods: () => allMoods(state),
       moodsOf: (player) => state.moods[player] ?? [],
       opponentsOf: (player) => state.players.map((p) => p.id).filter((id) => id !== player),
+      colorOf: (mood) => colorOf(mood, db),
       countColor: (color: Color) => countColor(state, db, color),
       mostCommonColors: () => mostCommonColors(state, db),
       moodiest: () => moodiest(state),
@@ -250,6 +295,9 @@ export class Engine {
       grantAdditionalMood: (n = 1) => {
         state.playsRemaining += n;
       },
+      grantDiscardMood: (n = 1) => {
+        state.discardPlaysRemaining += n;
+      },
       grantConditionalMood: (constraint) => {
         state.conditionalGrants.push({ constraint });
       },
@@ -308,9 +356,12 @@ export class Engine {
       this.logPush(state, `${this.pname(state, action.player)} passes`, 'pass', { actor: action.player });
       this.completeTurn(state, action.player);
     } else {
-      this.playMood(state, action.player, action.card, action.choices ?? {});
+      this.playMood(state, action.player, action.card, action.choices ?? {}, action.from ?? 'hand');
       // Turn continues only while the player still has a play available.
-      const canContinue = state.playsRemaining > 0 || state.conditionalGrants.length > 0;
+      const canContinue =
+        state.playsRemaining > 0 ||
+        state.conditionalGrants.length > 0 ||
+        state.discardPlaysRemaining > 0;
       if (!canContinue) this.completeTurn(state, action.player);
     }
     return state;
@@ -322,9 +373,19 @@ export class Engine {
     this.advance(state);
   }
 
-  private playMood(state: GameState, me: PlayerId, card: CardNumber, choices: Choices): void {
-    const hand = state.hands[me]!;
-    if (!hand.includes(card)) throw new Error(`${me} does not hold #${card}`);
+  private playMood(
+    state: GameState,
+    me: PlayerId,
+    card: CardNumber,
+    choices: Choices,
+    from: 'hand' | 'discard' = 'hand',
+  ): void {
+    const source = from === 'discard' ? state.discard : state.hands[me]!;
+    if (from === 'discard') {
+      if (!state.discard.includes(card)) throw new Error(`#${card} is not in the discard pile`);
+    } else if (!source.includes(card)) {
+      throw new Error(`${me} does not hold #${card}`);
+    }
     const data = this.db.get(card);
 
     // Build the mood up front so cost/effects can reference `self`.
@@ -344,17 +405,25 @@ export class Engine {
     const costCtx = this.costContext(state, mood, me, choices);
     if (eff.canPlay && !eff.canPlay(costCtx)) throw new Error(`Cannot pay cost for #${card}`);
 
-    // Consume a play slot (base play or a matching conditional grant).
-    this.consumePlay(state, me, data);
+    // Consume a play slot. A discard-sourced play spends a discard-play grant (or
+    // a normal play via Melancholy #69); a hand play spends the base play or a
+    // matching conditional grant.
+    if (from === 'discard') this.consumeDiscardPlay(state, me, data);
+    else this.consumePlay(state, me, data);
 
     // 1. pay cost (before the mood enters play)
     eff.payCost?.(costCtx);
 
-    // 2. enter play
-    hand.splice(hand.indexOf(card), 1);
+    // 2. enter play (remove from its source zone: hand or the discard pile)
+    source.splice(source.indexOf(card), 1);
     state.moods[me]!.push(mood);
     state.playedThisTurn.push(mood.uid);
-    this.logPush(state, `${this.pname(state, me)} plays ${data.name}`, 'play', { actor: me });
+    this.logPush(
+      state,
+      `${this.pname(state, me)} plays ${data.name}${from === 'discard' ? ' from the discard pile' : ''}`,
+      'play',
+      { actor: me },
+    );
 
     // 3. while-in-play stabilises
     this.stabilise(state);
@@ -384,6 +453,32 @@ export class Engine {
     if (state.conditionalGrants[idx]!.constraint.kind !== 'whileMoodCountBelow') {
       state.conditionalGrants.splice(idx, 1);
     }
+  }
+
+  /**
+   * Spend a discard-play: a dedicated discard-play grant (Angst/Grief/Harmony/
+   * Grace), else — if the player has a Melancholy #69 in play permitting it — a
+   * normal play (base or a matching conditional grant). Throws if neither exists,
+   * so a hand card can never be played as a discard play and vice-versa.
+   */
+  private consumeDiscardPlay(state: GameState, me: PlayerId, data: CardData): void {
+    if (state.discardPlaysRemaining > 0) {
+      state.discardPlaysRemaining -= 1;
+      return;
+    }
+    if (this.permitsPlayFromDiscard(state, me)) {
+      this.consumePlay(state, me, data);
+      return;
+    }
+    throw new Error(`${me} has no discard-play available for #${data.number}`);
+  }
+
+  /** Does the player control a mood that permits playing from the discard pile (Melancholy)? */
+  private permitsPlayFromDiscard(state: GameState, me: PlayerId): boolean {
+    return (state.moods[me] ?? []).some((m) => {
+      const hook = effectsFor(resolveCardNumber(m)).permitsPlayFromDiscard;
+      return !!hook && hook(this.readContext(state, m, snapshot(state)));
+    });
   }
 
   private grantAllows(grant: ConditionalGrant, data: CardData, me: PlayerId, state: GameState): boolean {
@@ -532,8 +627,15 @@ function snapshot(state: GameState): Map<string, number> {
 /** Reset the per-turn play budget when a new player's turn begins. */
 function resetTurn(state: GameState): void {
   state.playsRemaining = 1;
+  state.discardPlaysRemaining = 0;
   state.conditionalGrants = [];
   state.playedThisTurn = [];
+}
+
+/** Play-order key from a mood uid (`m<n>`): higher = played more recently. */
+function uidOrder(uid: string): number {
+  const n = Number.parseInt(uid.replace(/^m/, ''), 10);
+  return Number.isNaN(n) ? 0 : n;
 }
 
 function orderFrom(ids: PlayerId[], first: PlayerId): PlayerId[] {

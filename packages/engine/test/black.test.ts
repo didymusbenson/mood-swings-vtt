@@ -128,6 +128,48 @@ describe('black cards', () => {
     expect(g.moods.p1!.map((m) => m.card).sort((x, y) => x - y)).toEqual([5, 53]);
   });
 
+  it('#69 Melancholy lets a discard-pile card be played (and gates hand vs discard)', () => {
+    // p1: Ambition(53) to seed the discard, Melancholy(69), plus a red Boredom(83) to replay.
+    const { e, s } = game(rig([53, 69, 83, 5, 5], [55]));
+    // r1: Ambition discards Boredom(83) to the pile and grants a HAND play.
+    let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 53, choices: { cards: [83] } });
+    expect(g.discard).toContain(83);
+    expect(g.activePlayer).toBe('p1'); // extra play granted
+    // Without any discard-play permission yet, a from:'discard' play is illegal.
+    expect(() => e.apply(g, { type: 'play', player: 'p1', card: 83, from: 'discard' })).toThrow();
+    // Spend the granted hand play on Melancholy; that ends p1's turn.
+    g = e.apply(g, { type: 'play', player: 'p1', card: 69 });
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 (5) beats p2 (0); p1 leads r2
+    expect(g.activePlayer).toBe('p1');
+    expect(g.discard).toContain(83);
+    // Gating: a hand card cannot be played as a discard play, and vice-versa.
+    expect(() => e.apply(g, { type: 'play', player: 'p1', card: 5, from: 'discard' })).toThrow();
+    expect(() => e.apply(g, { type: 'play', player: 'p1', card: 83, from: 'hand' })).toThrow();
+    // With Melancholy in play, the discard card resolves via a normal play.
+    g = e.apply(g, { type: 'play', player: 'p1', card: 83, from: 'discard' });
+    expect(findMood(g, 'p1', 83)).toBeDefined();
+    expect(g.discard).not.toContain(83);
+  });
+
+  it('#54 Angst discards a blue/red mood to grant a discard-pile play', () => {
+    // r1: p1 plays a red Boredom(83); r2: Angst sacrifices it and replays it from discard.
+    const { e, s } = game(rig([83, 54, 5, 5, 5], [55]));
+    let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 83 });
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 (4) beats p2 (0); p1 leads r2
+    const redUid = findMood(g, 'p1', 83)!.uid;
+    g = e.apply(g, { type: 'play', player: 'p1', card: 54, choices: { moods: [redUid] } });
+    expect(findMood(g, 'p1', 83)).toBeUndefined(); // sacrificed to the pile
+    expect(g.discard).toContain(83);
+    expect(g.discardPlaysRemaining).toBe(1);
+    expect(g.activePlayer).toBe('p1'); // discard-play grant keeps the turn open
+    // The grant only permits a discard-sourced play.
+    expect(() => e.apply(g, { type: 'play', player: 'p1', card: 5, from: 'discard' })).toThrow();
+    g = e.apply(g, { type: 'play', player: 'p1', card: 83, from: 'discard' });
+    expect(findMood(g, 'p1', 83)).toBeDefined();
+    expect(g.discard).not.toContain(83);
+    expect(g.discardPlaysRemaining).toBe(0);
+  });
+
   it('#74 Sadness gains [2] per card in the discard pile', () => {
     // Ambition discards one card, then Sadness sees a 1-card discard pile.
     const { e, s } = game(rig([53, 74, 55], [55]));

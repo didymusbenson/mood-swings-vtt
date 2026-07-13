@@ -25,16 +25,17 @@ registerEffects(53, {
 });
 
 // #54 Angst — [3]; may discard one of your blue/red moods to play an additional
-// mood from the discard pile. (Play-from-discard unsupported: grants a normal
-// extra play instead — see report.)
+// mood this turn FROM THE DISCARD PILE. Colour uses in-play colour (colorOf), so
+// Imagination can enable/disable this (Card Notes: "If Imagination changes your
+// moods to a colour other than blue or red, you may not use them for this card").
 registerEffects(54, {
   afterPlaying: (ctx) => {
     const m = byUid(ctx, ctx.choices.moods?.[0]);
     if (!m || m.owner !== ctx.me) return;
-    const col = ctx.card(m).color;
+    const col = ctx.colorOf(m);
     if (col !== 'blue' && col !== 'red') return;
     ctx.discardMoodToPile(m);
-    ctx.grantAdditionalMood(1);
+    ctx.grantDiscardMood(1);
   },
 });
 
@@ -61,7 +62,7 @@ registerEffects(57, {
   afterPlaying: (ctx) => {
     const colors = ctx.mostCommonColors();
     for (const m of [...ctx.allMoods()]) {
-      if (m.uid !== ctx.self.uid && colors.includes(ctx.card(m).color)) ctx.discardMoodToPile(m);
+      if (m.uid !== ctx.self.uid && colors.includes(ctx.colorOf(m))) ctx.discardMoodToPile(m);
     }
   },
 });
@@ -85,7 +86,7 @@ registerEffects(58, {
 // #59 Contempt — [1]; may discard one green/white mood, or all green/white moods.
 registerEffects(59, {
   afterPlaying: (ctx) => {
-    const isGW = (m: Mood) => ['green', 'white'].includes(ctx.card(m).color);
+    const isGW = (m: Mood) => ['green', 'white'].includes(ctx.colorOf(m));
     if (ctx.choices.option === 'all') {
       for (const m of [...ctx.allMoods()]) if (m.uid !== ctx.self.uid && isGW(m)) ctx.discardMoodToPile(m);
     } else {
@@ -180,13 +181,11 @@ registerEffects(64, {
   },
 });
 
-// #65 Grief — [0]; may play up to two additional moods from the discard pile.
-// (Play-from-discard unsupported: grants normal extra plays, gated on discard size — see report.)
+// #65 Grief — [0]; "You may play up to two additional moods this turn from the
+// discard pile." Grants two discard-plays (the player may use 0, 1, or 2, each
+// resolved via a { from: 'discard' } action).
 registerEffects(65, {
-  afterPlaying: (ctx) => {
-    const n = Math.min(2, ctx.state.discard.length);
-    if (n > 0) ctx.grantAdditionalMood(n);
-  },
+  afterPlaying: (ctx) => ctx.grantDiscardMood(2),
 });
 
 // #66 Hate — [0]; may bottom-deck any mood and draw a card.
@@ -228,18 +227,21 @@ registerEffects(68, {
       .filter((m): m is Mood => !!m && m.owner === pid)
       .slice(0, 2);
     const picks = chosen.length === 2 ? chosen : ms.slice(0, 2);
-    const colors = new Set(picks.map((m) => ctx.card(m).color));
+    const colors = new Set(picks.map((m) => ctx.colorOf(m)));
     for (const m of [...ctx.allMoods()]) {
       if (m.uid === ctx.self.uid) continue;
-      if (picks.some((p) => p.uid === m.uid) || colors.has(ctx.card(m).color)) ctx.discardMoodToPile(m);
+      if (picks.some((p) => p.uid === m.uid) || colors.has(ctx.colorOf(m))) ctx.discardMoodToPile(m);
     }
   },
 });
 
-// #69 Melancholy — [3]; "While in play — you may play moods from the discard pile as
-// though they were in your hand." UNSUPPORTED: the engine's play action only draws
-// from hand and this passive permission has no representable effect. Left as printed
-// [3] with no registration — see report.
+// #69 Melancholy — [3]; "While in play — You may play moods from the discard pile as
+// though they were in your hand." Continuous permission (no extra play): while a
+// Melancholy is in play for you, a { from: 'discard' } action may consume a normal
+// play to play a mood from the discard pile.
+registerEffects(69, {
+  permitsPlayFromDiscard: () => true,
+});
 
 // #70 Misery — [2]/[6][2]=8; [8] if two or more discard-pile cards share a colour.
 registerEffects(70, {
@@ -280,7 +282,7 @@ registerEffects(73, {
       .slice(0, 2);
     if (ms.length < 2) return;
     const [a, b] = ms as [Mood, Mood];
-    if (ctx.card(a).color === ctx.card(b).color || ctx.valueOf(a) === ctx.valueOf(b)) {
+    if (ctx.colorOf(a) === ctx.colorOf(b) || ctx.valueOf(a) === ctx.valueOf(b)) {
       ctx.discardMoodToPile(a);
       ctx.discardMoodToPile(b);
     }
