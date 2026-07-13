@@ -1,3 +1,4 @@
+import type React from 'react';
 import type { CardData, Mood } from '@mood-swings/engine';
 import { useCardImage } from '../hooks/useCardImage.js';
 
@@ -14,6 +15,16 @@ interface CardProps {
   selected?: boolean;
   /** Show the card art layer (defaults to true). */
   showArt?: boolean;
+  /** A legal target for the current targeting slot / drag. */
+  highlighted?: boolean;
+  /** Chosen as a target in the active targeting flow. */
+  targetSelected?: boolean;
+  /** Dimmed because it is not a valid drop while a drag is in progress. */
+  dimmed?: boolean;
+  /** HTML5 drag-to-play wiring. */
+  draggable?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
 function dieLabel(v: number): string {
@@ -33,6 +44,12 @@ export function Card({
   compact,
   selected,
   showArt = true,
+  highlighted,
+  targetSelected,
+  dimmed,
+  draggable,
+  onDragStart,
+  onDragEnd,
 }: CardProps) {
   const { src, onError } = useCardImage(card);
   const headline = value ?? card.value;
@@ -46,13 +63,30 @@ export function Card({
     selected ? 'card--selected' : '',
     disabled ? 'card--disabled' : '',
     suppressed ? 'card--suppressed' : '',
+    highlighted ? 'card--target' : '',
+    targetSelected ? 'card--target-selected' : '',
+    dimmed ? 'card--dimmed' : '',
+    draggable ? 'card--draggable' : '',
   ]
     .filter(Boolean)
     .join(' ');
 
+  const dragProps = draggable
+    ? {
+        draggable: true,
+        onDragStart: (e: React.DragEvent) => {
+          e.dataTransfer.effectAllowed = 'move';
+          // Firefox requires data to be set for a drag to start.
+          e.dataTransfer.setData('text/plain', String(card.number));
+          onDragStart?.();
+        },
+        onDragEnd: () => onDragEnd?.(),
+      }
+    : {};
+
   if (compact) {
     return (
-      <button type="button" className={classes} onClick={onClick} disabled={disabled} title={card.rulesText ?? ''}>
+      <button type="button" className={classes} onClick={onClick} disabled={disabled} title={card.rulesText ?? ''} {...dragProps}>
         <span className="card__swatch" aria-hidden />
         <span className="card__compact-name">{card.name}</span>
         <span className="card__compact-value">{dieLabel(headline)}</span>
@@ -61,7 +95,7 @@ export function Card({
   }
 
   return (
-    <button type="button" className={classes} onClick={onClick} disabled={disabled}>
+    <button type="button" className={classes} onClick={onClick} disabled={disabled} {...dragProps}>
       <header className="card__head">
         <span className="card__name">{card.name}</span>
         <span className={`card__value card__value--${card.dieColor}`} title={`${card.dieColor} die`}>

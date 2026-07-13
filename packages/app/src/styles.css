@@ -562,6 +562,174 @@ input {
   line-height: 1;
 }
 
+/* ---------- Play + targeting UI ---------- */
+
+/* Mode toggle (banner) */
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.mode-toggle__lbl {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 0.2rem;
+}
+.mode-toggle .tab {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+}
+.mode-toggle .tab.is-active {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: rgba(110, 168, 254, 0.15);
+}
+
+/* Manual pre-play selection (full-size hand card) */
+.card:not(.card--compact).card--selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+
+/* Draggable hand cards + drag/target affordances on cards */
+.card--draggable {
+  cursor: grab;
+}
+.card--draggable:active {
+  cursor: grabbing;
+}
+.card--target {
+  border-color: var(--ok) !important;
+  box-shadow: 0 0 0 2px var(--ok) inset, 0 0 10px rgba(95, 208, 138, 0.35);
+}
+.card--target-selected {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+.card--dimmed {
+  opacity: 0.35;
+  filter: grayscale(0.5);
+}
+
+/* Player panel as target / drop zone */
+.player--target {
+  border-color: var(--ok);
+  box-shadow: 0 0 0 2px var(--ok) inset;
+  cursor: pointer;
+}
+.player--target-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+.player--dim {
+  opacity: 0.6;
+}
+
+.mood-drop {
+  display: inline-flex;
+  border-radius: 10px;
+}
+
+/* General play-field drop zone (drag mode) */
+.playfield {
+  grid-column: 1 / -1;
+  border: 2px dashed var(--line);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  background: var(--panel);
+}
+.playfield.is-armed {
+  border-color: var(--accent);
+  color: var(--ink);
+  background: rgba(110, 168, 254, 0.1);
+}
+
+/* Active-player action bar (select / play / extra-mood hint) */
+.handbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0.4rem 0 0.6rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.handbar__label {
+  font-size: 0.85rem;
+}
+.handbar__hint {
+  font-size: 0.82rem;
+}
+
+/* Targeting bar (guided slot walk) */
+.targetbar {
+  position: fixed;
+  bottom: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  min-width: 340px;
+  max-width: 92vw;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+.targetbar__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.targetbar__card {
+  font-weight: 700;
+}
+.targetbar__prompt {
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.targetbar__count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.targetbar__hint {
+  font-size: 0.8rem;
+  margin: 0 0 0.5rem;
+}
+.targetbar__opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.targetbar__opts .chip {
+  cursor: pointer;
+  text-transform: capitalize;
+}
+.targetbar__opts .chip.is-on {
+  border-color: var(--accent);
+  background: rgba(110, 168, 254, 0.2);
+  color: var(--ink);
+}
+.chip--color.is-on {
+  background: rgba(110, 168, 254, 0.18);
+}
+.targetbar__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 @media (max-width: 900px) {
   .board {
     grid-template-columns: 1fr;
