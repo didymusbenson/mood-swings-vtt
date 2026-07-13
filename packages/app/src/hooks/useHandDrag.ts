@@ -78,8 +78,10 @@ export function useHandDrag(
 
   const onCardPointerDown = useCallback(
     (e: React.PointerEvent, card: number, index: number) => {
-      // Only the active player, in drag mode, outside a targeting flow, may drag.
-      if (pc.mode !== 'drag' || !pc.canAct || pc.flow != null) return;
+      // The active player, outside a targeting flow, may press a card: a tap
+      // selects it (manual play), a drag past the threshold plays/reorders. Both
+      // modes are always available — no toggle.
+      if (!pc.canAct || pc.flow != null) return;
       if (e.button != null && e.button !== 0) return; // primary button / touch only
 
       const start = { x: e.clientX, y: e.clientY };
@@ -132,6 +134,8 @@ export function useHandDrag(
         finish();
         publish(null);
         if (!cur || !cur.active) {
+          // A tap (no drag): select the card for manual play (Play button).
+          if (cur) pc.onHandCardClick(cur.card);
           pc.endDrag();
           return;
         }

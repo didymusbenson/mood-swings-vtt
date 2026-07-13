@@ -58,7 +58,9 @@ function PlayerPanel({ player, state, ctx }: { player: PlayerState; state: GameS
   const draggingFrom = draggingHere ? drag!.fromIndex : null;
   const insertion = draggingHere && drag!.over.kind === 'hand' ? drag!.over.index : null;
 
-  const canDragHand = isMe && pc.mode === 'drag' && pc.flow == null;
+  // Both play modes are always available: outside a targeting flow, a card can be
+  // tapped to select (manual) or dragged to play/reorder.
+  const canDragHand = isMe && pc.flow == null;
 
   const panelClasses = [
     'player',
@@ -82,9 +84,10 @@ function PlayerPanel({ player, state, ctx }: { player: PlayerState; state: GameS
     const flowHandSlot = pc.flow != null && pc.currentSlot?.kind === 'handCard';
     const targetLegal = flowHandSlot && pc.handCardHighlighted(card);
     const interactive = isActive && (pc.flow == null ? true : flowHandSlot && targetLegal);
-    // Click selects only in manual mode or when picking a hand-card flow target;
-    // in drag mode the gesture is the drag itself.
-    const clickable = interactive && (pc.flow != null || pc.mode === 'manual');
+    // During a targeting flow, hand cards are clicked to pick handCard targets.
+    // Outside a flow, tap-to-select is handled by the drag hook's pointer-up, so
+    // no onClick here (avoids a double select-then-play).
+    const clickable = interactive && pc.flow != null;
     handChildren.push(
       <div key={`${card}-${idx}`} className="hand__slot" data-hand-index={idx}>
         <Card
@@ -197,9 +200,7 @@ function ActiveHandControls({ pc, state }: { pc: PlayController; state: GameStat
         </span>
       ) : (
         <span className="handbar__hint muted">
-          {pc.mode === 'manual'
-            ? 'Click a card to select it, then press Play.'
-            : 'Drag a card to the field or a target to play it — or drag within your hand to reorder.'}
+          Tap a card to select it (then Play), or drag it onto the field or a target to play it. Drag within your hand to reorder.
         </span>
       )}
     </div>
@@ -335,17 +336,6 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
         {!gameOver && active && (
           <div className="board__turn">
             Turn: <strong>{active.name}</strong>
-          </div>
-        )}
-        {!gameOver && (
-          <div className="mode-toggle" role="group" aria-label="Play mode">
-            <span className="mode-toggle__lbl">Play mode</span>
-            <button className={`tab ${pc.mode === 'manual' ? 'is-active' : ''}`} onClick={() => pc.setMode('manual')}>
-              Click
-            </button>
-            <button className={`tab ${pc.mode === 'drag' ? 'is-active' : ''}`} onClick={() => pc.setMode('drag')}>
-              Drag
-            </button>
           </div>
         )}
         {gameOver && (
