@@ -18,7 +18,12 @@ Two ways to get a starting deck:
 1. **Deckbuilder** — pick cards (must satisfy custom-deck minimums).
 2. **Random deck** — generate a deck matching the **Secret Lair box collation**.
 
-## 2. Rules — see [`docs/RULES.md`](docs/RULES.md)
+## 2. Rules — see [`docs/RULES.md`](docs/RULES.md) and [`docs/card-notes.md`](docs/card-notes.md)
+
+`docs/card-notes.md` holds Mark Rosewater's per-card mechanical clarifications
+(all 130 cards) — the source of truth for effect edge cases (e.g. simultaneous
+target selection, suppressed = value 0, Duplicity double-resolution).
+
 
 Full extracted ruleset lives there. The mechanically load-bearing facts for the engine:
 
@@ -50,17 +55,15 @@ Full extracted ruleset lives there. The mechanically load-bearing facts for the 
   Duplicates allowed but off by default. Deckbuilder enforces the 15-card minimum
   and the rarity-aware random generator.
 
-## 4. Card Data Status
+## 4. Card Data Status — ✅ complete
 
-**Have (committed):** [`data/card-index.json`](data/card-index.json) — all 135
-cards: `number, slug, name, color, url`. Color is derived deterministically from
-collector number (numbering runs white→blue→black→red→green, alphabetical within
-color; verified against the index). Counts: W26 / U26 / B27 / R27 / G28 / 1 special.
-
-**Missing:** per-card **value, die color, secondary value, rules text, rarity,
-artist** — i.e. `data/cards.json`. The data is fully available on each Moodfall
-SSR card page and the parser is **built and tested** (see §6), but this session's
-**network policy blocks `scryfall.com`**, so I can't run the fetch here. See Q1.
+**Committed:** [`data/cards.json`](data/cards.json) — all **135** cards with
+`value, dieColor, secondaryValue, rulesText, rarity, artist, image, color`, plus
+[`data/card-index.json`](data/card-index.json). Validated: 48C/40U/30R/15M (the
+133-card set) + #134 foil Love + #135 Hurt Feelings; 102 fixed / 33 variable
+dice; 35 secondary values; exactly 5 no-text vanillas (one per colour). Produced
+by the user running `tools/scrape-cards.mjs` (scryfall is network-blocked in this
+session).
 
 ## 5. Proposed Architecture
 
@@ -89,23 +92,23 @@ SSR card page and the parser is **built and tested** (see §6), but this session
 
 ---
 
-## <a name="open-questions"></a>Open Questions
+## 7. Build status
 
-1. **Card data source (BLOCKING).** How do you want `data/cards.json` produced?
-   (a) You **loosen this session's network policy** (allow `moodswings.scryfall.com`)
-   and I run `tools/scrape-cards.mjs` here; (b) you **run it locally** and commit
-   the output; or (c) you paste me the raw data another way. Everything downstream
-   needs the values + rules text.
-2. **Automation depth (biggest scope driver).** Should the engine **fully enforce**
-   all ~130 unique card effects (requirements, while-in-play, after-playing,
-   after-scoring), or is v1 a **"digital tabletop"** — engine tracks zones/turns/
-   scoring and *fixed* white-die values, but players resolve complex card text by
-   manually moving cards / setting values? Recommendation: **hybrid** — automate
-   turn/round/scoring + the common structured effects, with manual overrides for
-   the long tail — so we can play *now* and deepen automation card-by-card.
-3. **Card images.** OK to bundle the Scryfall `.webp` art (also network-blocked
-   here — you'd provide them), or should MVP render **text-only** card faces?
-4. **Tech stack.** React + TypeScript + Vite for the app + a shared TS engine — good?
+- ✅ Monorepo scaffold (`packages/engine`, npm workspaces).
+- ✅ Engine core: zones, turn/round/scoring/after-scoring/win loop, while-in-play
+  value fixpoint, per-card effect-hook interface, deck construction. **16 tests
+  pass, typecheck clean.** Reference cards encoded: #92 Glee, #134 Love.
+- ✅ Card data + rules + notes committed.
+- ⏳ Encode remaining ~128 effects (systematic, data-driven — see `docs/card-notes.md`).
+- ⏳ React + Vite hotseat app (board, deckbuilder, random-deck).
 
-*(Resolved by the rules PDF: turn/round loop, moods persisting, setup/hand size,
-win condition, deck counts, custom-deck minimums, value dice, tiebreakers.)*
+## Decisions (locked)
+
+- **Card data:** user runs the scraper locally → `data/cards.json` ✅ done.
+- **Automation:** **full** — engine enforces every card's effects.
+- **Art:** text faces first; later **Scryfall CDN → cache → local storage**.
+- **Stack:** React + TypeScript + Vite + shared TS engine.
+
+*(All earlier open questions resolved: rules loop, moods persisting, hand size,
+win condition, deck counts, custom-deck minimums, value dice, tiebreakers, and
+the four decisions above.)*
