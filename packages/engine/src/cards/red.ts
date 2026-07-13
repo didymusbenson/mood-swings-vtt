@@ -303,11 +303,19 @@ registerEffects(101, {
   },
 });
 
-// #102 Stubbornness — [3]. At the start of each of your turns, if another player
-// has more moods than you, you may play an additional mood. There is no
-// start-of-turn hook in the engine — this trigger is NOT modelled (see flag).
-// Registered as a no-op so its printed [3] value is used.
-registerEffects(102, {});
+// #102 Stubbornness — [3]. "While in play — At the start of each of your turns, if
+// another player has more moods than you, you may play an additional mood this turn."
+// Recurring: the `extraPlaysAtTurnStart` hook re-checks the mood counts at the start
+// of each of the owner's turns and grants one extra play when any other player has
+// strictly more moods than the owner.
+registerEffects(102, {
+  extraPlaysAtTurnStart: (ctx) => {
+    const me = ctx.self.owner;
+    const mine = ctx.moodsOf(me).length;
+    const behind = ctx.opponentsOf(me).some((o) => ctx.moodsOf(o).length > mine);
+    return behind ? { normal: 1 } : {};
+  },
+});
 
 // #103 Thrill — [1]. You may put any number of your other moods into your hand; if
 // you do, play that many additional moods this turn.

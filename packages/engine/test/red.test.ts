@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { Engine } from '../src/engine.js';
 import { loadCardDB, type RawCard } from '../src/data.js';
 import type { CardDB } from '../src/cards/registry.js';
-import type { GameState } from '../src/types.js';
+import type { GameState, Mood, PlayerId } from '../src/types.js';
 import '../src/cards/red.js';
 
 const path = fileURLToPath(new URL('../../../data/cards.json', import.meta.url));
@@ -20,6 +20,14 @@ const game = (deck: number[]) => {
   const e = new Engine(db);
   return { e, s: e.setup({ players: P, deck, preshuffled: true }) };
 };
+
+let uid = 0;
+function mkMood(card: number, owner: PlayerId): Mood {
+  return {
+    uid: `t${uid++}`, card, owner, stolenFrom: null, usingSecondary: false,
+    suppressed: 'none', suppressedBy: null, copyOf: null, currentValue: 0, data: {},
+  };
+}
 
 describe('red cards', () => {
   it('#92 Glee is [6] the round it is played, [0] afterwards', () => {
@@ -109,5 +117,29 @@ describe('red cards', () => {
     expect(g.moods.p1!.some((m) => m.card === 5)).toBe(true); // Complacency returned to p1
     expect(g.moods.p2!.some((m) => m.card === 100)).toBe(false); // Recklessness left play
     expect(g.deck[g.deck.length - 1]).toBe(100); // ...to the bottom of the deck
+  });
+
+  it('#102 Stubbornness grants an extra play at turn start while an opponent has more moods', () => {
+    const { e, s } = game(rig([5], [5]));
+    s.moods.p1 = [mkMood(102, 'p1')]; // p1: 1 mood (Stubbornness, [3])
+    s.moods.p2 = [mkMood(5, 'p2'), mkMood(5, 'p2')]; // p2: 2 moods ([4] each)
+    let g: GameState = e.apply(s, { type: 'pass', player: 'p1' });
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p2 (8) wins round 1, leads round 2
+    expect(g.round).toBe(2);
+    expect(g.activePlayer).toBe('p2');
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p2's round-2 turn -> p1 becomes active
+    expect(g.activePlayer).toBe('p1');
+    expect(g.playsRemaining).toBe(2); // p2 (2 moods) > p1 (1 mood) -> Stubbornness grants +1
+  });
+
+  it('#102 Stubbornness grants nothing when the owner is not behind on moods', () => {
+    const { e, s } = game(rig([5], [5]));
+    s.moods.p1 = [mkMood(102, 'p1'), mkMood(5, 'p1')]; // p1: 2 moods (worth 3 + 4 = 7)
+    s.moods.p2 = [mkMood(5, 'p2')]; // p2: 1 mood (4)
+    let g: GameState = e.apply(s, { type: 'pass', player: 'p1' });
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 (7) wins round 1, leads round 2
+    expect(g.round).toBe(2);
+    expect(g.activePlayer).toBe('p1');
+    expect(g.playsRemaining).toBe(1); // not behind -> no extra play
   });
 });

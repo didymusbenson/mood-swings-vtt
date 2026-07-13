@@ -6,6 +6,7 @@ import { loadCardDB, type RawCard } from '../src/data.js';
 import type { CardDB } from '../src/cards/registry.js';
 import type { GameState, Mood, PlayerId } from '../src/types.js';
 import '../src/cards/green.js';
+import '../src/cards/blue.js'; // Fear #38 (used to bounce Hope out of play)
 
 const path = fileURLToPath(new URL('../../../data/cards.json', import.meta.url));
 const db: CardDB = loadCardDB(JSON.parse(readFileSync(path, 'utf8')) as RawCard[]);
@@ -143,5 +144,82 @@ describe('green cards', () => {
     s.moods.p1 = [hap, mkMood(83, 'p1'), mkMood(5, 'p1')]; // add white to same player
     e.stabilise(s);
     expect(hap.currentValue).toBe(8);
+  });
+
+  // ---- F1: future-turn / recurring "additional mood" grants -----------------
+
+  it('#125 Joy grants exactly one extra play on the owner\'s NEXT turn, not this turn', () => {
+    // p1 hand: Joy(125) + fillers. Joy is [3]; p2 passes so p1 (3) wins round 1
+    // and leads round 2, giving us a clean look at p1's next turn.
+    const { e, s } = game(rig([125], [126]));
+    let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 125 });
+    // Joy grants only on the NEXT turn — this turn ends immediately (no extra play now).
+    expect(g.activePlayer).toBe('p2');
+    expect(g.pendingExtraPlays.p1).toBe(1); // queued for p1's next turn
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 (Joy [3]) wins round 1, leads round 2
+    expect(g.round).toBe(2);
+    expect(g.activePlayer).toBe('p1');
+    expect(g.playsRemaining).toBe(2); // base 1 + Joy's one-time grant
+    expect(g.pendingExtraPlays.p1).toBe(0); // consumed
+    // The extra play lets p1 play two moods this turn.
+    g = e.apply(g, { type: 'play', player: 'p1', card: 126 });
+    expect(g.activePlayer).toBe('p1'); // second play still available
+    g = e.apply(g, { type: 'play', player: 'p1', card: 126 });
+    expect(g.activePlayer).toBe('p2'); // both plays used, turn ends — grant was one-time
+  });
+
+  it('#120 Generosity grants the CHOSEN opponent an extra play on their next turn', () => {
+    // p1 plays Generosity([6]) choosing p2; p2's very next turn (same round) gets +1 play.
+    const { e, s } = game(rig([120], [126, 126, 126]));
+    let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 120, choices: { players: ['p2'] } });
+    expect(g.activePlayer).toBe('p2');
+    expect(g.playsRemaining).toBe(2); // Generosity gave p2 a second play at their turn start
+    expect(g.pendingExtraPlays.p2).toBe(0); // consumed
+    g = e.apply(g, { type: 'play', player: 'p2', card: 126 });
+    expect(g.activePlayer).toBe('p2'); // the extra play keeps p2's turn going
+    expect(g.playsRemaining).toBe(1);
+  });
+
+  it('#124 Hope grants an extra play EACH of the owner\'s turns while in play, and stops once it leaves', () => {
+    // Round 1: p1 plays Hope (its own-turn grant keeps the turn alive) then a filler.
+    const { e, s } = game(rig([124, 126, 38], [126]));
+    let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 124 });
+    expect(g.activePlayer).toBe('p1'); // Hope's "including the turn you play it" grant
+    expect(g.playsRemaining).toBe(1);
+    g = e.apply(g, { type: 'play', player: 'p1', card: 126 }); // spend the extra play
+    expect(g.activePlayer).toBe('p2');
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 (moods worth 4) wins round 1, leads round 2
+    expect(g.round).toBe(2);
+    expect(g.activePlayer).toBe('p1');
+    expect(g.playsRemaining).toBe(2); // recurring: Hope grants +1 at the start of each of p1's turns
+    // p1 bounces Hope back to hand with Fear #38, then passes to end the turn.
+    const hopeUid = g.moods.p1!.find((m) => m.card === 124)!.uid;
+    g = e.apply(g, { type: 'play', player: 'p1', card: 38, choices: { moods: [hopeUid] } });
+    expect(g.hands.p1).toContain(124); // Hope left play
+    expect(g.moods.p1!.some((m) => m.card === 124)).toBe(false);
+    g = e.apply(g, { type: 'pass', player: 'p1' }); // decline remaining plays, end turn
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 still wins, leads round 3
+    expect(g.round).toBe(3);
+    expect(g.activePlayer).toBe('p1');
+    expect(g.playsRemaining).toBe(1); // Hope gone -> recurring grant stops
+  });
+
+  it('#121 Grace grants a recurring discard play each of the owner\'s turns while in play', () => {
+    // A red mood sits in the discard pile to be replayed from it.
+    const { e, s } = game(rig([121, 126], [126]));
+    s.discard = [83];
+    let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 121 });
+    expect(g.discardPlaysRemaining).toBe(1); // Grace's own-turn discard grant
+    expect(g.activePlayer).toBe('p1'); // an available discard play keeps the turn alive
+    // Play the discard mood using the granted discard play.
+    g = e.apply(g, { type: 'play', player: 'p1', card: 83, from: 'discard' });
+    expect(g.moods.p1!.some((m) => m.card === 83)).toBe(true);
+    expect(g.discard).not.toContain(83);
+    expect(g.discardPlaysRemaining).toBe(0);
+    expect(g.activePlayer).toBe('p2'); // no plays left, turn ends
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 (Grace 0 + red 4) wins round 1, leads round 2
+    expect(g.round).toBe(2);
+    expect(g.activePlayer).toBe('p1');
+    expect(g.discardPlaysRemaining).toBe(1); // recurring: Grace re-grants a discard play at turn start
   });
 });
