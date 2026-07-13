@@ -9,6 +9,8 @@ and implement. Status legend: 🆕 new · 📋 planned · 🔧 in progress · �
 | F1 | 🆕 | engine | "Play an additional mood on a future turn" cards don't grant the extra play | Known gap: `playsRemaining` resets to 1 each turn with no cross-turn carry. Affects #120, #121, #124, #125 (#135 is 3+‑player, out of 2p MVP scope). |
 | F2 | 📋 | layout | Fix P1 bottom / P2 top; glow the active player's zone instead of swapping seats | **Resolved: option A** (fixed seats, each plays from their own edge) — implied by F3. |
 | F3 | 📋 | layout | Replace stacked bands with a single readable "battlefield" (round state + scoring at a glance); whole battlefield is the drop zone; deck+discard column, discard click-to-inspect | Keep Preview (left) + Log (right). **Arrangement resolved:** moods grouped by owner ("facing the player who played it") — yours bottom, oppo top. Rendering upright for readability (confirm if you want literal 180° rotation). |
+| F4 | 🆕 | targeting UX | Target selection must be an in-your-face **modal overlay** (dims background), not the current subtle inline flow | ❓ Open: avatar style + names picked vs auto (Q1); confirm-button home (Q2). Depends on **new: player avatars**. |
+| F4a | 🆕 | asset | **Player avatars** (new) — needed for the targeting overlay's player picker (and generally) | ❓ Open: style (initial badge / sketch faces / user art) + pick-on-start vs auto. |
 
 ---
 
@@ -75,3 +77,46 @@ serve the readability goal — flagged to the user to veto if they want true rot
 **Plan:** _to be written in the planning pass (F2 + F3 implement together)._
 **Sub-notes:** discard viewer = a click-to-open panel/modal listing discard-pile
 cards (also useful for "play from discard" cards later).
+
+### F4 — Modal targeting overlay (make selection unmissable)  (🆕)
+**What:** When a card forces target selection (moods in play, players, cards in the
+discard, hand cards for a cost, etc.) players don't realize they must select
+something — the current inline flow is too subtle. Replace it with a **modal
+overlay** that dims/blocks the irrelevant background and demands the choice.
+**Behavior:**
+- The overlay **dims the battlefield** and irrelevant info behind it.
+- The **card being played is held in the Preview space** (left rail) for reference
+  while choosing.
+- **Big bold header** at the top of the overlay: **"Choose {target(s)}"**, wording
+  driven by what's needed (e.g. "Choose a mood", "Choose up to two players",
+  "Choose a card from the discard").
+- **Target-kind presentation, brought to the front of the overlay:**
+  - **Players** → the **player avatars** (F4a) come forward to be clicked.
+  - **Cards in play (moods)** → the valid target moods are brought to the front.
+  - **Cards in discard** → the discard pile is shown as a **horizontally scrollable
+    fan** on the overlay; selected targets are highlighted.
+  - (Generalizes to hand-card / color / number slots too — each slot surfaces its
+    valid options in the overlay; selected = highlighted.)
+- **Cancel** (abort playing the card — e.g. no valid targets, or change of mind) and
+  **Submit** (confirm the selection). Respect slot min/max (Submit enabled once min
+  met; supports multi-select up to max).
+**Button placement rule (applies project-wide):** the **Submit/confirm button must
+NOT sit on top of the player's hand** (where it currently does). Every
+submit/confirmation button needs a **dedicated home** on the interface that doesn't
+collide with the rest of the UI. *Proposal:* modal Cancel/Submit at the
+**bottom-center of the overlay**; non-modal confirms (manual "Play") use a reserved
+**action slot** that never overlaps cards — pending Q2.
+**Engine impact:** none — this is presentation only. The overlay assembles the same
+`choices` object the engine already consumes (via `specFor`/`legalTargets`); the
+per-card target **specs already exist** and drive which slots/targets the overlay
+shows.
+**Open questions:** Q1 avatars (style + pick-vs-auto) · Q2 confirm-button home.
+**Plan:** _pending Q1/Q2._
+
+### F4a — Player avatars (new asset/component)  (🆕)
+**What:** Need player avatars — used by F4's player-target picker and generally to
+identify seats. **Must be original** (no copyrighted art).
+**Open question:** style — (a) initial/colour badge, (b) small set of hand-drawn
+sketch-face avatars matching the aesthetic (auto-assigned), (c) user-provided art;
+and whether name/avatar is chosen on the start screen or auto-assigned P1/P2.
+**Plan:** _pending Q1._
