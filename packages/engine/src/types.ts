@@ -37,8 +37,13 @@ export interface CardData {
 export type PlayerId = string;
 export type CardNumber = number;
 
-/** Suppression duration (value forced to 0 but identity/colour preserved). */
-export type Suppression = 'none' | 'turn' | 'sustained';
+/**
+ * Suppression duration (value forced to 0 but identity/colour preserved):
+ * - 'turn'      : until the end of the current turn
+ * - 'round'     : until the end of the current round
+ * - 'sustained' : for as long as the suppressing mood stays in play on its side
+ */
+export type Suppression = 'none' | 'turn' | 'round' | 'sustained';
 
 /** An instance of a card that is in play (a "mood"). */
 export interface Mood {
@@ -60,6 +65,16 @@ export interface Mood {
   currentValue: number;
   /** Per-instance scratch space for card effects. */
   data: Record<string, unknown>;
+}
+
+/** Serializable constraint on an extra ("additional mood") play. */
+export type PlayConstraint =
+  | { kind: 'primaryValueIn'; values: number[] } // top-right printed value in set
+  | { kind: 'colorNotSharedWithControllerMoods' } // Benevolence
+  | { kind: 'whileMoodCountBelow'; target: number }; // Pride — repeatable until met
+
+export interface ConditionalGrant {
+  constraint: PlayConstraint;
 }
 
 export type Phase =
@@ -94,6 +109,12 @@ export interface GameState {
   round: number;
   /** Whose turn it is right now. */
   activePlayer: PlayerId;
+  /** Unconditional plays left in the active player's current turn (starts at 1). */
+  playsRemaining: number;
+  /** Conditional extra plays granted this turn (each usable once, if it matches). */
+  conditionalGrants: ConditionalGrant[];
+  /** uids of moods the active player has played so far this turn. */
+  playedThisTurn: string[];
   /** Who leads the current round (wins ties). */
   firstPlayer: PlayerId;
   /** Turn order for the round (clockwise from firstPlayer). */

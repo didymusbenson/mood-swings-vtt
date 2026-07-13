@@ -2,7 +2,7 @@
 // these hooks it needs; the engine orchestrates *when* they run (see engine.ts
 // and docs/RULES.md "Order of operations" and "Scoring"/"After scoring").
 
-import type { CardData, Color, GameState, Mood, PlayerId } from './types.js';
+import type { CardData, Color, GameState, Mood, PlayConstraint, PlayerId } from './types.js';
 
 /** Read-only helpers available to value computation and effect resolution. */
 export interface ReadContext {
@@ -11,6 +11,8 @@ export interface ReadContext {
   readonly self: Mood;
   /** Static data for a mood, resolving `copyOf`. */
   card(mood: Mood): CardData;
+  /** Static data for a card number (e.g. to inspect a card in hand). */
+  cardData(cardNumber: number): CardData;
   /** Current value of a mood (as of the last stabilisation pass). */
   valueOf(mood: Mood): number;
   /** Every mood in play, across all players. */
@@ -28,7 +30,8 @@ export interface ReadContext {
 
 export type ValueOp =
   | { kind: 'add'; n: number }
-  | { kind: 'set'; n: number };
+  | { kind: 'set'; n: number }
+  | { kind: 'max'; n: number }; // value becomes max(current, n)
 
 /** A modifier one mood imposes on moods in play while it remains in play. */
 export interface ValueModifier {
@@ -47,10 +50,18 @@ export interface MutationApi {
   returnMoodToHand(mood: Mood, to?: PlayerId): void;
   discardFromHand(player: PlayerId, card: number): void;
   draw(player: PlayerId, n?: number): void;
-  suppress(mood: Mood, duration: 'turn' | 'sustained', bySelf?: boolean): void;
+  /** Put a mood on the bottom of the shared deck (leaves play). */
+  putOnBottomOfDeck(mood: Mood): void;
+  suppress(mood: Mood, duration: 'turn' | 'round' | 'sustained', bySelf?: boolean): void;
   steal(mood: Mood, to: PlayerId): void;
   giveMood(mood: Mood, to: PlayerId): void;
   rotateToSecondary(mood: Mood, on?: boolean): void;
+  /** Grant N unconditional extra plays this turn (the player may decline). */
+  grantAdditionalMood(n?: number): void;
+  /** Grant an extra play this turn, usable only on a card matching the constraint. */
+  grantConditionalMood(constraint: PlayConstraint): void;
+  /** Deterministic random integer in [0, maxExclusive) (advances the game seed). */
+  random(maxExclusive: number): number;
   log(message: string): void;
 }
 
@@ -81,6 +92,19 @@ export interface CardEffects {
   afterPlaying?(ctx: PlayContext): void;
   /** "After scoring" — resolved in turn order before losers draw. */
   afterScoring?(ctx: ScoreContext): void;
+
+  /**
+   * Fires when this mood's controller plays ANOTHER mood later in the same game
+   * ("each time you play another mood" — e.g. Scorn, Validation). `played` is
+   * the mood just put into play.
+   */
+  onOtherMoodPlayed?(ctx: PlayContext, played: Mood): void;
+
+  /**
+   * While in play, forces a specific player to lead each round (e.g. Honor).
+   * Returns the forced first player, or null for no override.
+   */
+  forcesFirstPlayer?(ctx: ReadContext): PlayerId | null;
 
   /**
    * This mood's intrinsic value given board state (before other moods'

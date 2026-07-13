@@ -4,6 +4,7 @@
 import {
   ROUNDS_TO_WIN,
   STARTING_HAND,
+  type CardData,
   type CardNumber,
   type Color,
   type GameState,
@@ -16,9 +17,11 @@ import type {
   PlayContext,
   ReadContext,
   ValueModifier,
+  ValueOp,
 } from './effects.js';
+import type { ConditionalGrant, PlayConstraint } from './types.js';
 import { CardDB, effectsFor } from './cards/registry.js';
-import { shuffle } from './rng.js';
+import { nextRandom, shuffle } from './rng.js';
 import {
   allMoods,
   countColor,
@@ -78,6 +81,9 @@ export class Engine {
       phase: 'awaitingPlay',
       round: 1,
       activePlayer: firstPlayer,
+      playsRemaining: 1,
+      conditionalGrants: [],
+      playedThisTurn: [],
       firstPlayer,
       turnOrder,
       actedThisRound: [],
@@ -119,18 +125,23 @@ export class Engine {
         const eff = effectsFor(resolveCardNumber(m));
         if (eff.whileInPlay) for (const mod of eff.whileInPlay(read(m))) mods.push({ mod, source: m });
       }
-      const applyPass = (kind: 'add' | 'set') => {
+      const applyPass = (kind: ValueOp['kind']) => {
         for (const { mod, source } of mods) {
           if (mod.op.kind !== kind) continue;
           for (const target of moods) {
             if (!mod.appliesTo(target, this.readContext(state, source, prev))) continue;
             const cur = values.get(target.uid) ?? 0;
-            values.set(target.uid, mod.op.kind === 'add' ? cur + mod.op.n : mod.op.n);
+            const next =
+              mod.op.kind === 'add' ? cur + mod.op.n
+              : mod.op.kind === 'max' ? Math.max(cur, mod.op.n)
+              : mod.op.n;
+            values.set(target.uid, next);
           }
         }
       };
       applyPass('add');
       applyPass('set');
+      applyPass('max');
 
       // 3. suppression forces 0; clamp negatives to 0
       for (const m of moods) {
@@ -156,6 +167,7 @@ export class Engine {
       state,
       self,
       card: (mood) => db.get(resolveCardNumber(mood)),
+      cardData: (cardNumber) => db.get(cardNumber),
       valueOf: (mood) => prev.get(mood.uid) ?? mood.currentValue,
       allMoods: () => allMoods(state),
       moodsOf: (player) => state.moods[player] ?? [],
@@ -197,6 +209,16 @@ export class Engine {
           state.hands[player]!.push(state.deck.shift()!);
         }
       },
+      putOnBottomOfDeck: (mood) => {
+        const m = removeMood(mood);
+        if (m) state.deck.push(m.card);
+      },
+      grantAdditionalMood: (n = 1) => {
+        state.playsRemaining += n;
+      },
+      grantConditionalMood: (constraint) => {
+        state.conditionalGrants.push({ constraint });
+      },
       suppress: (mood, duration, bySelf = false) => {
         mood.suppressed = duration;
         mood.suppressedBy = bySelf ? me : null;
@@ -220,6 +242,11 @@ export class Engine {
       rotateToSecondary: (mood, on = true) => {
         mood.usingSecondary = on;
       },
+      random: (maxExclusive) => {
+        const r = nextRandom(state.seed);
+        state.seed = r.seed;
+        return Math.floor(r.value * maxExclusive);
+      },
       log: (message) => state.log.push({ round: state.round, message }),
     };
   }
@@ -236,20 +263,28 @@ export class Engine {
     if (action.player !== state.activePlayer) throw new Error(`Not ${action.player}'s turn`);
 
     if (action.type === 'pass') {
+      // Passing always ends the current player's turn (declining any extra plays).
       state.log.push({ round: state.round, message: `${action.player} passes` });
+      this.completeTurn(state, action.player);
     } else {
       this.playMood(state, action.player, action.card, action.choices ?? {});
+      // Turn continues only while the player still has a play available.
+      const canContinue = state.playsRemaining > 0 || state.conditionalGrants.length > 0;
+      if (!canContinue) this.completeTurn(state, action.player);
     }
+    return state;
+  }
 
-    state.actedThisRound.push(action.player);
+  private completeTurn(state: GameState, player: PlayerId): void {
+    state.actedThisRound.push(player);
     this.endTurn(state);
     this.advance(state);
-    return state;
   }
 
   private playMood(state: GameState, me: PlayerId, card: CardNumber, choices: Choices): void {
     const hand = state.hands[me]!;
     if (!hand.includes(card)) throw new Error(`${me} does not hold #${card}`);
+    const data = this.db.get(card);
 
     // Build the mood up front so cost/effects can reference `self`.
     const mood: Mood = {
@@ -268,22 +303,58 @@ export class Engine {
     const costCtx = this.costContext(state, mood, me, choices);
     if (eff.canPlay && !eff.canPlay(costCtx)) throw new Error(`Cannot pay cost for #${card}`);
 
+    // Consume a play slot (base play or a matching conditional grant).
+    this.consumePlay(state, me, data);
+
     // 1. pay cost (before the mood enters play)
     eff.payCost?.(costCtx);
 
     // 2. enter play
     hand.splice(hand.indexOf(card), 1);
     state.moods[me]!.push(mood);
-    state.log.push({ round: state.round, message: `${me} plays ${this.db.get(card).name}` });
+    state.playedThisTurn.push(mood.uid);
+    state.log.push({ round: state.round, message: `${me} plays ${data.name}` });
 
     // 3. while-in-play stabilises
     this.stabilise(state);
 
     // 4. after-playing
     eff.afterPlaying?.(this.playContext(state, mood, me, choices));
-
-    // 5. re-stabilise
     this.stabilise(state);
+
+    // 5. "each time you play another mood" triggers on the player's other moods
+    for (const other of [...state.moods[me]!]) {
+      if (other.uid === mood.uid) continue;
+      const oeff = effectsFor(resolveCardNumber(other));
+      oeff.onOtherMoodPlayed?.(this.playContext(state, other, me, {}), mood);
+    }
+    this.stabilise(state);
+  }
+
+  /** Spend a play: the base play, else a matching conditional grant. */
+  private consumePlay(state: GameState, me: PlayerId, data: CardData): void {
+    if (state.playsRemaining > 0) {
+      state.playsRemaining -= 1;
+      return;
+    }
+    const idx = state.conditionalGrants.findIndex((g) => this.grantAllows(g, data, me, state));
+    if (idx < 0) throw new Error(`${me} has no available play for #${data.number}`);
+    // Repeatable grants (Pride) stay until their condition fails; others are single-use.
+    if (state.conditionalGrants[idx]!.constraint.kind !== 'whileMoodCountBelow') {
+      state.conditionalGrants.splice(idx, 1);
+    }
+  }
+
+  private grantAllows(grant: ConditionalGrant, data: CardData, me: PlayerId, state: GameState): boolean {
+    const c: PlayConstraint = grant.constraint;
+    switch (c.kind) {
+      case 'primaryValueIn':
+        return c.values.includes(data.value);
+      case 'colorNotSharedWithControllerMoods':
+        return !(state.moods[me] ?? []).some((m) => this.db.get(resolveCardNumber(m)).color === data.color);
+      case 'whileMoodCountBelow':
+        return (state.moods[me] ?? []).length < c.target;
+    }
   }
 
   /** Cost context: the mood is not yet in play, so effects act on existing board. */
@@ -308,6 +379,7 @@ export class Engine {
     const remaining = state.turnOrder.filter((p) => !state.actedThisRound.includes(p));
     if (remaining.length > 0) {
       state.activePlayer = remaining[0]!;
+      resetTurn(state);
       return;
     }
     this.score(state);
@@ -356,14 +428,31 @@ export class Engine {
       if (p.id !== winner) state.hands[p.id]!.push(...take(state, 1));
     }
 
-    // Next round: winner leads.
+    // 'round'-duration suppressions clear as the round ends.
+    for (const m of allMoods(state)) {
+      if (m.suppressed === 'round') {
+        m.suppressed = 'none';
+        m.suppressedBy = null;
+      }
+    }
+
+    // Next round: winner leads, unless a mood forces a first player (Honor).
+    let first: PlayerId = winner;
+    for (const m of allMoods(state)) {
+      const forced = effectsFor(resolveCardNumber(m)).forcesFirstPlayer?.(
+        this.readContext(state, m, snapshot(state))
+      );
+      if (forced) first = forced;
+    }
+
     state.round += 1;
-    state.firstPlayer = winner;
-    state.activePlayer = winner;
-    state.turnOrder = orderFrom(state.players.map((p) => p.id), winner);
+    state.firstPlayer = first;
+    state.activePlayer = first;
+    state.turnOrder = orderFrom(state.players.map((p) => p.id), first);
     state.actedThisRound = [];
     state.roundScores = {};
     state.phase = 'awaitingPlay';
+    resetTurn(state);
     this.stabilise(state);
   }
 
@@ -386,6 +475,13 @@ export class Engine {
 
 function snapshot(state: GameState): Map<string, number> {
   return new Map(allMoods(state).map((m) => [m.uid, m.currentValue]));
+}
+
+/** Reset the per-turn play budget when a new player's turn begins. */
+function resetTurn(state: GameState): void {
+  state.playsRemaining = 1;
+  state.conditionalGrants = [];
+  state.playedThisTurn = [];
 }
 
 function orderFrom(ids: PlayerId[], first: PlayerId): PlayerId[] {

@@ -8,7 +8,8 @@
 // The remaining ~125 effects are a systematic follow-up now that
 // data/cards.json is available (see REQUIREMENTS.md / task list).
 
-import './known/glee.js';
-import './known/love.js';
+import './white.js'; // #1–#26
+import './known/glee.js'; // #92 (red — pending red.ts)
+import './known/love.js'; // #134 (green — pending green.ts)
 
 export { registerEffects, effectsFor, CardDB } from './registry.js';
