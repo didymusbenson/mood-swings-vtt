@@ -4,13 +4,13 @@
 // "May" effects are opt-in: if the required choice is absent, nothing happens.
 //
 // GAPS FLAGGED (see report): the engine has no primitive for (a) skipping a
-// round's scoring (Awe), (b) playing an additional mood *from the discard pile*
-// (Grace, Harmony), (c) recurring per-turn extra plays (Grace, Hope), (d)
-// granting another player / your future turn an extra play (Generosity, Joy),
-// (e) an "additional mood must share a colour with your moods" constraint
-// (Eagerness), (f) round-scoped discard tracking (Vulnerability), (g) an
-// extra-scoring hook (Bliss, Enthusiasm — approximated by adjusting roundScores
-// in afterScoring). Each is implemented best-effort below and called out.
+// round's scoring (Awe), (e) an "additional mood must share a colour with your
+// moods" constraint (Eagerness; also Grace's discard-play colour-match residual),
+// (f) round-scoped discard tracking (Vulnerability), (g) an extra-scoring hook
+// (Bliss, Enthusiasm — approximated by adjusting roundScores in afterScoring).
+// NOW SUPPORTED: recurring per-turn extra plays (Grace, Hope via
+// `extraPlaysAtTurnStart`) and cross-turn / other-player extra plays (Generosity,
+// Joy via `grantExtraPlayNextTurn`). Remaining items are best-effort and called out.
 import type { Color, PlayerId } from '../types.js';
 import type { ReadContext } from '../effects.js';
 import { registerEffects } from './registry.js';
@@ -166,24 +166,28 @@ registerEffects(119, {
 });
 
 // #120 Generosity — [6]. Choose an opponent; they may play an additional mood on
-// their next turn. GAP: no primitive to grant another player a future-turn extra
-// play (playsRemaining is current-turn/current-player only). Best effort: log it.
+// their next turn. The one-time grant is queued on the chosen opponent and folded
+// into their play budget at the start of their next turn (see resetTurn).
 registerEffects(120, {
   afterPlaying: (ctx) => {
     const p = ctx.choices.players?.[0];
-    if (p) ctx.log(`Generosity: ${p} may play an additional mood next turn (unsupported cross-turn grant).`);
+    if (p && p !== ctx.me) ctx.grantExtraPlayNextTurn(p, 1);
   },
 });
 
-// #121 Grace — [0]. "While in play — During each of your turns you may play an
-// additional mood from the discard pile if it shares a colour with one of your
-// moods." Grants one discard-play (resolved via a { from: 'discard' } action).
-// RESIDUALS: (1) the per-turn recurrence needs a start-of-turn hook the engine
-// lacks, so this grants only on the turn Grace is played; (2) the colour-match
-// constraint isn't encodable on the plain discard-play counter, so it is not
-// enforced by the engine. See report.
+// #121 Grace — [0]. "While in play — During each of your turns (including the turn
+// you play this mood) you may play an additional mood from the discard pile if it
+// shares a colour with one of your moods." Recurring: `extraPlaysAtTurnStart` grants
+// one discard-play at the start of each of the owner's turns while Grace is in play;
+// `afterPlaying` covers the turn Grace itself is played (turn start has passed by
+// then). The discard-play is resolved via a { from: 'discard' } action.
+// RESIDUAL: the colour-match constraint ("if it shares a colour with one of your
+// moods") isn't enforced — `discardPlaysRemaining` is a shared plain counter that
+// can't distinguish a Grace-sourced grant from Harmony's unconstrained one. See
+// docs/effect-gaps.md (`colorSharedWithControllerMoods`).
 registerEffects(121, {
   afterPlaying: (ctx) => ctx.grantDiscardMood(1),
+  extraPlaysAtTurnStart: () => ({ fromDiscard: 1 }),
 });
 
 // #122 Happiness — [2]/[6][2]=8 if a single player has both a red mood and a
@@ -204,17 +208,21 @@ registerEffects(123, {
   afterPlaying: (ctx) => ctx.grantDiscardMood(1),
 });
 
-// #124 Hope — [0]. You may play an additional mood during each of your turns.
-// GAP: no recurring per-turn grant hook. Best effort: grant one extra play on the
-// turn Hope is played only.
+// #124 Hope — [0]. "While in play — You may play an additional mood during each of
+// your turns (including the turn you play this mood)." Recurring:
+// `extraPlaysAtTurnStart` grants one extra play at the start of each of the owner's
+// turns while Hope is in play (and stops once it leaves play); `afterPlaying` covers
+// the turn Hope itself is played (turn start has already passed by then).
 registerEffects(124, {
   afterPlaying: (ctx) => ctx.grantAdditionalMood(1),
+  extraPlaysAtTurnStart: () => ({ normal: 1 }),
 });
 
-// #125 Joy — [3]. You may play an additional mood on your next turn. GAP: no
-// primitive to grant a future-turn extra play. Best effort: log it.
+// #125 Joy — [3]. "After playing this mood — You may play an additional mood on your
+// next turn." One-time: queues an extra play on the controller, folded into their
+// play budget at the start of their next turn (see resetTurn).
 registerEffects(125, {
-  afterPlaying: (ctx) => ctx.log('Joy: controller may play an additional mood next turn (unsupported cross-turn grant).'),
+  afterPlaying: (ctx) => ctx.grantExtraPlayNextTurn(ctx.me, 1),
 });
 
 // #126 Laziness — vanilla (no rules text). The engine scores its printed [4]; no

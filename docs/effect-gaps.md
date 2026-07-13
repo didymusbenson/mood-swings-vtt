@@ -39,6 +39,20 @@ Wonder (#133 +[2]). Printed `value`/`secondaryValue` were already correct.
   permission that lets a `from:'discard'` play consume a normal play. A hand card
   can't be played as a discard play and vice-versa.
 - **Creativity copy + cost** — #32 Creativity, see the disambiguation note below.
+- **Start-of-turn / recurring extra play** — #124 Hope, #121 Grace (recurring half),
+  #102 Stubbornness. `CardEffects.extraPlaysAtTurnStart(ctx) => { normal?, fromDiscard? }`
+  is re-evaluated for each of the active player's in-play moods at every turn start
+  (the `Engine.resetTurn` path shared by `setup`, `advance`, and `endRound`), so these
+  grants fire on every one of the owner's turns while the mood is in play and stop once
+  it leaves. Hope → `{normal:1}`, Grace → `{fromDiscard:1}`, Stubbornness → `{normal:1}`
+  only when an opponent has strictly more moods. The turn a Hope/Grace is *played* is
+  covered by its `afterPlaying` grant ("including the turn you play this mood").
+- **Cross-turn / other-player extra play** — #125 Joy (self), #120 Generosity (chosen
+  opponent). Serializable per-player counters `GameState.pendingExtraPlays` /
+  `pendingDiscardPlays` hold one-time future grants; `MutationApi.grantExtraPlayNextTurn`
+  / `grantDiscardPlayNextTurn` fill them, and `resetTurn` folds a player's pending count
+  into `playsRemaining` / `discardPlaysRemaining` at their turn start and clears it
+  (consumed exactly once).
 
 ## Missing engine primitives (best-effort today; flagged by encoders)
 
@@ -52,15 +66,13 @@ approximated) without crashing; adding the primitive would make them fully faith
 - **"Score a mood an extra time"** — #108 Bliss, #116 Enthusiasm, #89 Exhilaration,
   #97 Passion. Approximated by adjusting `roundScores` in `afterScoring` (winner is
   still decided correctly).
-- **Start-of-turn / recurring extra play** — #102 Stubbornness, #124 Hope, and the
-  recurring half of #121 Grace ("during each of your turns"). No turn-start hook, so
-  Grace's discard-play grant fires only on the turn it is played.
-- **Cross-turn / other-player extra play** — #120 Generosity, #125 Joy. `playsRemaining`
-  is current-player/current-turn only.
 - **`colorSharedWithControllerMoods` constraint** — #114 Eagerness (only the inverse
   exists today; grants an unconstrained extra play). Also #121 Grace's discard-play
   colour-match ("if it shares a colour with one of your moods") is unconstrained:
-  `discardPlaysRemaining` is a plain counter and can't carry the constraint.
+  `discardPlaysRemaining` is a shared plain counter that can't distinguish a
+  Grace-sourced grant from Harmony's unconstrained one, so the colour-match is not
+  enforced. This is the sole residual of the (now-closed) recurring/cross-turn
+  extra-play work — the recurring discard grant itself fires correctly each turn.
 - **Play-gate (colour/other restrictions next round)** — #36 Doubt (recorded/logged
   only).
 - **Creativity dual mood-target disambiguation** — #32 Creativity now copies a mood

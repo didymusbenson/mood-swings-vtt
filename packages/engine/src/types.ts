@@ -151,6 +151,20 @@ export interface GameState {
   discardPlaysRemaining: number;
   /** Conditional extra plays granted this turn (each usable once, if it matches). */
   conditionalGrants: ConditionalGrant[];
+  /**
+   * One-time extra plays owed to a player at the START of their NEXT turn (Joy #125
+   * grants to self; Generosity #120 to a chosen opponent). At each player's turn
+   * start the counter is folded into `playsRemaining` and reset to 0, so a grant is
+   * consumed exactly once. Serializable (survives structuredClone).
+   */
+  pendingExtraPlays: Record<PlayerId, number>;
+  /**
+   * One-time extra DISCARD plays owed to a player at the start of their next turn
+   * (same mechanism as `pendingExtraPlays`, but folded into `discardPlaysRemaining`).
+   * No card grants this today, but the primitive mirrors `pendingExtraPlays` for
+   * cross-turn discard-play grants.
+   */
+  pendingDiscardPlays: Record<PlayerId, number>;
   /** uids of moods the active player has played so far this turn. */
   playedThisTurn: string[];
   /** Who leads the current round (wins ties). */

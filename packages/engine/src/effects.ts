@@ -73,6 +73,18 @@ export interface MutationApi {
   grantDiscardMood(n?: number): void;
   /** Grant an extra play this turn, usable only on a card matching the constraint. */
   grantConditionalMood(constraint: PlayConstraint): void;
+  /**
+   * Grant `player` N extra plays at the START of their NEXT turn (one-time, cross-turn).
+   * Joy #125 grants to `me`; Generosity #120 grants to the chosen opponent. Fills the
+   * serializable `GameState.pendingExtraPlays` counter, folded into `playsRemaining`
+   * at that player's turn start and consumed once.
+   */
+  grantExtraPlayNextTurn(player: PlayerId, n?: number): void;
+  /**
+   * Grant `player` N extra DISCARD plays at the start of their next turn (one-time,
+   * cross-turn — the discard-play analogue of `grantExtraPlayNextTurn`).
+   */
+  grantDiscardPlayNextTurn(player: PlayerId, n?: number): void;
   /** Deterministic random integer in [0, maxExclusive) (advances the game seed). */
   random(maxExclusive: number): number;
   log(message: string): void;
@@ -118,6 +130,19 @@ export interface CardEffects {
    * Returns the forced first player, or null for no override.
    */
   forcesFirstPlayer?(ctx: ReadContext): PlayerId | null;
+
+  /**
+   * While in play, grants its OWNER extra plays at the start of EACH of the owner's
+   * turns ("during each of your turns"). Re-evaluated at every turn start against the
+   * live board, so the grant fires every turn the mood is in play and stops once it
+   * leaves play. `normal` adds to `playsRemaining`; `fromDiscard` adds to
+   * `discardPlaysRemaining`. Hope #124 → `{ normal: 1 }`; Grace #121 → `{ fromDiscard: 1 }`;
+   * Stubbornness #102 → `{ normal: 1 }` only when its start-of-turn condition holds.
+   * `ctx.self` is the mood; use `ctx.self.owner` for the active player. NB: the turn a
+   * mood is played, its own `afterPlaying` covers the "including the turn you play this
+   * mood" grant (turn start has already passed by then).
+   */
+  extraPlaysAtTurnStart?(ctx: ReadContext): { normal?: number; fromDiscard?: number };
 
   /**
    * This mood's intrinsic value given board state (before other moods'

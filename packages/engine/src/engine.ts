@@ -107,6 +107,8 @@ export class Engine {
       playsRemaining: 1,
       discardPlaysRemaining: 0,
       conditionalGrants: [],
+      pendingExtraPlays: {},
+      pendingDiscardPlays: {},
       playedThisTurn: [],
       firstPlayer,
       turnOrder,
@@ -117,6 +119,9 @@ export class Engine {
       uidCounter: 0,
       log: [],
     };
+    // Apply the first player's turn-start play budget (no moods/pending yet, so this
+    // is just the base play — but keeps the turn-start path in one place).
+    this.resetTurn(state);
     this.stabilise(state);
     return state;
   }
@@ -300,6 +305,12 @@ export class Engine {
       },
       grantConditionalMood: (constraint) => {
         state.conditionalGrants.push({ constraint });
+      },
+      grantExtraPlayNextTurn: (player, n = 1) => {
+        state.pendingExtraPlays[player] = (state.pendingExtraPlays[player] ?? 0) + n;
+      },
+      grantDiscardPlayNextTurn: (player, n = 1) => {
+        state.pendingDiscardPlays[player] = (state.pendingDiscardPlays[player] ?? 0) + n;
       },
       suppress: (mood, duration, bySelf = false) => {
         mood.suppressed = duration;
@@ -515,7 +526,7 @@ export class Engine {
     const remaining = state.turnOrder.filter((p) => !state.actedThisRound.includes(p));
     if (remaining.length > 0) {
       state.activePlayer = remaining[0]!;
-      resetTurn(state);
+      this.resetTurn(state);
       return;
     }
     this.score(state);
@@ -599,8 +610,35 @@ export class Engine {
     state.actedThisRound = [];
     state.roundScores = {};
     state.phase = 'awaitingPlay';
-    resetTurn(state);
+    this.resetTurn(state);
     this.stabilise(state);
+  }
+
+  /**
+   * Begin the active player's turn: reset the per-turn play budget to the base play,
+   * then layer on (1) one-time pending grants (Joy #125 / Generosity #120), consumed
+   * here, and (2) recurring while-in-play grants — for each of the active player's
+   * moods, the `extraPlaysAtTurnStart` hook (Hope #124, Grace #121, Stubbornness #102),
+   * re-evaluated every turn so they fire while the mood is in play and stop once it
+   * leaves. This is the single turn-start path used by setup, advance, and endRound.
+   */
+  private resetTurn(state: GameState): void {
+    const player = state.activePlayer;
+    state.conditionalGrants = [];
+    state.playedThisTurn = [];
+    // Base play + one-time pending grants owed to this player (consumed now).
+    state.playsRemaining = 1 + (state.pendingExtraPlays[player] ?? 0);
+    state.discardPlaysRemaining = state.pendingDiscardPlays[player] ?? 0;
+    state.pendingExtraPlays[player] = 0;
+    state.pendingDiscardPlays[player] = 0;
+    // Recurring while-in-play grants from this player's own moods.
+    for (const m of state.moods[player] ?? []) {
+      const hook = effectsFor(resolveCardNumber(m)).extraPlaysAtTurnStart;
+      if (!hook) continue;
+      const { normal = 0, fromDiscard = 0 } = hook(this.readContext(state, m, snapshot(state)));
+      state.playsRemaining += normal;
+      state.discardPlaysRemaining += fromDiscard;
+    }
   }
 
   /** Highest score wins; tie → player who played earliest this round. */
@@ -622,14 +660,6 @@ export class Engine {
 
 function snapshot(state: GameState): Map<string, number> {
   return new Map(allMoods(state).map((m) => [m.uid, m.currentValue]));
-}
-
-/** Reset the per-turn play budget when a new player's turn begins. */
-function resetTurn(state: GameState): void {
-  state.playsRemaining = 1;
-  state.discardPlaysRemaining = 0;
-  state.conditionalGrants = [];
-  state.playedThisTurn = [];
 }
 
 /** Play-order key from a mood uid (`m<n>`): higher = played more recently. */
