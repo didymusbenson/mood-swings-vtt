@@ -1,0 +1,947 @@
+[
+  {
+    "number": 1,
+    "slug": "altruism",
+    "name": "Altruism",
+    "color": "white",
+    "url": "/card/1ed/1/altruism"
+  },
+  {
+    "number": 2,
+    "slug": "benevolence",
+    "name": "Benevolence",
+    "color": "white",
+    "url": "/card/1ed/2/benevolence"
+  },
+  {
+    "number": 3,
+    "slug": "charity",
+    "name": "Charity",
+    "color": "white",
+    "url": "/card/1ed/3/charity"
+  },
+  {
+    "number": 4,
+    "slug": "chivalry",
+    "name": "Chivalry",
+    "color": "white",
+    "url": "/card/1ed/4/chivalry"
+  },
+  {
+    "number": 5,
+    "slug": "complacency",
+    "name": "Complacency",
+    "color": "white",
+    "url": "/card/1ed/5/complacency"
+  },
+  {
+    "number": 6,
+    "slug": "conviction",
+    "name": "Conviction",
+    "color": "white",
+    "url": "/card/1ed/6/conviction"
+  },
+  {
+    "number": 7,
+    "slug": "courage",
+    "name": "Courage",
+    "color": "white",
+    "url": "/card/1ed/7/courage"
+  },
+  {
+    "number": 8,
+    "slug": "dignity",
+    "name": "Dignity",
+    "color": "white",
+    "url": "/card/1ed/8/dignity"
+  },
+  {
+    "number": 9,
+    "slug": "discipline",
+    "name": "Discipline",
+    "color": "white",
+    "url": "/card/1ed/9/discipline"
+  },
+  {
+    "number": 10,
+    "slug": "disillusionment",
+    "name": "Disillusionment",
+    "color": "white",
+    "url": "/card/1ed/10/disillusionment"
+  },
+  {
+    "number": 11,
+    "slug": "encouragement",
+    "name": "Encouragement",
+    "color": "white",
+    "url": "/card/1ed/11/encouragement"
+  },
+  {
+    "number": 12,
+    "slug": "faith",
+    "name": "Faith",
+    "color": "white",
+    "url": "/card/1ed/12/faith"
+  },
+  {
+    "number": 13,
+    "slug": "friendliness",
+    "name": "Friendliness",
+    "color": "white",
+    "url": "/card/1ed/13/friendliness"
+  },
+  {
+    "number": 14,
+    "slug": "guilt",
+    "name": "Guilt",
+    "color": "white",
+    "url": "/card/1ed/14/guilt"
+  },
+  {
+    "number": 15,
+    "slug": "honor",
+    "name": "Honor",
+    "color": "white",
+    "url": "/card/1ed/15/honor"
+  },
+  {
+    "number": 16,
+    "slug": "idealism",
+    "name": "Idealism",
+    "color": "white",
+    "url": "/card/1ed/16/idealism"
+  },
+  {
+    "number": 17,
+    "slug": "kindness",
+    "name": "Kindness",
+    "color": "white",
+    "url": "/card/1ed/17/kindness"
+  },
+  {
+    "number": 18,
+    "slug": "loyalty",
+    "name": "Loyalty",
+    "color": "white",
+    "url": "/card/1ed/18/loyalty"
+  },
+  {
+    "number": 19,
+    "slug": "meekness",
+    "name": "Meekness",
+    "color": "white",
+    "url": "/card/1ed/19/meekness"
+  },
+  {
+    "number": 20,
+    "slug": "pacifism",
+    "name": "Pacifism",
+    "color": "white",
+    "url": "/card/1ed/20/pacifism"
+  },
+  {
+    "number": 21,
+    "slug": "patience",
+    "name": "Patience",
+    "color": "white",
+    "url": "/card/1ed/21/patience"
+  },
+  {
+    "number": 22,
+    "slug": "pride",
+    "name": "Pride",
+    "color": "white",
+    "url": "/card/1ed/22/pride"
+  },
+  {
+    "number": 23,
+    "slug": "repentance",
+    "name": "Repentance",
+    "color": "white",
+    "url": "/card/1ed/23/repentance"
+  },
+  {
+    "number": 24,
+    "slug": "scorn",
+    "name": "Scorn",
+    "color": "white",
+    "url": "/card/1ed/24/scorn"
+  },
+  {
+    "number": 25,
+    "slug": "shame",
+    "name": "Shame",
+    "color": "white",
+    "url": "/card/1ed/25/shame"
+  },
+  {
+    "number": 26,
+    "slug": "validation",
+    "name": "Validation",
+    "color": "white",
+    "url": "/card/1ed/26/validation"
+  },
+  {
+    "number": 27,
+    "slug": "ambivalence",
+    "name": "Ambivalence",
+    "color": "blue",
+    "url": "/card/1ed/27/ambivalence"
+  },
+  {
+    "number": 28,
+    "slug": "anxiety",
+    "name": "Anxiety",
+    "color": "blue",
+    "url": "/card/1ed/28/anxiety"
+  },
+  {
+    "number": 29,
+    "slug": "avoidance",
+    "name": "Avoidance",
+    "color": "blue",
+    "url": "/card/1ed/29/avoidance"
+  },
+  {
+    "number": 30,
+    "slug": "bashfulness",
+    "name": "Bashfulness",
+    "color": "blue",
+    "url": "/card/1ed/30/bashfulness"
+  },
+  {
+    "number": 31,
+    "slug": "confusion",
+    "name": "Confusion",
+    "color": "blue",
+    "url": "/card/1ed/31/confusion"
+  },
+  {
+    "number": 32,
+    "slug": "creativity",
+    "name": "Creativity",
+    "color": "blue",
+    "url": "/card/1ed/32/creativity"
+  },
+  {
+    "number": 33,
+    "slug": "curiosity",
+    "name": "Curiosity",
+    "color": "blue",
+    "url": "/card/1ed/33/curiosity"
+  },
+  {
+    "number": 34,
+    "slug": "denial",
+    "name": "Denial",
+    "color": "blue",
+    "url": "/card/1ed/34/denial"
+  },
+  {
+    "number": 35,
+    "slug": "disorientation",
+    "name": "Disorientation",
+    "color": "blue",
+    "url": "/card/1ed/35/disorientation"
+  },
+  {
+    "number": 36,
+    "slug": "doubt",
+    "name": "Doubt",
+    "color": "blue",
+    "url": "/card/1ed/36/doubt"
+  },
+  {
+    "number": 37,
+    "slug": "duplicity",
+    "name": "Duplicity",
+    "color": "blue",
+    "url": "/card/1ed/37/duplicity"
+  },
+  {
+    "number": 38,
+    "slug": "fear",
+    "name": "Fear",
+    "color": "blue",
+    "url": "/card/1ed/38/fear"
+  },
+  {
+    "number": 39,
+    "slug": "fickleness",
+    "name": "Fickleness",
+    "color": "blue",
+    "url": "/card/1ed/39/fickleness"
+  },
+  {
+    "number": 40,
+    "slug": "guile",
+    "name": "Guile",
+    "color": "blue",
+    "url": "/card/1ed/40/guile"
+  },
+  {
+    "number": 41,
+    "slug": "hesitation",
+    "name": "Hesitation",
+    "color": "blue",
+    "url": "/card/1ed/41/hesitation"
+  },
+  {
+    "number": 42,
+    "slug": "imagination",
+    "name": "Imagination",
+    "color": "blue",
+    "url": "/card/1ed/42/imagination"
+  },
+  {
+    "number": 43,
+    "slug": "indecisiveness",
+    "name": "Indecisiveness",
+    "color": "blue",
+    "url": "/card/1ed/43/indecisiveness"
+  },
+  {
+    "number": 44,
+    "slug": "indifference",
+    "name": "Indifference",
+    "color": "blue",
+    "url": "/card/1ed/44/indifference"
+  },
+  {
+    "number": 45,
+    "slug": "insecurity",
+    "name": "Insecurity",
+    "color": "blue",
+    "url": "/card/1ed/45/insecurity"
+  },
+  {
+    "number": 46,
+    "slug": "neurosis",
+    "name": "Neurosis",
+    "color": "blue",
+    "url": "/card/1ed/46/neurosis"
+  },
+  {
+    "number": 47,
+    "slug": "obsession",
+    "name": "Obsession",
+    "color": "blue",
+    "url": "/card/1ed/47/obsession"
+  },
+  {
+    "number": 48,
+    "slug": "panic",
+    "name": "Panic",
+    "color": "blue",
+    "url": "/card/1ed/48/panic"
+  },
+  {
+    "number": 49,
+    "slug": "rationalization",
+    "name": "Rationalization",
+    "color": "blue",
+    "url": "/card/1ed/49/rationalization"
+  },
+  {
+    "number": 50,
+    "slug": "regret",
+    "name": "Regret",
+    "color": "blue",
+    "url": "/card/1ed/50/regret"
+  },
+  {
+    "number": 51,
+    "slug": "sneakiness",
+    "name": "Sneakiness",
+    "color": "blue",
+    "url": "/card/1ed/51/sneakiness"
+  },
+  {
+    "number": 52,
+    "slug": "worry",
+    "name": "Worry",
+    "color": "blue",
+    "url": "/card/1ed/52/worry"
+  },
+  {
+    "number": 53,
+    "slug": "ambition",
+    "name": "Ambition",
+    "color": "black",
+    "url": "/card/1ed/53/ambition"
+  },
+  {
+    "number": 54,
+    "slug": "angst",
+    "name": "Angst",
+    "color": "black",
+    "url": "/card/1ed/54/angst"
+  },
+  {
+    "number": 55,
+    "slug": "apathy",
+    "name": "Apathy",
+    "color": "black",
+    "url": "/card/1ed/55/apathy"
+  },
+  {
+    "number": 56,
+    "slug": "betrayal",
+    "name": "Betrayal",
+    "color": "black",
+    "url": "/card/1ed/56/betrayal"
+  },
+  {
+    "number": 57,
+    "slug": "bitterness",
+    "name": "Bitterness",
+    "color": "black",
+    "url": "/card/1ed/57/bitterness"
+  },
+  {
+    "number": 58,
+    "slug": "condescension",
+    "name": "Condescension",
+    "color": "black",
+    "url": "/card/1ed/58/condescension"
+  },
+  {
+    "number": 59,
+    "slug": "contempt",
+    "name": "Contempt",
+    "color": "black",
+    "url": "/card/1ed/59/contempt"
+  },
+  {
+    "number": 60,
+    "slug": "corruption",
+    "name": "Corruption",
+    "color": "black",
+    "url": "/card/1ed/60/corruption"
+  },
+  {
+    "number": 61,
+    "slug": "cruelty",
+    "name": "Cruelty",
+    "color": "black",
+    "url": "/card/1ed/61/cruelty"
+  },
+  {
+    "number": 62,
+    "slug": "cynicism",
+    "name": "Cynicism",
+    "color": "black",
+    "url": "/card/1ed/62/cynicism"
+  },
+  {
+    "number": 63,
+    "slug": "disgust",
+    "name": "Disgust",
+    "color": "black",
+    "url": "/card/1ed/63/disgust"
+  },
+  {
+    "number": 64,
+    "slug": "envy",
+    "name": "Envy",
+    "color": "black",
+    "url": "/card/1ed/64/envy"
+  },
+  {
+    "number": 65,
+    "slug": "grief",
+    "name": "Grief",
+    "color": "black",
+    "url": "/card/1ed/65/grief"
+  },
+  {
+    "number": 66,
+    "slug": "hate",
+    "name": "Hate",
+    "color": "black",
+    "url": "/card/1ed/66/hate"
+  },
+  {
+    "number": 67,
+    "slug": "intimidation",
+    "name": "Intimidation",
+    "color": "black",
+    "url": "/card/1ed/67/intimidation"
+  },
+  {
+    "number": 68,
+    "slug": "malice",
+    "name": "Malice",
+    "color": "black",
+    "url": "/card/1ed/68/malice"
+  },
+  {
+    "number": 69,
+    "slug": "melancholy",
+    "name": "Melancholy",
+    "color": "black",
+    "url": "/card/1ed/69/melancholy"
+  },
+  {
+    "number": 70,
+    "slug": "misery",
+    "name": "Misery",
+    "color": "black",
+    "url": "/card/1ed/70/misery"
+  },
+  {
+    "number": 71,
+    "slug": "paranoia",
+    "name": "Paranoia",
+    "color": "black",
+    "url": "/card/1ed/71/paranoia"
+  },
+  {
+    "number": 72,
+    "slug": "pity",
+    "name": "Pity",
+    "color": "black",
+    "url": "/card/1ed/72/pity"
+  },
+  {
+    "number": 73,
+    "slug": "rejection",
+    "name": "Rejection",
+    "color": "black",
+    "url": "/card/1ed/73/rejection"
+  },
+  {
+    "number": 74,
+    "slug": "sadness",
+    "name": "Sadness",
+    "color": "black",
+    "url": "/card/1ed/74/sadness"
+  },
+  {
+    "number": 75,
+    "slug": "self-loathing",
+    "name": "Self-Loathing",
+    "color": "black",
+    "url": "/card/1ed/75/self-loathing"
+  },
+  {
+    "number": 76,
+    "slug": "spite",
+    "name": "Spite",
+    "color": "black",
+    "url": "/card/1ed/76/spite"
+  },
+  {
+    "number": 77,
+    "slug": "superiority",
+    "name": "Superiority",
+    "color": "black",
+    "url": "/card/1ed/77/superiority"
+  },
+  {
+    "number": 78,
+    "slug": "suspicion",
+    "name": "Suspicion",
+    "color": "black",
+    "url": "/card/1ed/78/suspicion"
+  },
+  {
+    "number": 79,
+    "slug": "vanity",
+    "name": "Vanity",
+    "color": "black",
+    "url": "/card/1ed/79/vanity"
+  },
+  {
+    "number": 80,
+    "slug": "anger",
+    "name": "Anger",
+    "color": "red",
+    "url": "/card/1ed/80/anger"
+  },
+  {
+    "number": 81,
+    "slug": "animosity",
+    "name": "Animosity",
+    "color": "red",
+    "url": "/card/1ed/81/animosity"
+  },
+  {
+    "number": 82,
+    "slug": "arrogance",
+    "name": "Arrogance",
+    "color": "red",
+    "url": "/card/1ed/82/arrogance"
+  },
+  {
+    "number": 83,
+    "slug": "boredom",
+    "name": "Boredom",
+    "color": "red",
+    "url": "/card/1ed/83/boredom"
+  },
+  {
+    "number": 84,
+    "slug": "bravado",
+    "name": "Bravado",
+    "color": "red",
+    "url": "/card/1ed/84/bravado"
+  },
+  {
+    "number": 85,
+    "slug": "chaos",
+    "name": "Chaos",
+    "color": "red",
+    "url": "/card/1ed/85/chaos"
+  },
+  {
+    "number": 86,
+    "slug": "compulsion",
+    "name": "Compulsion",
+    "color": "red",
+    "url": "/card/1ed/86/compulsion"
+  },
+  {
+    "number": 87,
+    "slug": "embarrassment",
+    "name": "Embarrassment",
+    "color": "red",
+    "url": "/card/1ed/87/embarrassment"
+  },
+  {
+    "number": 88,
+    "slug": "excitement",
+    "name": "Excitement",
+    "color": "red",
+    "url": "/card/1ed/88/excitement"
+  },
+  {
+    "number": 89,
+    "slug": "exhilaration",
+    "name": "Exhilaration",
+    "color": "red",
+    "url": "/card/1ed/89/exhilaration"
+  },
+  {
+    "number": 90,
+    "slug": "frustration",
+    "name": "Frustration",
+    "color": "red",
+    "url": "/card/1ed/90/frustration"
+  },
+  {
+    "number": 91,
+    "slug": "fury",
+    "name": "Fury",
+    "color": "red",
+    "url": "/card/1ed/91/fury"
+  },
+  {
+    "number": 92,
+    "slug": "glee",
+    "name": "Glee",
+    "color": "red",
+    "url": "/card/1ed/92/glee"
+  },
+  {
+    "number": 93,
+    "slug": "gluttony",
+    "name": "Gluttony",
+    "color": "red",
+    "url": "/card/1ed/93/gluttony"
+  },
+  {
+    "number": 94,
+    "slug": "hostility",
+    "name": "Hostility",
+    "color": "red",
+    "url": "/card/1ed/94/hostility"
+  },
+  {
+    "number": 95,
+    "slug": "infatuation",
+    "name": "Infatuation",
+    "color": "red",
+    "url": "/card/1ed/95/infatuation"
+  },
+  {
+    "number": 96,
+    "slug": "instability",
+    "name": "Instability",
+    "color": "red",
+    "url": "/card/1ed/96/instability"
+  },
+  {
+    "number": 97,
+    "slug": "passion",
+    "name": "Passion",
+    "color": "red",
+    "url": "/card/1ed/97/passion"
+  },
+  {
+    "number": 98,
+    "slug": "rage",
+    "name": "Rage",
+    "color": "red",
+    "url": "/card/1ed/98/rage"
+  },
+  {
+    "number": 99,
+    "slug": "rebellion",
+    "name": "Rebellion",
+    "color": "red",
+    "url": "/card/1ed/99/rebellion"
+  },
+  {
+    "number": 100,
+    "slug": "recklessness",
+    "name": "Recklessness",
+    "color": "red",
+    "url": "/card/1ed/100/recklessness"
+  },
+  {
+    "number": 101,
+    "slug": "shock",
+    "name": "Shock",
+    "color": "red",
+    "url": "/card/1ed/101/shock"
+  },
+  {
+    "number": 102,
+    "slug": "stubbornness",
+    "name": "Stubbornness",
+    "color": "red",
+    "url": "/card/1ed/102/stubbornness"
+  },
+  {
+    "number": 103,
+    "slug": "thrill",
+    "name": "Thrill",
+    "color": "red",
+    "url": "/card/1ed/103/thrill"
+  },
+  {
+    "number": 104,
+    "slug": "triumph",
+    "name": "Triumph",
+    "color": "red",
+    "url": "/card/1ed/104/triumph"
+  },
+  {
+    "number": 105,
+    "slug": "wrath",
+    "name": "Wrath",
+    "color": "red",
+    "url": "/card/1ed/105/wrath"
+  },
+  {
+    "number": 106,
+    "slug": "zeal",
+    "name": "Zeal",
+    "color": "red",
+    "url": "/card/1ed/106/zeal"
+  },
+  {
+    "number": 107,
+    "slug": "awe",
+    "name": "Awe",
+    "color": "green",
+    "url": "/card/1ed/107/awe"
+  },
+  {
+    "number": 108,
+    "slug": "bliss",
+    "name": "Bliss",
+    "color": "green",
+    "url": "/card/1ed/108/bliss"
+  },
+  {
+    "number": 109,
+    "slug": "celebration",
+    "name": "Celebration",
+    "color": "green",
+    "url": "/card/1ed/109/celebration"
+  },
+  {
+    "number": 110,
+    "slug": "cheer",
+    "name": "Cheer",
+    "color": "green",
+    "url": "/card/1ed/110/cheer"
+  },
+  {
+    "number": 111,
+    "slug": "delight",
+    "name": "Delight",
+    "color": "green",
+    "url": "/card/1ed/111/delight"
+  },
+  {
+    "number": 112,
+    "slug": "determination",
+    "name": "Determination",
+    "color": "green",
+    "url": "/card/1ed/112/determination"
+  },
+  {
+    "number": 113,
+    "slug": "disregard",
+    "name": "Disregard",
+    "color": "green",
+    "url": "/card/1ed/113/disregard"
+  },
+  {
+    "number": 114,
+    "slug": "eagerness",
+    "name": "Eagerness",
+    "color": "green",
+    "url": "/card/1ed/114/eagerness"
+  },
+  {
+    "number": 115,
+    "slug": "enjoyment",
+    "name": "Enjoyment",
+    "color": "green",
+    "url": "/card/1ed/115/enjoyment"
+  },
+  {
+    "number": 116,
+    "slug": "enthusiasm",
+    "name": "Enthusiasm",
+    "color": "green",
+    "url": "/card/1ed/116/enthusiasm"
+  },
+  {
+    "number": 117,
+    "slug": "euphoria",
+    "name": "Euphoria",
+    "color": "green",
+    "url": "/card/1ed/117/euphoria"
+  },
+  {
+    "number": 118,
+    "slug": "fascination",
+    "name": "Fascination",
+    "color": "green",
+    "url": "/card/1ed/118/fascination"
+  },
+  {
+    "number": 119,
+    "slug": "fondness",
+    "name": "Fondness",
+    "color": "green",
+    "url": "/card/1ed/119/fondness"
+  },
+  {
+    "number": 120,
+    "slug": "generosity",
+    "name": "Generosity",
+    "color": "green",
+    "url": "/card/1ed/120/generosity"
+  },
+  {
+    "number": 121,
+    "slug": "grace",
+    "name": "Grace",
+    "color": "green",
+    "url": "/card/1ed/121/grace"
+  },
+  {
+    "number": 122,
+    "slug": "happiness",
+    "name": "Happiness",
+    "color": "green",
+    "url": "/card/1ed/122/happiness"
+  },
+  {
+    "number": 123,
+    "slug": "harmony",
+    "name": "Harmony",
+    "color": "green",
+    "url": "/card/1ed/123/harmony"
+  },
+  {
+    "number": 124,
+    "slug": "hope",
+    "name": "Hope",
+    "color": "green",
+    "url": "/card/1ed/124/hope"
+  },
+  {
+    "number": 125,
+    "slug": "joy",
+    "name": "Joy",
+    "color": "green",
+    "url": "/card/1ed/125/joy"
+  },
+  {
+    "number": 126,
+    "slug": "laziness",
+    "name": "Laziness",
+    "color": "green",
+    "url": "/card/1ed/126/laziness"
+  },
+  {
+    "number": 127,
+    "slug": "love",
+    "name": "Love",
+    "color": "green",
+    "url": "/card/1ed/127/love"
+  },
+  {
+    "number": 128,
+    "slug": "nostalgia",
+    "name": "Nostalgia",
+    "color": "green",
+    "url": "/card/1ed/128/nostalgia"
+  },
+  {
+    "number": 129,
+    "slug": "serenity",
+    "name": "Serenity",
+    "color": "green",
+    "url": "/card/1ed/129/serenity"
+  },
+  {
+    "number": 130,
+    "slug": "sloth",
+    "name": "Sloth",
+    "color": "green",
+    "url": "/card/1ed/130/sloth"
+  },
+  {
+    "number": 131,
+    "slug": "tranquility",
+    "name": "Tranquility",
+    "color": "green",
+    "url": "/card/1ed/131/tranquility"
+  },
+  {
+    "number": 132,
+    "slug": "vulnerability",
+    "name": "Vulnerability",
+    "color": "green",
+    "url": "/card/1ed/132/vulnerability"
+  },
+  {
+    "number": 133,
+    "slug": "wonder",
+    "name": "Wonder",
+    "color": "green",
+    "url": "/card/1ed/133/wonder"
+  },
+  {
+    "number": 134,
+    "slug": "love",
+    "name": "Love",
+    "color": "green",
+    "url": "/card/1ed/134/love"
+  },
+  {
+    "number": 135,
+    "slug": "hurt-feelings",
+    "name": "Hurt Feelings",
+    "color": "colorless",
+    "url": "/card/1ed/135/hurt-feelings"
+  }
+]
