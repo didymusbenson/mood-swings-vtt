@@ -667,32 +667,64 @@ input:focus-visible {
   overflow: hidden;
 }
 
-/* Center column: opponent band / shared middle / your band, top to bottom. */
-.center {
+/* ============================================================================
+   Battlefield (F3): a single readable play area. Deck+discard column at the
+   left edge; fixed top/bottom seats (F2); the whole area is the drop zone.
+   ========================================================================== */
+.battlefield {
+  position: relative;
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(0, 3.5fr) auto minmax(0, 5.5fr);
-  gap: 0.5rem;
-  overflow: hidden;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas:
+    'pile top'
+    'pile mid'
+    'pile bot';
+  gap: 0.3rem 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 2.5px dashed transparent;
+  border-radius: 16px;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
-.band {
-  min-height: 0;
-  min-width: 0;
+/* The whole field lights up as the drop zone while a card is held (MTG-style). */
+.battlefield.is-armed {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.battlefield.is-over {
+  border-color: var(--ok);
+  background: rgba(63, 157, 90, 0.14);
+  box-shadow: inset 0 0 0 3px rgba(63, 157, 90, 0.3);
+}
+
+.bf__pile {
+  grid-area: pile;
+  align-self: center;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-}
-.band--mid {
-  overflow: visible;
   align-items: center;
-  justify-content: center;
+  gap: 0.6rem;
 }
-/* Your hand hugs the bottom edge; the tableau sits above it. A small gap keeps
-   the fan clear of the very bottom edge so it doesn't read as clipped. */
-.band--you .hand-dock {
-  margin-top: auto;
-  padding-bottom: 6px;
+.bf__center {
+  grid-area: mid;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-family: var(--font-hand);
+  font-size: 0.95rem;
+  min-height: 1.6rem;
+}
+.battlefield.is-armed .bf__drop-msg {
+  color: var(--ink);
+  font-weight: 700;
+}
+.seat--top {
+  grid-area: top;
+}
+.seat--bottom {
+  grid-area: bot;
 }
 
 /* ---------- Top bar ---------- */
@@ -819,81 +851,110 @@ input:focus-visible {
     transform: rotate(360deg);
   }
 }
-
 /* ============================================================================
-   Seats (players) + tableau + hand
+   Seats (fixed top/bottom) + tableau + hand
    ========================================================================== */
 .seat {
   position: relative;
   min-height: 0;
   min-width: 0;
-  background: rgba(246, 242, 231, 0.72);
-  border: 2px solid var(--line-strong);
-  border-radius: 14px 11px 13px 12px / 12px 13px 11px 14px;
-  padding: 0.4rem 0.6rem;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
-}
-/* In the opponent band the seat fills the band and lays out its own rows. */
-.band--opp .seat {
-  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: rgba(246, 242, 231, 0.66);
+  border: 2px solid var(--line-strong);
+  border-radius: 14px 11px 13px 12px / 12px 13px 11px 14px;
+  padding: 0.3rem 0.5rem;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
-.seat--opponent {
-  transform: rotate(-0.3deg);
+.seat--top {
+  transform: rotate(-0.2deg);
 }
-.seat--active {
+.seat--bottom {
   transform: rotate(0.2deg);
 }
+/* Active player's zone glows (F2 — no seat swapping). */
 .seat--turn {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow);
+  background: rgba(47, 111, 176, 0.08);
+  box-shadow: 0 0 0 2px var(--accent-soft), 0 0 22px rgba(47, 111, 176, 0.35), var(--shadow);
 }
-.seat--target {
-  border-color: var(--ok);
-  box-shadow: 0 0 0 3px rgba(63, 157, 90, 0.28);
-  cursor: pointer;
+
+/* The acting seat's hand + action slot ride above the targeting overlay scrim
+   so the confirm controls stay reachable while the battlefield is dimmed (F4).
+   The seat's decorative rotate() would trap those children in its own stacking
+   context (leaving them under the scrim), so we drop it while acting and let the
+   action slot / hand escape to the table's stacking context above the overlay. */
+.seat--acting {
+  transform: none;
+  overflow: visible;
 }
-.seat--target-selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-.seat--dim {
-  opacity: 0.6;
+.seat--acting .actionslot,
+.seat--acting .hand {
+  position: relative;
+  z-index: 60;
 }
 
 .seat__head {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  margin-bottom: 0.3rem;
+  gap: 0.5rem;
   flex: none;
+  padding: 0.1rem 0;
+}
+.seat__avatar {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  line-height: 1;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  background: var(--paper);
+  box-shadow: 1px 1px 0 rgba(44, 42, 37, 0.35);
+}
+.seat--turn .seat__avatar {
+  border-color: var(--accent);
+}
+/* Avatar is the player drop/target (drag-to-player + F4 player picker). */
+.seat__avatar--target {
+  border-color: var(--ok);
+  box-shadow: 0 0 0 3px rgba(63, 157, 90, 0.3), 0 0 12px rgba(63, 157, 90, 0.45);
+  cursor: pointer;
+}
+.seat__avatar--selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.seat__avatar--dim {
+  opacity: 0.4;
 }
 .seat__id {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
+  min-width: 0;
 }
 .seat__name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   line-height: 1;
-}
-.seat--opponent .seat__name {
-  font-size: 1.1rem;
+  white-space: nowrap;
 }
 .seat__score {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  align-items: baseline;
+  gap: 0.25rem;
   margin-left: auto;
   font-family: var(--font-hand);
 }
 .seat__score-num {
-  font-size: 1.2rem;
+  font-size: 1.55rem;
   line-height: 1;
+  font-weight: 700;
   color: var(--ink);
 }
 .seat__score-lbl {
@@ -906,8 +967,8 @@ input:focus-visible {
   font-family: var(--font-hand);
   background: var(--accent);
   color: #fff;
-  font-size: 0.75rem;
-  padding: 0.1rem 0.6rem;
+  font-size: 0.72rem;
+  padding: 0.08rem 0.55rem;
   border-radius: 999px;
   transform: rotate(-2deg);
   box-shadow: 1px 1px 0 rgba(44, 42, 37, 0.5);
@@ -929,52 +990,48 @@ input:focus-visible {
   gap: 3px;
 }
 .pip--ghost {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   border-radius: 4px;
   border: 1.5px dashed var(--line-strong);
   display: inline-block;
 }
 
-.zone__label {
-  font-family: var(--font-hand);
-  font-size: 0.8rem;
-  color: var(--ink-soft);
-  letter-spacing: 0.02em;
-  display: flex;
-  align-items: center;
-  margin-bottom: 0.2rem;
-  flex: none;
-}
-
-/* Mood tableau — a single row that scrolls horizontally within its band. */
+/* Mood tableau — a single row that scrolls horizontally, grouped by owner and
+   rendered upright/readable (F3 — not rotated 180deg). */
 .tableau {
   min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
 }
-.tableau--active {
+.seat--bottom .tableau {
+  justify-content: flex-end;
+}
+.tableau--bottom {
   --card-w: var(--tile-you-w);
   --card-h: var(--tile-you-h);
 }
-.tableau--opponent {
-  flex: 1;
-  min-height: 0;
+.tableau--top {
   --card-w: var(--tile-opp-w);
   --card-h: var(--tile-opp-h);
 }
 .tableau__cards {
   display: flex;
   flex-wrap: nowrap;
-  gap: 0.5rem;
+  gap: 0.4rem;
   min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 0.15rem;
+  padding-bottom: 0.1rem;
   align-items: flex-start;
 }
 .tableau__empty {
   font-style: italic;
+  font-family: var(--font-hand);
+  align-self: center;
+  margin: 0.2rem 0;
 }
 .mood-drop {
   display: inline-flex;
@@ -993,30 +1050,28 @@ input:focus-visible {
   }
 }
 
-/* ---------- Hand (fanned arc) ---------- */
-.hand-dock {
-  min-height: 0;
-}
-.hand--active {
+/* ---------- Hand (fanned arc, from the player's own edge) ---------- */
+.hand {
+  flex: none;
   display: flex;
   flex-direction: column;
+}
+.hand--focal {
   --card-w: var(--tile-hand-w);
   --card-h: var(--tile-hand-h);
 }
-.hand--opponent {
+.hand--idle {
   --card-w: var(--tile-opphand-w);
   --card-h: var(--tile-opphand-h);
 }
 .hand__scroll {
-  overflow-x: auto;
-  overflow-y: visible;
-  padding: 0.3rem 0;
-}
-/* The active fan compresses via overlap (no horizontal scroll) so the hover
-   lift is never clipped by an overflow container. */
-.hand--active .hand__scroll {
   overflow: visible;
   padding: 0;
+}
+.hand--idle .hand__scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 0.2rem 0;
 }
 .hand__cards {
   display: flex;
@@ -1025,11 +1080,18 @@ input:focus-visible {
   min-height: 0;
   padding: 0.2rem 0.5rem;
 }
-.hand--active .hand__cards {
-  min-height: calc(var(--card-h) + 14px);
-  padding-top: 12px;
+.hand--focal .hand__cards {
+  min-height: calc(var(--card-h) + 16px);
 }
-.hand--opponent .hand__cards {
+.hand--focal.hand--bottom .hand__cards {
+  align-items: flex-end;
+  padding-top: 14px;
+}
+.hand--focal.hand--top .hand__cards {
+  align-items: flex-start;
+  padding-bottom: 14px;
+}
+.hand--idle .hand__cards {
   padding: 0.15rem 0.4rem;
 }
 
@@ -1042,29 +1104,37 @@ input:focus-visible {
   display: inline-flex;
   flex: none;
 }
-.hand--active .hand__slot + .hand__slot {
+.hand--focal .hand__slot + .hand__slot {
   margin-left: -46px;
 }
-.hand--opponent .hand__slot + .hand__slot {
+.hand--idle .hand__slot + .hand__slot {
   margin-left: -28px;
 }
-.hand--active .hand__slot .card {
+.hand__slot .card {
   transform: rotate(var(--rot)) translateY(var(--ty));
-  transform-origin: bottom center;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-.hand--opponent .hand__slot .card {
-  transform: rotate(var(--rot)) translateY(var(--ty));
+.hand--bottom .hand__slot .card {
   transform-origin: bottom center;
 }
-/* Lift on hover / keyboard focus — the focal interaction. */
-.hand--active .hand__slot:hover,
-.hand--active .hand__slot:focus-within {
+.hand--top .hand__slot .card {
+  transform-origin: top center;
+}
+/* Lift on hover / keyboard focus — the focal interaction (card enlarges above
+   its neighbours). Bottom seat lifts up toward its player; top seat lifts down
+   into the battlefield so it stays visible. */
+.hand--focal .hand__slot:hover,
+.hand--focal .hand__slot:focus-within {
   z-index: 60;
 }
-.hand--active .hand__slot:hover .card,
-.hand--active .hand__slot:focus-within .card {
-  transform: rotate(0deg) translateY(-14px) scale(1.05);
+.hand--focal.hand--bottom .hand__slot:hover .card,
+.hand--focal.hand--bottom .hand__slot:focus-within .card {
+  transform: rotate(0deg) translateY(-14px) scale(1.06);
+  box-shadow: 0 16px 30px rgba(60, 50, 30, 0.4);
+}
+.hand--focal.hand--top .hand__slot:hover .card,
+.hand--focal.hand--top .hand__slot:focus-within .card {
+  transform: rotate(0deg) translateY(14px) scale(1.06);
   box-shadow: 0 16px 30px rgba(60, 50, 30, 0.4);
 }
 
@@ -1075,7 +1145,6 @@ input:focus-visible {
   border-radius: 12px;
   background: rgba(74, 108, 140, 0.05);
   transform: rotate(var(--rot)) translateY(var(--ty));
-  transform-origin: bottom center;
 }
 .hand__insert {
   width: 4px;
@@ -1086,54 +1155,75 @@ input:focus-visible {
   box-shadow: 0 0 8px rgba(47, 111, 176, 0.6);
 }
 
-/* ============================================================================
-   Play field (shared centre): deck stack + drop + discard fan
-   ========================================================================== */
-.field {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+/* ---------- Action slot (above the hand, off to the right) ---------- */
+.actionslot {
+  flex: none;
+  min-height: 2rem;
+  display: flex;
   align-items: center;
-  gap: 1rem;
-  width: min(100%, 560px);
-  padding: 0.45rem 0.9rem;
-  border: 2.5px dashed var(--line-strong);
-  border-radius: 16px;
-  background:
-    radial-gradient(80% 120% at 50% 50%, rgba(255, 255, 255, 0.5), transparent 70%),
-    rgba(231, 223, 201, 0.4);
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.15rem 0.2rem;
 }
-.field.is-armed {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+.actionslot--empty {
+  min-height: 0.4rem;
 }
-.field.is-over {
-  border-color: var(--ok);
-  background: rgba(63, 157, 90, 0.16);
-  box-shadow: inset 0 0 0 3px rgba(63, 157, 90, 0.35);
+.actionslot__label,
+.actionslot__hint {
+  font-family: var(--font-hand);
+  font-size: 0.82rem;
 }
-.field__pile {
+.actionslot--flow {
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 rgba(44, 42, 37, 0.5);
+  padding: 0.2rem 0.5rem;
+}
+
+/* ============================================================================
+   Deck + discard column (left edge of the battlefield)
+   ========================================================================== */
+.pile {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
-.field__count {
+.pile__count {
   font-family: var(--font-hand);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   color: var(--ink-soft);
+  white-space: nowrap;
 }
-.field__drop {
-  text-align: center;
-  color: var(--muted);
-  font-family: var(--font-hand);
-  font-size: 0.95rem;
-  min-height: 2rem;
+.pile--discard {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  background: none;
+  border: 2px dashed transparent;
+  border-radius: 12px;
+  padding: 0.25rem 0.3rem;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.pile--discard:not(:disabled):hover {
+  border-color: var(--line-strong);
+  background: rgba(74, 108, 140, 0.06);
+}
+.pile--discard:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.pile__discard-top {
+  width: 60px;
+  height: 84px;
   display: grid;
   place-items: center;
 }
-.field.is-armed .field__drop-msg {
-  color: var(--ink);
+.pile__empty {
+  font-family: var(--font-hand);
+  font-size: 0.8rem;
 }
 
 /* Deck stack of card-backs */
@@ -1153,42 +1243,21 @@ input:focus-visible {
   min-height: 84px;
 }
 
-/* Discard fan of mini cards */
-.discard-fan {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  min-width: 60px;
-  height: 84px;
-}
-.discard-fan__empty {
-  align-self: center;
-  font-family: var(--font-hand);
-}
+/* Discard mini-card (top of pile + inspector fan use the same look) */
 .discard-card {
-  --rot: 0deg;
-  --i: 0;
-  width: 48px;
-  height: 66px;
+  width: 56px;
+  height: 78px;
   flex: none;
   border-radius: 8px;
   border: 2.5px solid var(--line-strong);
   background: var(--paper);
   box-shadow: 1px 2px 4px rgba(60, 50, 30, 0.25);
-  transform: rotate(var(--rot));
-  transform-origin: bottom center;
-  cursor: default;
   display: grid;
   place-items: center;
-  z-index: var(--i);
-}
-.discard-card + .discard-card {
-  margin-left: -34px;
 }
 .discard-card__mono {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 1.7rem;
   color: var(--ink);
   opacity: 0.55;
 }
@@ -1212,95 +1281,206 @@ input:focus-visible {
 }
 
 /* ============================================================================
-   Handbar / targeting bar / chips
+   Chips (color / number / choice options)
    ========================================================================== */
-.handbar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin: 0.1rem 0 0.2rem;
-  padding: 0.2rem 0.6rem;
-  background: var(--paper);
-  border: 2px solid var(--line-strong);
-  border-radius: 10px;
-  box-shadow: 1px 1px 0 rgba(44, 42, 37, 0.4);
-  flex: none;
-}
-.handbar__label,
-.handbar__hint {
-  font-family: var(--font-hand);
-  font-size: 0.82rem;
-}
-
 .chip {
   font-family: var(--font-hand);
   background: var(--paper);
   border: 2px solid var(--line-strong);
   border-radius: 999px;
-  padding: 0.18rem 0.7rem;
-  font-size: 0.85rem;
-  color: var(--ink);
-}
-
-.targetbar {
-  position: fixed;
-  bottom: 1.2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 60;
-  background: var(--paper);
-  border: 2.5px solid var(--ink);
-  border-radius: 14px;
-  padding: 0.7rem 0.9rem;
-  min-width: 340px;
-  max-width: 92vw;
-  box-shadow: 4px 6px 0 rgba(44, 42, 37, 0.55), var(--shadow);
-}
-.targetbar__head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.5rem;
-}
-.targetbar__card {
-  font-family: var(--font-display);
-  font-size: 1.4rem;
-}
-.targetbar__prompt {
-  font-family: var(--font-hand);
+  padding: 0.22rem 0.8rem;
   font-size: 0.95rem;
-}
-.targetbar__count {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-.targetbar__hint {
-  font-size: 0.85rem;
-  margin: 0 0 0.5rem;
-}
-.targetbar__opts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 0.6rem;
-}
-.targetbar__opts .chip {
+  color: var(--ink);
   cursor: pointer;
   text-transform: capitalize;
 }
-.targetbar__opts .chip.is-on {
+.chip.is-on {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
 .chip--color {
   border-width: 3px;
 }
-.targetbar__actions {
+
+/* ============================================================================
+   Modal targeting overlay (F4) + discard inspector (F3)
+   ========================================================================== */
+.overlay,
+.inspector {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+}
+.overlay__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(28, 24, 16, 0.5);
+  backdrop-filter: blur(1.5px);
+  animation: scrim-in 0.16s ease-out both;
+}
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.overlay__panel,
+.inspector__panel {
+  position: relative;
+  z-index: 55;
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+  border-radius: 16px 12px 15px 11px / 11px 15px 12px 16px;
+  box-shadow: 5px 7px 0 rgba(44, 42, 37, 0.5), var(--shadow);
+  padding: 1rem 1.2rem;
+  max-width: min(92vw, 720px);
+  max-height: 82vh;
+  overflow: auto;
+  animation: pop-in 0.18s ease-out both;
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.overlay__title {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  margin: 0 0 0.1rem;
+  color: var(--ink);
+}
+.overlay__sub {
+  font-family: var(--font-hand);
+  font-size: 1rem;
+  color: var(--ink-soft);
+  margin: 0 0 0.4rem;
+}
+.overlay__count {
+  font-family: var(--font-hand);
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0 0 0.6rem;
+}
+.overlay__targets {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 4rem;
+}
+.overlay__targets--player {
+  gap: 1.2rem;
+}
+.overlay__chips {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
+  justify-content: center;
+}
+.overlay__foot {
+  font-family: var(--font-hand);
+  font-size: 0.8rem;
+  margin: 0.7rem 0 0;
+  text-align: center;
+}
+
+/* Player avatar picker (F4a comes forward as clickable avatars). */
+.avatar-pick {
+  font: inherit;
+  cursor: pointer;
+  background: var(--paper);
+  border: 2.5px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 0.7rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  box-shadow: 2px 2px 0 rgba(44, 42, 37, 0.45);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+.avatar-pick:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 rgba(44, 42, 37, 0.5);
+}
+.avatar-pick.is-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-soft), 2px 2px 0 rgba(44, 42, 37, 0.45);
+}
+.avatar-pick__face {
+  font-size: 2.6rem;
+  line-height: 1;
+}
+.avatar-pick__name {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+.avatar-pick__score {
+  font-family: var(--font-hand);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* Mood / hand-card targets brought to the front as a horizontal fan. */
+.target-fan {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding: 0.3rem 0.2rem 0.5rem;
+  max-width: min(88vw, 660px);
+  --card-w: 96px;
+  --card-h: 134px;
+}
+.target-fan__item {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+.target-fan__owner {
+  font-family: var(--font-hand);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* Discard inspector: the pile as a horizontally scrollable card fan. */
+.inspector__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.6rem;
+}
+.inspector__title {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  margin: 0;
+}
+.inspector__fan {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.4rem 0.2rem 0.6rem;
+  --card-w: 104px;
+  --card-h: 146px;
+}
+.inspector__item {
+  flex: none;
 }
 
 /* ============================================================================
@@ -1715,7 +1895,7 @@ input:focus-visible {
     grid-template-columns: 1fr;
     overflow: visible;
   }
-  .center {
+  .battlefield {
     overflow: visible;
   }
   .preview,
