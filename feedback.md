@@ -4,24 +4,32 @@ Running list of interface fixes and jank to address. The user adds items; each i
 documented here as it comes in. Once the list is complete we turn it into a plan
 and implement. Status legend: 🆕 new · 📋 planned · 🔧 in progress · ✅ done.
 
-**Implementation plan (agent team, in progress):**
+**Implementation plan (agent team) — ✅ shipped (merged to main, commit `c9cc772`):**
 - **Agent A — engine (F1):** persistent per-player extra-play mechanism —
   one-time pending grants (Joy #125 self, Generosity #120 chosen opponent) applied
   at that player's next turn start, and recurring while-in-play grants
-  (Hope #124 normal, Grace #121 discard+color-match) re-evaluated each of the
-  owner's turn starts. Engine-only; new tests; update effect-gaps.md.
+  (Hope #124 normal, Grace #121 discard) re-evaluated each of the
+  owner's turn starts. Engine-only; +6 tests (75 total); effect-gaps.md updated.
 - **Agent B — app (F2+F3+F4+F4a):** fixed seats + glow, unified battlefield
   (by-owner moods, deck+discard column w/ inspector, whole-field drop zone),
   modal targeting overlay (emoji avatars, discard fan), confirm slot above the
-  hand (right). App-only; preserve engine wiring + fixed-screen no-scroll.
+  hand (right). App-only; engine wiring + fixed-screen no-scroll preserved; +5 tests.
+
+**Residuals (documented, not blocking):**
+- **Grace #121 colour-match** on the recurring discard play is best-effort — the shared
+  `discardPlaysRemaining` counter can't distinguish a Grace-sourced grant from Harmony's
+  unconstrained one, so the "shares a colour with one of your moods" gate isn't enforced.
+  Logged in `docs/effect-gaps.md`.
+- **Mood rotation:** moods render **upright** (grouped by owner), not literally rotated 180°.
+  Flag if you want true rotation.
 
 | # | Status | Area | Item | Notes / open questions |
 |---|--------|------|------|------------------------|
-| F1 | 🆕 | engine | "Play an additional mood on a future turn" cards don't grant the extra play | Known gap: `playsRemaining` resets to 1 each turn with no cross-turn carry. Affects #120, #121, #124, #125 (#135 is 3+‑player, out of 2p MVP scope). |
-| F2 | 📋 | layout | Fix P1 bottom / P2 top; glow the active player's zone instead of swapping seats | **Resolved: option A** (fixed seats, each plays from their own edge) — implied by F3. |
-| F3 | 📋 | layout | Replace stacked bands with a single readable "battlefield" (round state + scoring at a glance); whole battlefield is the drop zone; deck+discard column, discard click-to-inspect | Keep Preview (left) + Log (right). **Arrangement resolved:** moods grouped by owner ("facing the player who played it") — yours bottom, oppo top. Rendering upright for readability (confirm if you want literal 180° rotation). |
-| F4 | 📋 | targeting UX | Target selection must be an in-your-face **modal overlay** (dims background), not the current subtle inline flow | **Resolved:** confirm/submit buttons live in a dedicated slot **above the hand, off to the right** (never over cards). |
-| F4a | 📋 | asset | **Player avatars** — **emoji placeholders** for now (real art TBD), auto-assigned per player | Used by the F4 player picker + seat identity. |
+| F1 | ✅ | engine | "Play an additional mood on a future turn" cards don't grant the extra play | Fixed via `pendingExtraPlays`/`pendingDiscardPlays` + `extraPlaysAtTurnStart` hook, consulted at every turn start. #120/#121/#124/#125 (+#102 Stubbornness) wired. #135 remains 3+‑player, out of 2p MVP scope. |
+| F2 | ✅ | layout | Fix P1 bottom / P2 top; glow the active player's zone instead of swapping seats | Fixed seats (P1 bottom / P2 top); active seat gets `.seat--turn` glow + "Your turn". Each plays from their own edge. |
+| F3 | ✅ | layout | Replace stacked bands with a single readable "battlefield" (round state + scoring at a glance); whole battlefield is the drop zone; deck+discard column, discard click-to-inspect | Unified `.battlefield` grid; moods grouped by owner (upright), per-side scores, deck+discard column at left edge, discard opens a dimmed inspector modal; whole field is `data-drop="field"`. Preview (left) + Log (right) kept. |
+| F4 | ✅ | targeting UX | Target selection must be an in-your-face **modal overlay** (dims background), not the current subtle inline flow | Dimming overlay, bold "Choose {target(s)}" header + count, played card held in Preview, per-kind pickers (avatars/moods/hand-fan/chips) brought forward. Submit/Skip/Cancel in the action slot above the hand, off to the right. |
+| F4a | ✅ | asset | **Player avatars** — **emoji placeholders** for now (real art TBD), auto-assigned per player | `assignAvatars` gives each seat a distinct emoji (🦊 P1 / 🐙 P2); shown in seat headers, topbar, and the F4 player picker. |
 
 ---
 
