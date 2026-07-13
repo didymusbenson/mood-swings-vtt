@@ -7,6 +7,7 @@ and implement. Status legend: 🆕 new · 📋 planned · 🔧 in progress · �
 | # | Status | Area | Item | Notes / open questions |
 |---|--------|------|------|------------------------|
 | F1 | 🆕 | engine | "Play an additional mood on a future turn" cards don't grant the extra play | Known gap: `playsRemaining` resets to 1 each turn with no cross-turn carry. Affects #120, #121, #124, #125 (#135 is 3+‑player, out of 2p MVP scope). |
+| F2 | 🆕 | layout | Stop swapping player seats each turn; fix P1 bottom / P2 top and glow the active player's zone instead | ❓ Open: on P2's turn, is the interactive hand at the top (symmetric seats, option A) or always docked at the bottom (option B)? |
 
 ---
 
@@ -31,3 +32,19 @@ mechanism to carry a grant into a future turn. This is the documented
 start of each turn — one‑time grants (Joy, Generosity) consumed once; recurring
 grants (Hope, Grace) driven by a while‑in‑play hook re-evaluated each turn start.
 **Open question:** none blocking — semantics are clear from the card text.
+
+### F2 — Fixed seats + glowing active zone (stop swapping seats)  (🆕)
+**What:** The hotseat currently swaps which player is at the bottom vs top based on
+whose turn it is. The abrupt repositioning makes testing harder. Instead: keep
+**Player 1 on the bottom, Player 2 on the top permanently**, and indicate whose
+turn it is by making that player's **zone glow** — no seat swapping.
+**Where:** `GameBoard.tsx` center bands + `styles.css`. Today the layout is
+"active seat (bottom, big fanned hand) vs opponent (top, compact)"; it must become
+fixed-position seats.
+**Open question (blocking the plan):** on **P2's turn (top)**, where is the
+interactive/drag-from hand?
+- **(A) Symmetric seats** — P2's hand at the top becomes the interactive fanned
+  hand (fans downward, drags toward center); P2's zone glows. Most literal read.
+- **(B) Interactive hand always bottom-docked** — seats/labels stay fixed and the
+  active zone glows, but the hand you drag from always docks at the bottom edge.
+**Plan:** _pending answer to the open question._
