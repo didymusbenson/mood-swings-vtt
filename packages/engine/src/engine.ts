@@ -8,6 +8,8 @@ import {
   type CardNumber,
   type Color,
   type GameState,
+  type LogEntry,
+  type LogKind,
   type Mood,
   type PlayerId,
 } from './types.js';
@@ -50,6 +52,14 @@ export interface SetupOptions {
 
 export class Engine {
   constructor(private readonly db: CardDB) {}
+
+  private pname(state: GameState, id: PlayerId): string {
+    return state.players.find((p) => p.id === id)?.name ?? id;
+  }
+
+  private logPush(state: GameState, message: string, kind: LogKind, extra: Partial<LogEntry> = {}): void {
+    state.log.push({ round: state.round, message, kind, ...extra });
+  }
 
   // ---- setup ------------------------------------------------------------
 
@@ -188,30 +198,54 @@ export class Engine {
       }
       return undefined;
     };
+    const pname = (id: PlayerId) => state.players.find((p) => p.id === id)?.name ?? id;
+    const nm = (mood: Mood) => db.get(resolveCardNumber(mood)).name;
+    const push = (message: string, kind: LogKind, extra: Partial<LogEntry> = {}) =>
+      state.log.push({ round: state.round, message, kind, actor: me, ...extra });
     return {
       me,
       choices,
       discardMoodToPile: (mood) => {
+        const label = nm(mood);
+        const owner = mood.owner;
         const m = removeMood(mood);
-        if (m) state.discard.push(m.card);
+        if (m) {
+          state.discard.push(m.card);
+          push(`${pname(owner)}'s ${label} is discarded`, 'discard');
+        }
       },
       returnMoodToHand: (mood, to) => {
+        const label = nm(mood);
         const m = removeMood(mood);
-        if (m) (state.hands[to ?? m.owner] ??= []).push(m.card);
+        if (m) {
+          (state.hands[to ?? m.owner] ??= []).push(m.card);
+          push(`${label} returns to ${pname(to ?? m.owner)}'s hand`, 'return');
+        }
       },
       discardFromHand: (player, card) => {
         const hand = state.hands[player]!;
         const i = hand.indexOf(card);
-        if (i >= 0) state.discard.push(hand.splice(i, 1)[0]!);
-      },
-      draw: (player, n = 1) => {
-        for (let k = 0; k < n && state.deck.length > 0; k++) {
-          state.hands[player]!.push(state.deck.shift()!);
+        if (i >= 0) {
+          state.discard.push(hand.splice(i, 1)[0]!);
+          push(`${pname(player)} discards ${db.get(card).name} from hand`, 'discard');
         }
       },
+      draw: (player, n = 1) => {
+        let drawn = 0;
+        for (let k = 0; k < n && state.deck.length > 0; k++) {
+          state.hands[player]!.push(state.deck.shift()!);
+          drawn++;
+        }
+        // The card's identity is hidden (only the drawer knows) — omit it.
+        if (drawn > 0) push(`${pname(player)} draws ${drawn === 1 ? 'a card' : `${drawn} cards`}`, 'draw', { private: player });
+      },
       putOnBottomOfDeck: (mood) => {
+        const label = nm(mood);
         const m = removeMood(mood);
-        if (m) state.deck.push(m.card);
+        if (m) {
+          state.deck.push(m.card);
+          push(`${label} is put on the bottom of the deck`, 'bottomdeck');
+        }
       },
       grantAdditionalMood: (n = 1) => {
         state.playsRemaining += n;
@@ -222,21 +256,28 @@ export class Engine {
       suppress: (mood, duration, bySelf = false) => {
         mood.suppressed = duration;
         mood.suppressedBy = bySelf ? me : null;
+        push(`${pname(me)} suppresses ${nm(mood)}`, 'suppress');
       },
       steal: (mood, to) => {
+        const label = nm(mood);
+        const from = mood.owner;
         mood.stolenFrom = mood.owner;
         const m = removeMood(mood);
         if (m) {
           m.owner = to;
           state.moods[to]!.push(m);
+          push(`${pname(to)} takes ${label} from ${pname(from)}`, 'steal');
         }
       },
       giveMood: (mood, to) => {
+        const label = nm(mood);
+        const from = mood.owner;
         const m = removeMood(mood);
         if (m) {
           m.owner = to;
           m.stolenFrom = null;
           state.moods[to]!.push(m);
+          push(`${pname(from)} gives ${label} to ${pname(to)}`, 'give');
         }
       },
       rotateToSecondary: (mood, on = true) => {
@@ -247,7 +288,7 @@ export class Engine {
         state.seed = r.seed;
         return Math.floor(r.value * maxExclusive);
       },
-      log: (message) => state.log.push({ round: state.round, message }),
+      log: (message) => state.log.push({ round: state.round, message, kind: 'info', actor: me }),
     };
   }
 
@@ -264,7 +305,7 @@ export class Engine {
 
     if (action.type === 'pass') {
       // Passing always ends the current player's turn (declining any extra plays).
-      state.log.push({ round: state.round, message: `${action.player} passes` });
+      this.logPush(state, `${this.pname(state, action.player)} passes`, 'pass', { actor: action.player });
       this.completeTurn(state, action.player);
     } else {
       this.playMood(state, action.player, action.card, action.choices ?? {});
@@ -313,7 +354,7 @@ export class Engine {
     hand.splice(hand.indexOf(card), 1);
     state.moods[me]!.push(mood);
     state.playedThisTurn.push(mood.uid);
-    state.log.push({ round: state.round, message: `${me} plays ${data.name}` });
+    this.logPush(state, `${this.pname(state, me)} plays ${data.name}`, 'play', { actor: me });
 
     // 3. while-in-play stabilises
     this.stabilise(state);
@@ -391,10 +432,11 @@ export class Engine {
     for (const p of state.players) {
       state.roundScores[p.id] = (state.moods[p.id] ?? []).reduce((sum, m) => sum + m.currentValue, 0);
     }
-    state.log.push({
-      round: state.round,
-      message: `Scores — ${state.players.map((p) => `${p.id}:${state.roundScores[p.id]}`).join(', ')}`,
-    });
+    this.logPush(
+      state,
+      `Scoring — ${state.players.map((p) => `${this.pname(state, p.id)} ${state.roundScores[p.id]}`).join(', ')}`,
+      'score'
+    );
     this.afterScoring(state);
   }
 
@@ -414,18 +456,28 @@ export class Engine {
     const winner = this.roundWinner(state);
     const winP = state.players.find((p) => p.id === winner)!;
     winP.roundsWon += 1;
-    state.log.push({ round: state.round, message: `${winner} wins round ${state.round}` });
+    this.logPush(
+      state,
+      `${this.pname(state, winner)} wins round ${state.round} (${winP.roundsWon}/${ROUNDS_TO_WIN})`,
+      'round',
+      { actor: winner }
+    );
 
     if (winP.roundsWon >= ROUNDS_TO_WIN) {
       state.winner = winner;
       state.phase = 'gameOver';
+      this.logPush(state, `${this.pname(state, winner)} wins the game!`, 'game', { actor: winner });
       return;
     }
 
     // Losers draw a card (2-player: the single loser). 3+ player Hurt Feelings
     // is intentionally deferred (MVP is 2-player).
     for (const p of state.players) {
-      if (p.id !== winner) state.hands[p.id]!.push(...take(state, 1));
+      if (p.id !== winner) {
+        const drawn = take(state, 1);
+        state.hands[p.id]!.push(...drawn);
+        if (drawn.length) this.logPush(state, `${this.pname(state, p.id)} draws a card`, 'draw', { actor: p.id, private: p.id });
+      }
     }
 
     // 'round'-duration suppressions clear as the round ends.

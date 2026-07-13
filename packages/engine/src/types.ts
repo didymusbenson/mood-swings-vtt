@@ -91,9 +91,35 @@ export interface PlayerState {
   roundsWon: number;
 }
 
+export type LogKind =
+  | 'play'
+  | 'pass'
+  | 'draw'
+  | 'discard'
+  | 'return'
+  | 'bottomdeck'
+  | 'suppress'
+  | 'steal'
+  | 'give'
+  | 'score'
+  | 'round'
+  | 'game'
+  | 'info';
+
+/**
+ * A single trace entry. `message` is the public text everyone sees. For hidden
+ * information (e.g. a drawn card's identity), set `private` to the only player
+ * who may see `message`; other viewers see `redacted` instead. In the v1 hotseat
+ * everything is public, so the UI shows `message` for all — but the shape lets v2
+ * conceal per-viewer without changing the engine.
+ */
 export interface LogEntry {
   round: number;
   message: string;
+  kind?: LogKind;
+  actor?: PlayerId;
+  private?: PlayerId;
+  redacted?: string;
 }
 
 export interface GameState {
