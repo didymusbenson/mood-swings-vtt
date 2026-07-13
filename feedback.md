@@ -7,8 +7,8 @@ and implement. Status legend: 🆕 new · 📋 planned · 🔧 in progress · �
 | # | Status | Area | Item | Notes / open questions |
 |---|--------|------|------|------------------------|
 | F1 | 🆕 | engine | "Play an additional mood on a future turn" cards don't grant the extra play | Known gap: `playsRemaining` resets to 1 each turn with no cross-turn carry. Affects #120, #121, #124, #125 (#135 is 3+‑player, out of 2p MVP scope). |
-| F2 | 🆕 | layout | Stop swapping player seats each turn; fix P1 bottom / P2 top and glow the active player's zone instead | ❓ Open: A vs B — likely resolved to **A** by F3 (fixed seats, play from your own edge). Confirm. |
-| F3 | 🆕 | layout | Replace stacked bands with a single readable "battlefield" (round state + scoring at a glance); whole battlefield is the drop zone | Keep Preview (left) + Log (right) rails. ❓ Open: split moods by owner (top=oppo / bottom=you) vs single shared pool — see F3 details. |
+| F2 | 📋 | layout | Fix P1 bottom / P2 top; glow the active player's zone instead of swapping seats | **Resolved: option A** (fixed seats, each plays from their own edge) — implied by F3. |
+| F3 | 📋 | layout | Replace stacked bands with a single readable "battlefield" (round state + scoring at a glance); whole battlefield is the drop zone; deck+discard column, discard click-to-inspect | Keep Preview (left) + Log (right). **Arrangement resolved:** moods grouped by owner ("facing the player who played it") — yours bottom, oppo top. Rendering upright for readability (confirm if you want literal 180° rotation). |
 
 ---
 
@@ -66,11 +66,12 @@ with a single **battlefield** that represents the current round + scoring clearl
 - The **whole battlefield is the drop zone** — dropping a card anywhere in the play
   area plays it (to the active player's side); specific mood/player targets still
   work for targeted cards.
-**Open question (blocking the plan):** mood arrangement —
-- **(Split by owner, recommended):** opponent moods in the top half (near their
-  hand), yours in the bottom half (near your hand), each side showing its running
-  score. Implies fixed seats + play-from-your-own-edge ⇒ **resolves F2 as option A**.
-- **(Single shared pool):** all moods intermixed in one grid.
-**Plan:** _pending answers (arrangement + F2 A/B)._
+**Arrangement (RESOLVED):** moods are grouped **by owner** — "facing the player
+who played it." Your moods sit on the bottom half near your hand; the opponent's on
+the top half near theirs; each side shows its running score. This fixes seats and
+means each player plays from their own edge ⇒ **F2 = option A**. Cards are rendered
+**upright/readable** (grouped by owner spatially, *not* literally rotated 180°) to
+serve the readability goal — flagged to the user to veto if they want true rotation.
+**Plan:** _to be written in the planning pass (F2 + F3 implement together)._
 **Sub-notes:** discard viewer = a click-to-open panel/modal listing discard-pile
 cards (also useful for "play from discard" cards later).
