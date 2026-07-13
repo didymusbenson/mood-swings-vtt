@@ -61,6 +61,19 @@
 
   --card-w: 148px;
   --card-h: 208px;
+
+  /* Compact board-tile dimensions (fixed full-screen layout). Tuned so a full
+     hand, both tableaus, the shared row and both rails fit 1366x768 / 1440x900
+     with no page scroll. */
+  --tile-hand-w: 82px;
+  --tile-hand-h: 112px;
+  --tile-you-w: 68px;
+  --tile-you-h: 92px;
+  --tile-opp-w: 62px;
+  --tile-opp-h: 86px;
+  --tile-opphand-w: 56px;
+  --tile-opphand-h: 78px;
+
   --radius: 10px;
   --shadow: 0 6px 16px rgba(60, 50, 30, 0.18);
 }
@@ -69,6 +82,11 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
 html,
 body {
   max-width: 100%;
@@ -96,7 +114,7 @@ body {
 /* Paper grain + soft vignette overlay (non-interactive). */
 .app {
   position: relative;
-  min-height: 100vh;
+  height: 100%;
 }
 .app::before {
   content: '';
@@ -522,6 +540,59 @@ input:focus-visible {
   min-height: 300px;
 }
 
+/* Compact board tile: coloured frame + name + pip-die, no rules text. */
+.card--tile {
+  width: var(--card-w);
+  min-height: var(--card-h);
+  padding: 0.28rem 0.32rem;
+  gap: 0.18rem;
+}
+.card--tile.card--art {
+  padding: 0;
+}
+.card--tile .card__head {
+  align-items: center;
+  gap: 0.2rem;
+}
+.card--tile .card__name {
+  font-size: 0.72rem;
+  line-height: 1.02;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.card--tile .card__die .die {
+  width: 1.15em;
+  height: 1.15em;
+}
+.card--tile .card__die--overlay {
+  top: 3px;
+  right: 3px;
+  padding: 0 2px;
+}
+.card--tile .card__die--overlay .die {
+  width: 1.05em;
+  height: 1.05em;
+}
+.card__art--tile {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.card--tile .card__monogram {
+  font-size: 1.7rem;
+}
+.card__tile-flags {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  display: flex;
+  gap: 3px;
+  font-size: 0.55rem;
+  font-family: var(--font-hand);
+}
+
 /* ============================================================================
    Card back (sketch homage — original CSS/SVG, no copyrighted asset)
    ========================================================================== */
@@ -575,77 +646,135 @@ input:focus-visible {
 /* ============================================================================
    Table layout
    ========================================================================== */
+/* Fixed full-screen shell: a slim top bar over a three-column board that fills
+   the viewport. Only inner regions scroll — the page itself never does. */
 .table {
+  height: 100%;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 320px;
   grid-template-rows: auto minmax(0, 1fr);
-  grid-template-areas:
-    'banner banner banner'
-    'preview center  log';
-  gap: 1rem;
-  padding: 1rem;
-  max-width: 1720px;
-  margin: 0 auto;
-  align-items: start;
-  min-height: 100vh;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  overflow: hidden;
 }
-.table__center {
-  grid-area: center;
+
+/* Three columns: left rail (Previewer) / center (play) / right rail (log). */
+.board {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr) 300px;
+  gap: 0.6rem;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Center column: opponent band / shared middle / your band, top to bottom. */
+.center {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 3.5fr) auto minmax(0, 5.5fr);
+  gap: 0.5rem;
+  overflow: hidden;
+}
+.band {
+  min-height: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  overflow: hidden;
 }
-.table__log {
-  grid-area: log;
-  min-width: 0;
+.band--mid {
+  overflow: visible;
+  align-items: center;
+  justify-content: center;
+}
+/* Your hand hugs the bottom edge; the tableau sits above it. A small gap keeps
+   the fan clear of the very bottom edge so it doesn't read as clipped. */
+.band--you .hand-dock {
+  margin-top: auto;
+  padding-bottom: 6px;
 }
 
-/* ---------- Banner ---------- */
-.table__banner {
-  grid-area: banner;
+/* ---------- Top bar ---------- */
+.topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
   background: var(--paper);
   border: 2px solid var(--ink);
   border-radius: 16px 12px 15px 11px / 11px 15px 12px 16px;
-  padding: 0.5rem 1.1rem;
+  padding: 0.28rem 0.9rem;
   box-shadow: var(--shadow);
+  min-height: 0;
 }
-.banner__title {
+.topbar__brand {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.6rem;
 }
-.banner__meta {
+.topbar .starburst {
+  width: 46px;
+  height: 46px;
+}
+.topbar__meta {
   display: flex;
   flex-direction: column;
   line-height: 1;
 }
-.banner__game {
+.topbar__game {
   font-family: var(--font-display);
-  font-size: 1.9rem;
+  font-size: 1.55rem;
   font-weight: 700;
   color: var(--ink);
 }
-.banner__phase {
+.topbar__phase {
   color: var(--muted);
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   letter-spacing: 0.08em;
 }
-.banner__turn {
-  font-family: var(--font-hand);
-  font-size: 1.1rem;
-}
-.banner__gameover {
+.topbar__scores {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.6rem;
+  margin: 0 auto;
+}
+.scoretag {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   font-family: var(--font-hand);
-  font-size: 1.1rem;
+  border: 2px solid var(--line-strong);
+  border-radius: 11px 8px 10px 9px / 9px 10px 8px 11px;
+  padding: 0.12rem 0.55rem;
+  background: rgba(246, 242, 231, 0.72);
+}
+.scoretag.is-turn {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.scoretag__name {
+  font-size: 0.92rem;
+}
+.scoretag--you .scoretag__name::after {
+  content: ' (you)';
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.scoretag__score {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-left: auto;
+}
+.topbar__winner {
+  font-family: var(--font-hand);
+  font-size: 1rem;
   color: var(--ok);
 }
 
@@ -696,11 +825,20 @@ input:focus-visible {
    ========================================================================== */
 .seat {
   position: relative;
+  min-height: 0;
+  min-width: 0;
   background: rgba(246, 242, 231, 0.72);
   border: 2px solid var(--line-strong);
   border-radius: 14px 11px 13px 12px / 12px 13px 11px 14px;
-  padding: 0.7rem 0.9rem;
+  padding: 0.4rem 0.6rem;
   transition: box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+/* In the opponent band the seat fills the band and lays out its own rows. */
+.band--opp .seat {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .seat--opponent {
   transform: rotate(-0.3deg);
@@ -728,8 +866,9 @@ input:focus-visible {
 .seat__head {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  margin-bottom: 0.5rem;
+  gap: 0.7rem;
+  margin-bottom: 0.3rem;
+  flex: none;
 }
 .seat__id {
   display: flex;
@@ -739,11 +878,11 @@ input:focus-visible {
 .seat__name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.6rem;
+  font-size: 1.2rem;
   line-height: 1;
 }
 .seat--opponent .seat__name {
-  font-size: 1.3rem;
+  font-size: 1.1rem;
 }
 .seat__score {
   display: flex;
@@ -753,7 +892,7 @@ input:focus-visible {
   font-family: var(--font-hand);
 }
 .seat__score-num {
-  font-size: 1.7rem;
+  font-size: 1.2rem;
   line-height: 1;
   color: var(--ink);
 }
@@ -799,30 +938,47 @@ input:focus-visible {
 
 .zone__label {
   font-family: var(--font-hand);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--ink-soft);
   letter-spacing: 0.02em;
   display: flex;
   align-items: center;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.2rem;
+  flex: none;
 }
 
-/* Mood tableau */
+/* Mood tableau — a single row that scrolls horizontally within its band. */
+.tableau {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tableau--active {
+  --card-w: var(--tile-you-w);
+  --card-h: var(--tile-you-h);
+}
+.tableau--opponent {
+  flex: 1;
+  min-height: 0;
+  --card-w: var(--tile-opp-w);
+  --card-h: var(--tile-opp-h);
+}
 .tableau__cards {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  min-height: 40px;
-}
-.tableau--opponent .card {
-  --card-w: 108px;
-  --card-h: 150px;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.15rem;
+  align-items: flex-start;
 }
 .tableau__empty {
   font-style: italic;
 }
 .mood-drop {
   display: inline-flex;
+  flex: none;
   border-radius: 12px;
   animation: tween-in 0.28s ease-out both;
 }
@@ -839,23 +995,42 @@ input:focus-visible {
 
 /* ---------- Hand (fanned arc) ---------- */
 .hand-dock {
-  margin-top: 0.2rem;
+  min-height: 0;
+}
+.hand--active {
+  display: flex;
+  flex-direction: column;
+  --card-w: var(--tile-hand-w);
+  --card-h: var(--tile-hand-h);
+}
+.hand--opponent {
+  --card-w: var(--tile-opphand-w);
+  --card-h: var(--tile-opphand-h);
 }
 .hand__scroll {
   overflow-x: auto;
   overflow-y: visible;
-  padding: 0.5rem 0;
+  padding: 0.3rem 0;
+}
+/* The active fan compresses via overlap (no horizontal scroll) so the hover
+   lift is never clipped by an overflow container. */
+.hand--active .hand__scroll {
+  overflow: visible;
+  padding: 0;
 }
 .hand__cards {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  min-height: 60px;
+  min-height: 0;
   padding: 0.2rem 0.5rem;
 }
 .hand--active .hand__cards {
-  min-height: calc(var(--card-h) + 40px);
-  padding-top: 34px;
+  min-height: calc(var(--card-h) + 14px);
+  padding-top: 12px;
+}
+.hand--opponent .hand__cards {
+  padding: 0.15rem 0.4rem;
 }
 
 .hand__slot {
@@ -871,11 +1046,7 @@ input:focus-visible {
   margin-left: -46px;
 }
 .hand--opponent .hand__slot + .hand__slot {
-  margin-left: -34px;
-}
-.hand--opponent .card {
-  --card-w: 100px;
-  --card-h: 140px;
+  margin-left: -28px;
 }
 .hand--active .hand__slot .card {
   transform: rotate(var(--rot)) translateY(var(--ty));
@@ -893,7 +1064,7 @@ input:focus-visible {
 }
 .hand--active .hand__slot:hover .card,
 .hand--active .hand__slot:focus-within .card {
-  transform: rotate(0deg) translateY(-34px) scale(1.07);
+  transform: rotate(0deg) translateY(-14px) scale(1.05);
   box-shadow: 0 16px 30px rgba(60, 50, 30, 0.4);
 }
 
@@ -923,7 +1094,8 @@ input:focus-visible {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 1rem;
-  padding: 0.7rem 1rem;
+  width: min(100%, 560px);
+  padding: 0.45rem 0.9rem;
   border: 2.5px dashed var(--line-strong);
   border-radius: 16px;
   background:
@@ -967,8 +1139,8 @@ input:focus-visible {
 /* Deck stack of card-backs */
 .deck-stack {
   position: relative;
-  width: 78px;
-  height: 108px;
+  width: 60px;
+  height: 84px;
 }
 .deck-stack__card {
   --d: 0;
@@ -978,7 +1150,7 @@ input:focus-visible {
   border-radius: 10px;
 }
 .deck-stack__card .cardback {
-  min-height: 108px;
+  min-height: 84px;
 }
 
 /* Discard fan of mini cards */
@@ -987,8 +1159,8 @@ input:focus-visible {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  min-width: 78px;
-  height: 108px;
+  min-width: 60px;
+  height: 84px;
 }
 .discard-fan__empty {
   align-self: center;
@@ -997,8 +1169,8 @@ input:focus-visible {
 .discard-card {
   --rot: 0deg;
   --i: 0;
-  width: 60px;
-  height: 84px;
+  width: 48px;
+  height: 66px;
   flex: none;
   border-radius: 8px;
   border: 2.5px solid var(--line-strong);
@@ -1012,7 +1184,7 @@ input:focus-visible {
   z-index: var(--i);
 }
 .discard-card + .discard-card {
-  margin-left: -44px;
+  margin-left: -34px;
 }
 .discard-card__mono {
   font-family: var(--font-display);
@@ -1045,19 +1217,20 @@ input:focus-visible {
 .handbar {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
-  margin: 0.2rem 0 0.4rem;
-  padding: 0.4rem 0.7rem;
+  margin: 0.1rem 0 0.2rem;
+  padding: 0.2rem 0.6rem;
   background: var(--paper);
   border: 2px solid var(--line-strong);
   border-radius: 10px;
   box-shadow: 1px 1px 0 rgba(44, 42, 37, 0.4);
+  flex: none;
 }
 .handbar__label,
 .handbar__hint {
   font-family: var(--font-hand);
-  font-size: 0.92rem;
+  font-size: 0.82rem;
 }
 
 .chip {
@@ -1134,15 +1307,16 @@ input:focus-visible {
    Preview pane (taped index card)
    ========================================================================== */
 .preview {
-  grid-area: preview;
-  position: sticky;
-  top: 1rem;
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: var(--paper);
   border: 2px solid var(--line-strong);
   border-radius: 6px;
-  padding: 1.1rem 1rem 1rem;
+  padding: 1rem 0.9rem;
   box-shadow: var(--shadow);
-  transform: rotate(-0.6deg);
 }
 .preview::after {
   /* faint index-card ruling */
@@ -1262,9 +1436,9 @@ input:focus-visible {
 .log {
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 2rem);
+  height: 100%;
+  min-height: 0;
+  margin: 0;
   background: var(--paper);
   border: 2px solid var(--line-strong);
   border-left: 6px solid var(--c-red);
@@ -1529,26 +1703,25 @@ input:focus-visible {
 /* ============================================================================
    Responsive
    ========================================================================== */
-@media (max-width: 1180px) {
+/* Below the fixed-layout target range, fall back to a scrolling stack so the
+   rails don't get crushed. (Targets 1366x768 / 1440x900 use the fixed grid.) */
+@media (max-width: 1100px) {
   .table {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+  .board {
     grid-template-columns: 1fr;
-    grid-template-areas:
-      'banner'
-      'preview'
-      'center'
-      'log';
+    overflow: visible;
+  }
+  .center {
+    overflow: visible;
   }
   .preview,
   .log {
-    position: static;
-    max-height: none;
-    transform: none;
-  }
-  .log__scroll {
-    max-height: 340px;
-  }
-  .preview {
-    max-width: 420px;
+    height: auto;
+    max-height: 360px;
   }
 }
 

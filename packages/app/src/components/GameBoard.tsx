@@ -52,10 +52,10 @@ function RoundPips({ won }: { won: number }) {
 function fanVars(i: number, n: number, active: boolean): React.CSSProperties {
   if (n <= 1) return { ['--rot']: '0deg', ['--ty']: '0px', ['--i']: String(i) } as React.CSSProperties;
   const mid = (n - 1) / 2;
-  const step = active ? Math.min(6, 44 / n) : Math.min(3.5, 24 / n);
+  const step = active ? Math.min(5, 36 / n) : Math.min(3.5, 24 / n);
   const off = Math.abs(i - mid);
   const rot = (i - mid) * step;
-  const ty = active ? off * off * 1.1 : off * 1.0;
+  const ty = active ? off * off * 0.7 : off * 1.0;
   return {
     ['--rot']: `${rot.toFixed(2)}deg`,
     ['--ty']: `${ty.toFixed(1)}px`,
@@ -100,6 +100,7 @@ function MoodTableau({ player, state, ctx, variant }: { player: PlayerState; sta
                 card={db.get(m.card)}
                 mood={m}
                 value={m.currentValue}
+                tile
                 highlighted={legal}
                 targetSelected={pc.moodSelected(m.uid)}
                 dimmed={dragging && !legal}
@@ -156,6 +157,7 @@ function HandRow({ player, state, ctx, variant }: { player: PlayerState; state: 
       <div key={`${card}-${idx}`} className="hand__slot" data-hand-index={idx} style={fanVars(idx, order.length, active)}>
         <Card
           card={db.get(card)}
+          tile
           disabled={!interactive}
           selected={isActive && pc.isSelected(card)}
           highlighted={!!targetLegal}
@@ -356,7 +358,7 @@ function DragGhost({ handDrag }: { handDrag: HandDragApi }) {
       style={{ left: drag.x, top: drag.y }}
       aria-hidden
     >
-      <Card card={db.get(drag.card)} />
+      <Card card={db.get(drag.card)} tile />
     </div>
   );
 }
@@ -451,49 +453,68 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
 
   return (
     <div className="table">
-      <header className="table__banner">
-        <div className="banner__title">
-          <Starburst className="banner__burst" label={`Round ${state.round}`} />
-          <div className="banner__meta">
-            <strong className="banner__game">Mood Swings</strong>
-            <span className="banner__phase">{state.phase}</span>
+      <header className="topbar">
+        <div className="topbar__brand">
+          <Starburst className="topbar__burst" label={`Round ${state.round}`} />
+          <div className="topbar__meta">
+            <strong className="topbar__game">Mood Swings</strong>
+            <span className="topbar__phase">{gameOver ? 'game over' : state.phase}</span>
           </div>
         </div>
-        {!gameOver && bottom && (
-          <div className="banner__turn">
-            Turn: <strong>{bottom.name}</strong>
-          </div>
-        )}
-        {gameOver && (
-          <div className="banner__gameover">
-            <strong>{winnerName} wins the game!</strong>
-            <button className="btn btn--primary" onClick={onNewGame}>
-              New game
-            </button>
-          </div>
-        )}
+
+        <div className="topbar__scores">
+          {state.players.map((p) => (
+            <div
+              key={p.id}
+              className={[
+                'scoretag',
+                p.id === bottomPid ? 'scoretag--you' : '',
+                !gameOver && state.activePlayer === p.id && state.phase === 'awaitingPlay' ? 'is-turn' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <span className="scoretag__name">{p.name}</span>
+              <span className="scoretag__score">{liveScore(state, p.id)}</span>
+              <RoundPips won={p.roundsWon} />
+            </div>
+          ))}
+        </div>
+
+        <div className="topbar__actions">
+          {gameOver && <span className="topbar__winner">{winnerName} wins!</span>}
+          <button className="btn btn--primary" onClick={onNewGame}>
+            New game
+          </button>
+        </div>
       </header>
 
-      <PreviewPane target={previewTarget} />
+      <div className="board">
+        <PreviewPane target={previewTarget} />
 
-      <main className="table__center">
-        {top && <Seat player={top} state={state} ctx={ctx} variant="opponent" />}
+        <main className="center">
+          <div className="band band--opp">
+            {top && <Seat player={top} state={state} ctx={ctx} variant="opponent" />}
+          </div>
 
-        <PlayField state={state} dragging={dragging} fieldOver={fieldOver} gameOver={gameOver} setPreview={setPreview} />
+          <div className="band band--mid">
+            <PlayField state={state} dragging={dragging} fieldOver={fieldOver} gameOver={gameOver} setPreview={setPreview} />
+          </div>
 
-        {bottom && (
-          <>
-            <Seat player={bottom} state={state} ctx={ctx} variant="active" />
-            <div className="hand-dock">
-              <HandRow player={bottom} state={state} ctx={ctx} variant="active" />
-            </div>
-          </>
-        )}
-      </main>
+          <div className="band band--you">
+            {bottom && (
+              <>
+                <Seat player={bottom} state={state} ctx={ctx} variant="active" />
+                <div className="hand-dock">
+                  <HandRow player={bottom} state={state} ctx={ctx} variant="active" />
+                </div>
+              </>
+            )}
+          </div>
+        </main>
 
-      <aside className="table__log">
         <ActivityLog log={state.log} />
-      </aside>
+      </div>
 
       <TargetingBar pc={pc} />
       <DragGhost handDrag={handDrag} />

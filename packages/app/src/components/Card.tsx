@@ -30,6 +30,11 @@ interface CardProps {
   onFocus?: () => void;
   /** Large, non-interactive rendering for the preview pane. */
   large?: boolean;
+  /**
+   * Compact board tile: coloured frame + name + value pip-die (or the art with
+   * its die overlay) and NO rules text. The full rules live in the Previewer.
+   */
+  tile?: boolean;
   /** Render the sketch card back instead of the face (hidden hands, deck). */
   faceDown?: boolean;
 }
@@ -161,6 +166,46 @@ function FallbackFace({ card, headline, mood }: { card: CardData; headline: numb
   );
 }
 
+/**
+ * The compact board tile face: a mini frame carrying the card name + value
+ * pip-die and a small doodle — no rules text (that lives in the Previewer).
+ * Keeps the coloured frame border + pip-die so a tile still reads as a card.
+ */
+function TileFace({ card, headline, mood }: { card: CardData; headline: number; mood?: Mood }) {
+  const secondaryActive = mood?.usingSecondary ?? false;
+  const suppressed = mood && mood.suppressed !== 'none';
+  return (
+    <>
+      <header className="card__head">
+        <span className="card__name">{card.name}</span>
+        <span className="card__die" title={`${card.dieColor} die`}>
+          <DiceValue value={headline} dieColor={card.dieColor} />
+        </span>
+      </header>
+
+      <div className="card__art card__art--placeholder card__art--tile" aria-hidden>
+        <svg className="card__doodle" viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
+          <path
+            d="M8 46 Q20 14 34 32 Q42 44 52 24 Q62 6 74 30 Q82 46 92 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="card__monogram">{card.name.charAt(0)}</span>
+      </div>
+
+      {(suppressed || secondaryActive) && (
+        <span className="card__tile-flags" aria-hidden>
+          {suppressed && <span className="card__flag">suppressed</span>}
+          {secondaryActive && <span className="card__flag">flipped</span>}
+        </span>
+      )}
+    </>
+  );
+}
+
 function dieLabel(v: number): string {
   if (v <= 6) return String(v);
   return `6+${v - 6}`;
@@ -183,6 +228,7 @@ export function Card({
   onPointerEnter,
   onFocus,
   large,
+  tile,
   faceDown,
 }: CardProps) {
   const { src, onError } = useCardImage(card);
@@ -197,6 +243,7 @@ export function Card({
     hasArt ? 'card--art' : 'card--frame',
     faceDown ? 'card--back' : '',
     compact ? 'card--compact' : '',
+    tile ? 'card--tile' : '',
     large ? 'card--large' : '',
     selected ? 'card--selected' : '',
     disabled ? 'card--disabled' : '',
@@ -239,6 +286,8 @@ export function Card({
           {suppressed && <span className="card__art-flag">suppressed</span>}
           {secondaryActive && <span className="card__art-flag card__art-flag--alt">flipped</span>}
         </div>
+      ) : tile ? (
+        <TileFace card={card} headline={headline} mood={mood} />
       ) : (
         <FallbackFace card={card} headline={headline} mood={mood} />
       )}
