@@ -14,6 +14,25 @@ and implement. Status legend: 🆕 new · 📋 planned · 🔧 in progress · �
 
 ---
 
+## Design references (interaction inspiration)
+
+For card fanning, confirmation buttons, and target/discard selection, draw on the
+*interaction conventions* of **MTG Arena** and **Slay the Spire** — adapted to our
+graph-paper aesthetic (borrow the feel, not their assets):
+- **Hand fanning:** an arc that spreads/spaces out on hover so cards are readable;
+  the hovered card lifts + enlarges above its neighbours.
+- **Drag-to-play:** pick a card up and it follows the cursor; a clear "release here
+  to play" affordance (the battlefield lights up as the drop zone).
+- **Confirm button:** a single prominent, consistently-placed confirm/submit control
+  (ours: the action slot above the hand, off to the right — F4).
+- **Target / discard selection:** a dimmed modal overlay that isolates the choice;
+  pile/discard selection presented as a horizontally scrollable **card fan** with
+  selected targets highlighted (F4).
+Applies to F2 (fan), F3 (battlefield drop zone), F4 (modal targeting/discard fan +
+confirm placement).
+
+---
+
 ## Details
 
 ### F1 — Future-turn "additional mood" grants are ignored  (🆕)
