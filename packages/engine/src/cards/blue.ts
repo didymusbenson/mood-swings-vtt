@@ -206,7 +206,11 @@ registerEffects(36, {
     ctx.draw(ctx.me, revealed.length);
     const colors = [...new Set(revealed.map((c) => ctx.cardData(c).color))];
     ctx.self.data.restrictedColors = colors;
-    ctx.log(`Doubt: next round should bar colours ${colors.join(',')} (not enforced by engine)`);
+    // Stage the ban: these colours become unplayable (for everyone) for exactly the
+    // next round. The engine folds pendingBannedColors → bannedColors at round start
+    // and rejects any play of a banned-colour card.
+    ctx.state.pendingBannedColors = [...new Set([...ctx.state.pendingBannedColors, ...colors])];
+    ctx.log(`Doubt: ${colors.join(', ')} moods can't be played next round`);
   },
 });
 

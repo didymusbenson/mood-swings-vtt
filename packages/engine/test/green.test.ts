@@ -90,14 +90,17 @@ describe('green cards', () => {
     expect(sloth.currentValue).toBe(6); // 3 + 3
   });
 
-  it('#132 Vulnerability is [7] once a card is in the discard pile (discard-count)', () => {
+  it('#132 Vulnerability is [7] once a card is discarded THIS round (round-scoped, not pile contents)', () => {
     const { e, s } = game(rig([132], [126]));
     const vuln = mkMood(132, 'p1');
     s.moods.p1 = [vuln];
-    s.discard = [];
+    // A pile carried over from a prior round must NOT trigger it — only a discard
+    // that happened this round does.
+    s.discard = [55];
+    s.discardedThisRound = 0;
     e.stabilise(s);
     expect(vuln.currentValue).toBe(1);
-    s.discard = [55]; // something got discarded
+    s.discardedThisRound = 1; // a card was put into the discard pile this round
     e.stabilise(s);
     expect(vuln.currentValue).toBe(7);
   });
@@ -204,22 +207,34 @@ describe('green cards', () => {
     expect(g.playsRemaining).toBe(1); // Hope gone -> recurring grant stops
   });
 
-  it('#121 Grace grants a recurring discard play each of the owner\'s turns while in play', () => {
-    // A red mood sits in the discard pile to be replayed from it.
+  it('#121 Grace grants a recurring, colour-matched discard play each of the owner\'s turns', () => {
+    // Grace is green; a GREEN mood sits in the discard pile so it shares a colour with
+    // Grace (satisfying "if it shares a color with one of your moods").
     const { e, s } = game(rig([121, 126], [126]));
-    s.discard = [83];
+    s.discard = [126];
+    const hasDiscardGrant = (g: GameState) => g.conditionalGrants.some((x) => x.from === 'discard');
     let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 121 });
-    expect(g.discardPlaysRemaining).toBe(1); // Grace's own-turn discard grant
+    expect(hasDiscardGrant(g)).toBe(true); // Grace's own-turn colour-matched discard grant
     expect(g.activePlayer).toBe('p1'); // an available discard play keeps the turn alive
-    // Play the discard mood using the granted discard play.
-    g = e.apply(g, { type: 'play', player: 'p1', card: 83, from: 'discard' });
-    expect(g.moods.p1!.some((m) => m.card === 83)).toBe(true);
-    expect(g.discard).not.toContain(83);
-    expect(g.discardPlaysRemaining).toBe(0);
+    // Play the green discard mood using the granted (colour-matched) discard play.
+    g = e.apply(g, { type: 'play', player: 'p1', card: 126, from: 'discard' });
+    expect(g.moods.p1!.filter((m) => m.card === 126).length).toBe(1);
+    expect(g.discard).not.toContain(126);
+    expect(hasDiscardGrant(g)).toBe(false); // grant consumed
     expect(g.activePlayer).toBe('p2'); // no plays left, turn ends
-    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 (Grace 0 + red 4) wins round 1, leads round 2
+    g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 wins round 1, leads round 2
     expect(g.round).toBe(2);
     expect(g.activePlayer).toBe('p1');
-    expect(g.discardPlaysRemaining).toBe(1); // recurring: Grace re-grants a discard play at turn start
+    expect(hasDiscardGrant(g)).toBe(true); // recurring: Grace re-grants at turn start
+  });
+
+  it('#121 Grace\'s discard play is REFUSED for a card sharing no colour with your moods', () => {
+    // Grace (green) is the only mood; a RED card in discard shares no colour, so the
+    // colour-matched discard grant can't be spent on it.
+    const { e, s } = game(rig([121, 126], [126]));
+    s.discard = [83]; // red
+    const g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 121 });
+    expect(g.conditionalGrants.some((x) => x.from === 'discard')).toBe(true);
+    expect(() => e.apply(g, { type: 'play', player: 'p1', card: 83, from: 'discard' })).toThrow();
   });
 });

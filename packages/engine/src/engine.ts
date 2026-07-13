@@ -114,6 +114,9 @@ export class Engine {
       turnOrder,
       actedThisRound: [],
       roundScores: {},
+      discardedThisRound: 0,
+      bannedColors: [],
+      pendingBannedColors: [],
       winner: null,
       seed,
       uidCounter: 0,
@@ -258,14 +261,17 @@ export class Engine {
       discardMoodToPile: (mood) => {
         const label = nm(mood);
         const owner = mood.owner;
+        this.fireLeavePlay(state, mood);
         const m = removeMood(mood);
         if (m) {
           state.discard.push(m.card);
+          state.discardedThisRound += 1;
           push(`${pname(owner)}'s ${label} is discarded`, 'discard');
         }
       },
       returnMoodToHand: (mood, to) => {
         const label = nm(mood);
+        this.fireLeavePlay(state, mood);
         const m = removeMood(mood);
         if (m) {
           (state.hands[to ?? m.owner] ??= []).push(m.card);
@@ -277,6 +283,7 @@ export class Engine {
         const i = hand.indexOf(card);
         if (i >= 0) {
           state.discard.push(hand.splice(i, 1)[0]!);
+          state.discardedThisRound += 1;
           push(`${pname(player)} discards ${db.get(card).name} from hand`, 'discard');
         }
       },
@@ -291,6 +298,7 @@ export class Engine {
       },
       putOnBottomOfDeck: (mood) => {
         const label = nm(mood);
+        this.fireLeavePlay(state, mood);
         const m = removeMood(mood);
         if (m) {
           state.deck.push(m.card);
@@ -303,8 +311,8 @@ export class Engine {
       grantDiscardMood: (n = 1) => {
         state.discardPlaysRemaining += n;
       },
-      grantConditionalMood: (constraint) => {
-        state.conditionalGrants.push({ constraint });
+      grantConditionalMood: (constraint, from = 'hand') => {
+        state.conditionalGrants.push({ constraint, from });
       },
       grantExtraPlayNextTurn: (player, n = 1) => {
         state.pendingExtraPlays[player] = (state.pendingExtraPlays[player] ?? 0) + n;
@@ -355,6 +363,16 @@ export class Engine {
     return { ...this.readContext(state, self, snapshot(state)), ...this.mutationApi(state, me, choices) };
   }
 
+  /**
+   * Fire a leaving mood's `onLeavePlay` hook (Arrogance #82 give-back). Called by the
+   * true-leave mutations (discard / bottom-deck / return-to-hand) just before the mood
+   * is removed — not by steal/give, which keep the mood in play under a new controller.
+   */
+  private fireLeavePlay(state: GameState, mood: Mood): void {
+    const hook = effectsFor(resolveCardNumber(mood)).onLeavePlay;
+    if (hook) hook(this.playContext(state, mood, mood.owner, {}));
+  }
+
   // ---- actions ----------------------------------------------------------
 
   apply(prevState: GameState, action: Action): GameState {
@@ -398,6 +416,10 @@ export class Engine {
       throw new Error(`${me} does not hold #${card}`);
     }
     const data = this.db.get(card);
+    // Doubt #36: no player may play a mood whose colour is banned this round.
+    if (state.bannedColors.includes(data.color)) {
+      throw new Error(`${data.color} moods can't be played this round (#${card})`);
+    }
 
     // Build the mood up front so cost/effects can reference `self`.
     const mood: Mood = {
@@ -452,13 +474,15 @@ export class Engine {
     this.stabilise(state);
   }
 
-  /** Spend a play: the base play, else a matching conditional grant. */
+  /** Spend a play: the base play, else a matching hand-sourced conditional grant. */
   private consumePlay(state: GameState, me: PlayerId, data: CardData): void {
     if (state.playsRemaining > 0) {
       state.playsRemaining -= 1;
       return;
     }
-    const idx = state.conditionalGrants.findIndex((g) => this.grantAllows(g, data, me, state));
+    const idx = state.conditionalGrants.findIndex(
+      (g) => (g.from ?? 'hand') === 'hand' && this.grantAllows(g, data, me, state),
+    );
     if (idx < 0) throw new Error(`${me} has no available play for #${data.number}`);
     // Repeatable grants (Pride) stay until their condition fails; others are single-use.
     if (state.conditionalGrants[idx]!.constraint.kind !== 'whileMoodCountBelow') {
@@ -475,6 +499,16 @@ export class Engine {
   private consumeDiscardPlay(state: GameState, me: PlayerId, data: CardData): void {
     if (state.discardPlaysRemaining > 0) {
       state.discardPlaysRemaining -= 1;
+      return;
+    }
+    // A colour-matched discard grant (Grace #121) is a discard-sourced conditional grant.
+    const idx = state.conditionalGrants.findIndex(
+      (g) => g.from === 'discard' && this.grantAllows(g, data, me, state),
+    );
+    if (idx >= 0) {
+      if (state.conditionalGrants[idx]!.constraint.kind !== 'whileMoodCountBelow') {
+        state.conditionalGrants.splice(idx, 1);
+      }
       return;
     }
     if (this.permitsPlayFromDiscard(state, me)) {
@@ -494,11 +528,17 @@ export class Engine {
 
   private grantAllows(grant: ConditionalGrant, data: CardData, me: PlayerId, state: GameState): boolean {
     const c: PlayConstraint = grant.constraint;
+    // The played card's colour is its printed colour (it is in hand or the discard
+    // pile — neither zone is recoloured); the controller's moods use their in-play
+    // colour (colorOf, honouring Imagination #42).
+    const sharesColor = () => (state.moods[me] ?? []).some((m) => colorOf(m, this.db) === data.color);
     switch (c.kind) {
       case 'primaryValueIn':
         return c.values.includes(data.value);
       case 'colorNotSharedWithControllerMoods':
-        return !(state.moods[me] ?? []).some((m) => this.db.get(resolveCardNumber(m)).color === data.color);
+        return !sharesColor();
+      case 'colorSharedWithControllerMoods':
+        return sharesColor();
       case 'whileMoodCountBelow':
         return (state.moods[me] ?? []).length < c.target;
     }
@@ -535,8 +575,28 @@ export class Engine {
   private score(state: GameState): void {
     state.phase = 'scoring';
     this.stabilise(state);
+
+    // Awe #107: cancel this round's scoring entirely (no winner / draw / after-scoring).
+    const canceller = allMoods(state).find((m) =>
+      effectsFor(resolveCardNumber(m)).cancelsRoundScoring?.(this.readContext(state, m, snapshot(state))),
+    );
+    if (canceller) {
+      this.skipRound(state, canceller);
+      return;
+    }
+
     for (const p of state.players) {
       state.roundScores[p.id] = (state.moods[p.id] ?? []).reduce((sum, m) => sum + m.currentValue, 0);
+    }
+    // "Score … an extra time" contributions (Bliss #108, Enthusiasm #116,
+    // Exhilaration #89, Passion #97), applied before logging so the logged scores and
+    // the round winner both reflect them.
+    for (const m of allMoods(state)) {
+      const hook = effectsFor(resolveCardNumber(m)).scoreExtras;
+      if (!hook) continue;
+      for (const { player, points } of hook(this.readContext(state, m, snapshot(state)))) {
+        if (points) state.roundScores[player] = (state.roundScores[player] ?? 0) + points;
+      }
     }
     this.logPush(
       state,
@@ -544,6 +604,18 @@ export class Engine {
       'score'
     );
     this.afterScoring(state);
+  }
+
+  /**
+   * Awe #107: end the round with no scoring — no winner, no losers drawing, no
+   * after-scoring effects. The Awe player chooses who leads next round.
+   */
+  private skipRound(state: GameState, canceller: Mood): void {
+    this.logPush(state, `No scoring this round — no one wins or loses`, 'round', { actor: canceller.owner });
+    const chosen = effectsFor(resolveCardNumber(canceller)).chooseNextFirstPlayer?.(
+      this.readContext(state, canceller, snapshot(state)),
+    );
+    this.startNextRound(state, chosen ?? state.firstPlayer);
   }
 
   private afterScoring(state: GameState): void {
@@ -561,10 +633,18 @@ export class Engine {
   private endRound(state: GameState): void {
     const winner = this.roundWinner(state);
     const winP = state.players.find((p) => p.id === winner)!;
-    winP.roundsWon += 1;
+    // Base win + any extra round wins for the winner (Corruption #60's "wins two
+    // rounds instead of one"), summed over every in-play mood granting it.
+    let wins = 1;
+    for (const m of allMoods(state)) {
+      wins += effectsFor(resolveCardNumber(m)).extraRoundWinsForWinner?.(
+        this.readContext(state, m, snapshot(state)),
+      ) ?? 0;
+    }
+    winP.roundsWon += wins;
     this.logPush(
       state,
-      `${this.pname(state, winner)} wins round ${state.round} (${winP.roundsWon}/${ROUNDS_TO_WIN})`,
+      `${this.pname(state, winner)} wins round ${state.round}${wins > 1 ? ` ×${wins}` : ''} (${winP.roundsWon}/${ROUNDS_TO_WIN})`,
       'round',
       { actor: winner }
     );
@@ -586,14 +666,6 @@ export class Engine {
       }
     }
 
-    // 'round'-duration suppressions clear as the round ends.
-    for (const m of allMoods(state)) {
-      if (m.suppressed === 'round') {
-        m.suppressed = 'none';
-        m.suppressedBy = null;
-      }
-    }
-
     // Next round: winner leads, unless a mood forces a first player (Honor).
     let first: PlayerId = winner;
     for (const m of allMoods(state)) {
@@ -602,13 +674,33 @@ export class Engine {
       );
       if (forced) first = forced;
     }
+    this.startNextRound(state, first);
+  }
 
+  /**
+   * Advance to the next round with the given first player: clear round-scoped
+   * suppressions, reset per-round counters, rotate Doubt #36's staged colour ban into
+   * effect, then begin the leader's turn. Shared by `endRound` (normal) and
+   * `skipRound` (Awe #107, no scoring).
+   */
+  private startNextRound(state: GameState, first: PlayerId): void {
+    // 'round'-duration suppressions clear as the round ends.
+    for (const m of allMoods(state)) {
+      if (m.suppressed === 'round') {
+        m.suppressed = 'none';
+        m.suppressedBy = null;
+      }
+    }
     state.round += 1;
     state.firstPlayer = first;
     state.activePlayer = first;
     state.turnOrder = orderFrom(state.players.map((p) => p.id), first);
     state.actedThisRound = [];
     state.roundScores = {};
+    state.discardedThisRound = 0;
+    // Doubt #36: the colours staged this round become unplayable for exactly this next round.
+    state.bannedColors = state.pendingBannedColors;
+    state.pendingBannedColors = [];
     state.phase = 'awaitingPlay';
     this.resetTurn(state);
     this.stabilise(state);
@@ -635,9 +727,10 @@ export class Engine {
     for (const m of state.moods[player] ?? []) {
       const hook = effectsFor(resolveCardNumber(m)).extraPlaysAtTurnStart;
       if (!hook) continue;
-      const { normal = 0, fromDiscard = 0 } = hook(this.readContext(state, m, snapshot(state)));
+      const { normal = 0, fromDiscard = 0, grants = [] } = hook(this.readContext(state, m, snapshot(state)));
       state.playsRemaining += normal;
       state.discardPlaysRemaining += fromDiscard;
+      for (const g of grants) state.conditionalGrants.push({ constraint: g.constraint, from: g.from ?? 'hand' });
     }
   }
 

@@ -3,14 +3,14 @@
 // players = ids, cards = card numbers in hand, option/number/colors = misc).
 // "May" effects are opt-in: if the required choice is absent, nothing happens.
 //
-// GAPS FLAGGED (see report): the engine has no primitive for (a) skipping a
-// round's scoring (Awe), (e) an "additional mood must share a colour with your
-// moods" constraint (Eagerness; also Grace's discard-play colour-match residual),
-// (f) round-scoped discard tracking (Vulnerability), (g) an extra-scoring hook
-// (Bliss, Enthusiasm — approximated by adjusting roundScores in afterScoring).
-// NOW SUPPORTED: recurring per-turn extra plays (Grace, Hope via
-// `extraPlaysAtTurnStart`) and cross-turn / other-player extra plays (Generosity,
-// Joy via `grantExtraPlayNextTurn`). Remaining items are best-effort and called out.
+// NOW SUPPORTED (previously flagged gaps, all closed — see docs/effect-gaps.md):
+// skipping a round's scoring (Awe #107 via `cancelsRoundScoring`); the "additional
+// mood must share a colour with your moods" constraint (Eagerness #114, Grace #121's
+// discard grant via `colorSharedWithControllerMoods`); round-scoped discard tracking
+// (Vulnerability #132 via `state.discardedThisRound`); the extra-scoring hook (Bliss
+// #108, Enthusiasm #116 via `scoreExtras`); recurring per-turn extra plays (Grace,
+// Hope via `extraPlaysAtTurnStart`); and cross-turn / other-player extra plays
+// (Generosity, Joy via `grantExtraPlayNextTurn`).
 import type { Color, PlayerId } from '../types.js';
 import type { ReadContext } from '../effects.js';
 import { registerEffects } from './registry.js';
@@ -22,27 +22,25 @@ const ALL_COLORS: Color[] = ['white', 'blue', 'black', 'red', 'green', 'colorles
 const distinctColors = (ctx: ReadContext, pid: PlayerId): number =>
   new Set(ctx.moodsOf(pid).map((m) => ctx.colorOf(m))).size;
 
-// #107 Awe — "No scoring this round; you choose who goes first next round."
-// GAP: the engine always scores a round, picks a winner, and has losers draw;
-// there is no hook to cancel scoring or to set only *next* round's leader
-// (forcesFirstPlayer would force EVERY round, which is wrong). Best effort: log
-// the intent and record the chosen leader. Faithful support needs a new engine
-// primitive ("skip scoring this round").
+// #107 Awe — "After playing this mood — There is no scoring this round. No one wins
+// or loses this round. You choose which player goes first next round." Modelled with
+// `cancelsRoundScoring` (gated to the round Awe was played, since the mood persists)
+// which the engine consults at scoring time to skip scoring/winner/draw/after-scoring;
+// `chooseNextFirstPlayer` supplies the chosen next leader.
 registerEffects(107, {
   afterPlaying: (ctx) => {
     const p = ctx.choices.players?.[0];
     ctx.self.data.aweFirstPlayer = p ?? null;
-    ctx.log(
-      `Awe: no-scoring-this-round is unsupported by the engine; round will still score. Chosen next leader: ${p ?? '(none)'}`,
-    );
+    ctx.log(`Awe: no scoring this round — ${p ?? 'the current leader'} goes first next round.`);
   },
+  cancelsRoundScoring: (ctx) => (ctx.self.data.playedRound as number | undefined) === ctx.state.round,
+  chooseNextFirstPlayer: (ctx) => (ctx.self.data.aweFirstPlayer as PlayerId | undefined) ?? null,
 });
 
-// #108 Bliss — [2]. To play: discard a card from hand. While in play: score each
-// of your moods sharing the discarded card's colour two extra times.
-// The extra scoring is applied in afterScoring by adding to roundScores (the
-// engine has no dedicated extra-scoring hook, but roundScores still decides the
-// winner). Bliss itself is always [2].
+// #108 Bliss — [2]. To play: discard a card from hand. While in play: score each of
+// your moods sharing the discarded card's colour two extra times. The extra scoring
+// is contributed via `scoreExtras` (applied during scoring, so the winner + logged
+// scores reflect it). Bliss itself is always [2].
 registerEffects(108, {
   canPlay: (ctx) => (ctx.state.hands[ctx.me]?.length ?? 0) >= 2, // Bliss + ≥1 other card
   payCost: (ctx) => {
@@ -53,13 +51,13 @@ registerEffects(108, {
     ctx.self.data.blissColor = ctx.cardData(c).color;
     ctx.discardFromHand(ctx.me, c);
   },
-  afterScoring: (ctx) => {
+  scoreExtras: (ctx) => {
     const col = ctx.self.data.blissColor as Color | undefined;
-    if (!col) return;
-    let extra = 0;
+    if (!col) return [];
+    let points = 0;
     // blissColor is the discarded card's printed colour; moods use in-play colour.
-    for (const m of ctx.moodsOf(ctx.me)) if (ctx.colorOf(m) === col) extra += 2 * m.currentValue;
-    if (extra) ctx.state.roundScores[ctx.me] = (ctx.state.roundScores[ctx.me] ?? 0) + extra;
+    for (const m of ctx.moodsOf(ctx.self.owner)) if (ctx.colorOf(m) === col) points += 2 * m.currentValue;
+    return points ? [{ player: ctx.self.owner, points }] : [];
   },
 });
 
@@ -109,12 +107,12 @@ registerEffects(113, {
   intrinsicValue: (ctx) => (ctx.countColor('blue') + ctx.countColor('black') >= 2 ? 3 : 6),
 });
 
-// #114 Eagerness — [2]. Play an additional mood if it shares a colour with one of
-// your moods. GAP: there is no PlayConstraint for "colour SHARED with your moods"
-// (only the inverse, colorNotSharedWithControllerMoods, exists). Best effort:
-// grant an unconstrained extra play; the colour requirement is NOT enforced.
+// #114 Eagerness — [2]. Play an additional mood this turn if it shares a colour with
+// one of your moods. The extra play is a conditional grant constrained by
+// `colorSharedWithControllerMoods`, so the engine only lets it be spent on a
+// colour-matching card (Eagerness itself is green, so any green extra qualifies).
 registerEffects(114, {
-  afterPlaying: (ctx) => ctx.grantAdditionalMood(1),
+  afterPlaying: (ctx) => ctx.grantConditionalMood({ kind: 'colorSharedWithControllerMoods' }),
 });
 
 // #115 Enjoyment — [3]/[6]=6 if two or more red and/or white moods are in play.
@@ -123,15 +121,14 @@ registerEffects(115, {
 });
 
 // #116 Enthusiasm — [0]. While scoring, you may score one of your moods an extra
-// time. GAP: no extra-scoring hook and afterScoring receives no choices, so this
-// auto-scores your highest-value mood again (optimal for a "may"), applied via
-// roundScores.
+// time. Contributed via `scoreExtras`; since it's a "may" with free choice, it
+// auto-scores the owner's highest-value mood again (the optimal pick).
 registerEffects(116, {
-  afterScoring: (ctx) => {
-    const mine = ctx.moodsOf(ctx.me);
-    if (mine.length === 0) return;
+  scoreExtras: (ctx) => {
+    const mine = ctx.moodsOf(ctx.self.owner);
+    if (mine.length === 0) return [];
     const best = Math.max(...mine.map((m) => m.currentValue));
-    if (best > 0) ctx.state.roundScores[ctx.me] = (ctx.state.roundScores[ctx.me] ?? 0) + best;
+    return best > 0 ? [{ player: ctx.self.owner, points: best }] : [];
   },
 });
 
@@ -178,16 +175,18 @@ registerEffects(120, {
 // #121 Grace — [0]. "While in play — During each of your turns (including the turn
 // you play this mood) you may play an additional mood from the discard pile if it
 // shares a colour with one of your moods." Recurring: `extraPlaysAtTurnStart` grants
-// one discard-play at the start of each of the owner's turns while Grace is in play;
-// `afterPlaying` covers the turn Grace itself is played (turn start has passed by
-// then). The discard-play is resolved via a { from: 'discard' } action.
-// RESIDUAL: the colour-match constraint ("if it shares a colour with one of your
-// moods") isn't enforced — `discardPlaysRemaining` is a shared plain counter that
-// can't distinguish a Grace-sourced grant from Harmony's unconstrained one. See
-// docs/effect-gaps.md (`colorSharedWithControllerMoods`).
+// one colour-matched discard-play at the start of each of the owner's turns while
+// Grace is in play; `afterPlaying` covers the turn Grace itself is played (turn start
+// has passed by then). Both are conditional grants constrained by
+// `colorSharedWithControllerMoods` with `from: 'discard'`, so the engine only lets the
+// extra discard-play be spent on a discard card sharing a colour with one of your
+// moods (Grace itself is green, so a green discard card always qualifies). The play is
+// resolved via a { from: 'discard' } action.
 registerEffects(121, {
-  afterPlaying: (ctx) => ctx.grantDiscardMood(1),
-  extraPlaysAtTurnStart: () => ({ fromDiscard: 1 }),
+  afterPlaying: (ctx) => ctx.grantConditionalMood({ kind: 'colorSharedWithControllerMoods' }, 'discard'),
+  extraPlaysAtTurnStart: () => ({
+    grants: [{ constraint: { kind: 'colorSharedWithControllerMoods' }, from: 'discard' }],
+  }),
 });
 
 // #122 Happiness — [2]/[6][2]=8 if a single player has both a red mood and a
@@ -267,11 +266,10 @@ registerEffects(131, {
 });
 
 // #132 Vulnerability — [1]/[6][1]=7 if a card was put into the discard pile THIS
-// ROUND. GAP: no round-scoped discard tracking exists. Best effort: [7] whenever
-// the discard pile is non-empty (over-counts across rounds if the pile carries
-// cards from prior rounds).
+// ROUND. Uses `state.discardedThisRound`, the per-round discard counter (reset each
+// round), so a pile carrying cards from prior rounds no longer wrongly triggers it.
 registerEffects(132, {
-  intrinsicValue: (ctx) => (ctx.state.discard.length > 0 ? 7 : 1),
+  intrinsicValue: (ctx) => (ctx.state.discardedThisRound > 0 ? 7 : 1),
 });
 
 // #133 Wonder — [0]. Choose a colour; +N for each mood of that colour and each

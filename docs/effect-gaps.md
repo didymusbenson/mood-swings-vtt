@@ -53,37 +53,52 @@ Wonder (#133 +[2]). Printed `value`/`secondaryValue` were already correct.
   / `grantDiscardPlayNextTurn` fill them, and `resetTurn` folds a player's pending count
   into `playsRemaining` / `discardPlaysRemaining` at their turn start and clears it
   (consumed exactly once).
+- **`colorSharedWithControllerMoods` constraint** — #114 Eagerness, #121 Grace's
+  discard grant. New `PlayConstraint` kind; `ConditionalGrant` gained an optional
+  `from: 'hand' | 'discard'` so a constrained grant can target either zone.
+  `grantConditionalMood(constraint, from?)` and `extraPlaysAtTurnStart().grants` push
+  them; `consumePlay` spends `from:'hand'` grants, `consumeDiscardPlay` spends
+  `from:'discard'` grants. `grantAllows` checks "shares a colour with one of your
+  moods" using `colorOf` (honours Imagination #42). Grace's own-turn grant comes from
+  `afterPlaying`, its recurring grant from `extraPlaysAtTurnStart`. Grace/Eagerness are
+  green, so a green extra always qualifies; off-colour plays are rejected.
+- **"Score … an extra time"** — #108 Bliss, #116 Enthusiasm, #89 Exhilaration,
+  #97 Passion. New `CardEffects.scoreExtras(ctx) => { player, points }[]`, applied
+  during `Engine.score` after values stabilise and **before** the score is logged, so
+  the logged scores and the round winner both reflect it. Bliss/Enthusiasm/Exhilaration
+  add to their owner; Passion adds a chosen opponent's mood value to its owner while the
+  opponent still scores it (its base score is untouched).
+- **Skip / cancel a round's scoring** — #107 Awe. New `CardEffects.cancelsRoundScoring`
+  (gated to the round Awe was played, since the mood persists) makes `Engine.score`
+  take a no-score path: no winner, no losers drawing, no after-scoring effects; the
+  round still ends. `chooseNextFirstPlayer` supplies the next leader. Round transition
+  is unified in `Engine.startNextRound` (shared by normal `endRound` and Awe's skip).
+- **Extra round win** — #60 Corruption. New `CardEffects.extraRoundWinsForWinner`,
+  summed over in-play moods and added to the **actual** round winner's `roundsWon` in
+  `endRound` (honours the real tie-break, unlike the old projected-winner scan).
+- **Play-gate (colour restriction next round)** — #36 Doubt. `GameState.bannedColors` /
+  `pendingBannedColors`: Doubt stages the revealed cards' colours; `startNextRound`
+  rotates them into effect for exactly the next round; `playMood` rejects any play of a
+  banned-colour card (the app surfaces the rejection as a toast).
+- **Leave-play hook** — #82 Arrogance. New `CardEffects.onLeavePlay`, fired by the
+  true-leave mutations (discard / bottom-deck / return-to-hand — not steal/give) just
+  before the mood is removed. Arrogance gives the taken mood back to its original owner
+  (if still controlled).
+- **Round-scoped discard counter** — #132 Vulnerability. `GameState.discardedThisRound`
+  counts discards from any zone this round (reset each round), so a pile carried over
+  from prior rounds no longer wrongly triggers it.
 
 ## Missing engine primitives (best-effort today; flagged by encoders)
 
 These effects are implemented as far as the current API allows (often logged or
 approximated) without crashing; adding the primitive would make them fully faithful.
 
-- **Skip / cancel a round's scoring** — #107 Awe. No hook to cancel scoring / the
-  round win / losers drawing.
-- **Extra round win** — #60 Corruption (and its Awe interaction). Approximated by
-  pre-incrementing the projected winner in `afterScoring`.
-- **"Score a mood an extra time"** — #108 Bliss, #116 Enthusiasm, #89 Exhilaration,
-  #97 Passion. Approximated by adjusting `roundScores` in `afterScoring` (winner is
-  still decided correctly).
-- **`colorSharedWithControllerMoods` constraint** — #114 Eagerness (only the inverse
-  exists today; grants an unconstrained extra play). Also #121 Grace's discard-play
-  colour-match ("if it shares a colour with one of your moods") is unconstrained:
-  `discardPlaysRemaining` is a shared plain counter that can't distinguish a
-  Grace-sourced grant from Harmony's unconstrained one, so the colour-match is not
-  enforced. This is the sole residual of the (now-closed) recurring/cross-turn
-  extra-play work — the recurring discard grant itself fires correctly each turn.
-- **Play-gate (colour/other restrictions next round)** — #36 Doubt (recorded/logged
-  only).
 - **Creativity dual mood-target disambiguation** — #32 Creativity now copies a mood
   in play (`choices.moods[0]`), adopts value/colour/abilities via `copyOf` set before
   cost resolution, and DOES pay the copied card's "To play" cost (its canPlay/payCost
   are delegated; `choices.moods[1..]` feed the copied card's own mood targets).
   Residual: a copied card that needs two independent *mood-target lists* can't be
   disambiguated from the single shared `moods` array (rare in the set).
-- **Leave-play hook** — #82 Arrogance's "give back when this leaves play".
-- **Round-scoped discard counter** — #132 Vulnerability (approximated as "discard
-  non-empty").
 
 Hand-to-hand card passing (#31 Confusion, #49 Rationalization, #85 Chaos,
 #86 Compulsion, #106 Zeal) is done via direct `ctx.state` mutation (sanctioned by

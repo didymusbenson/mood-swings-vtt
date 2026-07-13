@@ -7,7 +7,7 @@
 // truth) prints Envy "+[1] per moodiest opponent mood", Sadness "+[1] per discard
 // card" and Vanity "+[1] / +[2] per your mood". The MaRo Card Notes page quotes
 // [2]/[2]/[3] respectively. We encode the printed cards.json numbers. See report.
-import type { Color, Mood, PlayerId } from '../types.js';
+import type { Color, Mood } from '../types.js';
 import type { ReadContext } from '../effects.js';
 import { registerEffects } from './registry.js';
 
@@ -97,8 +97,9 @@ registerEffects(59, {
 });
 
 // #60 Corruption — [2]; choose one: bottom-deck up to two discard cards and draw
-// that many, OR the round's winner wins two rounds. (Double-win approximated in
-// afterScoring by pre-incrementing the projected winner — see report.)
+// that many, OR the round's winner wins two rounds instead of one. The double-win is
+// modelled by `extraRoundWinsForWinner`, which the engine adds to the *actual* round
+// winner's tally (so it honours the real tie-break, unlike the old score-scan approximation).
 registerEffects(60, {
   afterPlaying: (ctx) => {
     if (ctx.choices.option === 'wins') {
@@ -117,21 +118,7 @@ registerEffects(60, {
     }
     if (moved > 0) ctx.draw(ctx.me, moved);
   },
-  afterScoring: (ctx) => {
-    if (!ctx.self.data.doubleWin) return;
-    const scores = ctx.state.roundScores;
-    let best: PlayerId | null = null;
-    let bestScore = -Infinity;
-    for (const pid of ctx.state.actedThisRound) {
-      const s = scores[pid] ?? 0;
-      if (s > bestScore) {
-        bestScore = s;
-        best = pid;
-      }
-    }
-    const p = best ? ctx.state.players.find((pp) => pp.id === best) : undefined;
-    if (p) p.roundsWon += 1;
-  },
+  extraRoundWinsForWinner: (ctx) => (ctx.self.data.doubleWin ? 1 : 0),
 });
 
 // #61 Cruelty — [3]; chosen opponents with 2+ moods each discard a random mood.

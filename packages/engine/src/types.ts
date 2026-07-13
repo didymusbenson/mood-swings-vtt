@@ -78,10 +78,17 @@ export interface Mood {
 export type PlayConstraint =
   | { kind: 'primaryValueIn'; values: number[] } // top-right printed value in set
   | { kind: 'colorNotSharedWithControllerMoods' } // Benevolence
+  | { kind: 'colorSharedWithControllerMoods' } // Eagerness #114, Grace #121 (discard)
   | { kind: 'whileMoodCountBelow'; target: number }; // Pride — repeatable until met
 
 export interface ConditionalGrant {
   constraint: PlayConstraint;
+  /**
+   * Which zone the granted extra play must come from. 'hand' (default) is a normal
+   * play; 'discard' is a discard-pile play (Grace #121's colour-matched discard
+   * grant). Consumed by `consumePlay` ('hand') vs `consumeDiscardPlay` ('discard').
+   */
+  from?: 'hand' | 'discard';
 }
 
 export type Phase =
@@ -175,6 +182,24 @@ export interface GameState {
   actedThisRound: PlayerId[];
   /** Scores captured at scoring time (for after-scoring effects). */
   roundScores: Record<PlayerId, number>;
+  /**
+   * Count of cards put into the discard pile during the current round (from any
+   * zone). Reset to 0 at the start of each round. Drives "a card was put into the
+   * discard pile this round" checks (Vulnerability #132).
+   */
+  discardedThisRound: number;
+  /**
+   * Colours nobody may play this round (Doubt #36). A play of a card whose printed
+   * colour is in this list is rejected. Cleared/rotated at each round start from
+   * `pendingBannedColors`.
+   */
+  bannedColors: Color[];
+  /**
+   * Colours to ban NEXT round, staged by a Doubt #36 played this round. Folded into
+   * `bannedColors` (and cleared) when the next round begins, so the ban applies for
+   * exactly the round after Doubt is played.
+   */
+  pendingBannedColors: Color[];
   /** Set once a player reaches 3 round wins. */
   winner: PlayerId | null;
 

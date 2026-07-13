@@ -39,9 +39,10 @@ registerEffects(81, {
     ctx.opponentsOf(ctx.self.owner).some((p) => (ctx.state.hands[p]?.length ?? 0) >= 3) ? 5 : 3,
 });
 
-// #82 Arrogance — [2]. You may choose an opponent; they choose one of their white
-// or blue moods and it becomes yours. (Give-back "after this mood is no longer in
-// play" has no engine hook — see flag in report; only the take is modelled.)
+// #82 Arrogance — [2]. You may choose an opponent; they choose one of their white or
+// blue moods and it becomes yours. When Arrogance leaves play, the taken mood is
+// given back to its original owner (if you still control it), via the `onLeavePlay`
+// hook the engine fires on discard / bottom-deck / return-to-hand.
 registerEffects(82, {
   afterPlaying: (ctx) => {
     const m = byUid(ctx, ctx.choices.moods?.[0]);
@@ -50,6 +51,10 @@ registerEffects(82, {
     if (col !== 'white' && col !== 'blue') return;
     ctx.steal(m, ctx.me);
     ctx.self.data.tookUid = m.uid;
+  },
+  onLeavePlay: (ctx) => {
+    const m = byUid(ctx, ctx.self.data.tookUid as string | undefined);
+    if (m && m.owner === ctx.self.owner && m.stolenFrom) ctx.giveMood(m, m.stolenFrom);
   },
 });
 
@@ -121,8 +126,8 @@ registerEffects(88, {
 });
 
 // #89 Exhilaration — [0]. To play: put one of your moods into the discard pile.
-// While in play: score your moods an extra time. (No extra-scoring primitive —
-// best-effort via adding the owner's mood total to roundScores after scoring.)
+// While in play: score your moods an extra time (each of the owner's moods counted
+// once more), contributed via `scoreExtras` so it feeds the winner + logged scores.
 registerEffects(89, {
   canPlay: (ctx) => ctx.moodsOf(ctx.me).length >= 1,
   payCost: (ctx) => {
@@ -131,9 +136,9 @@ registerEffects(89, {
       ctx.moodsOf(ctx.me)[0];
     if (pick) ctx.discardMoodToPile(pick);
   },
-  afterScoring: (ctx) => {
-    const extra = ctx.moodsOf(ctx.me).reduce((s, m) => s + m.currentValue, 0);
-    ctx.state.roundScores[ctx.me] = (ctx.state.roundScores[ctx.me] ?? 0) + extra;
+  scoreExtras: (ctx) => {
+    const points = ctx.moodsOf(ctx.self.owner).reduce((s, m) => s + m.currentValue, 0);
+    return points ? [{ player: ctx.self.owner, points }] : [];
   },
 });
 
@@ -235,14 +240,15 @@ registerEffects(96, {
 });
 
 // #97 Passion — [0]. While scoring, you may score one of your opponents' moods as
-// though it were yours (they still score it too). (No extra-scoring primitive and
-// no choices in afterScoring — best-effort: auto-adds the opponents' highest mood.)
+// though it were yours (they still score it too). Contributed via `scoreExtras`,
+// adding the opponents' highest mood value to the owner's score (the opponent's own
+// score is untouched, so they still score it). Auto-picks the best (a "may").
 registerEffects(97, {
-  afterScoring: (ctx) => {
-    const opp = ctx.opponentsOf(ctx.me).flatMap((p) => ctx.moodsOf(p));
-    if (opp.length === 0) return;
+  scoreExtras: (ctx) => {
+    const opp = ctx.opponentsOf(ctx.self.owner).flatMap((p) => ctx.moodsOf(p));
+    if (opp.length === 0) return [];
     const best = opp.reduce((a, b) => (b.currentValue > a.currentValue ? b : a));
-    ctx.state.roundScores[ctx.me] = (ctx.state.roundScores[ctx.me] ?? 0) + best.currentValue;
+    return best.currentValue ? [{ player: ctx.self.owner, points: best.currentValue }] : [];
   },
 });
 
