@@ -7,7 +7,8 @@ and implement. Status legend: 🆕 new · 📋 planned · 🔧 in progress · �
 | # | Status | Area | Item | Notes / open questions |
 |---|--------|------|------|------------------------|
 | F1 | 🆕 | engine | "Play an additional mood on a future turn" cards don't grant the extra play | Known gap: `playsRemaining` resets to 1 each turn with no cross-turn carry. Affects #120, #121, #124, #125 (#135 is 3+‑player, out of 2p MVP scope). |
-| F2 | 🆕 | layout | Stop swapping player seats each turn; fix P1 bottom / P2 top and glow the active player's zone instead | ❓ Open: on P2's turn, is the interactive hand at the top (symmetric seats, option A) or always docked at the bottom (option B)? |
+| F2 | 🆕 | layout | Stop swapping player seats each turn; fix P1 bottom / P2 top and glow the active player's zone instead | ❓ Open: A vs B — likely resolved to **A** by F3 (fixed seats, play from your own edge). Confirm. |
+| F3 | 🆕 | layout | Replace stacked bands with a single readable "battlefield" (round state + scoring at a glance); whole battlefield is the drop zone | Keep Preview (left) + Log (right) rails. ❓ Open: split moods by owner (top=oppo / bottom=you) vs single shared pool — see F3 details. |
 
 ---
 
@@ -48,3 +49,28 @@ interactive/drag-from hand?
 - **(B) Interactive hand always bottom-docked** — seats/labels stay fixed and the
   active zone glows, but the hand you drag from always docks at the bottom edge.
 **Plan:** _pending answer to the open question._
+
+### F3 — Unified "battlefield" center (readability)  (🆕)
+**What:** The stacked-bands center (opponent band / deck+drag band / you band) is
+hard to read — you can't glance at the board and see the round's state. Replace it
+with a single **battlefield** that represents the current round + scoring clearly.
+**Keep:** the left **Preview** rail and right **Log** rail exactly where they are.
+**Battlefield layout (from the sketch):**
+- **Opponent hand** across the top; **your hand** along the bottom edge.
+- Both players' **played moods** laid out in the central area (see open question on
+  arrangement).
+- **Deck** at the left edge, with the **discard pile directly below it**; the
+  discard is **clickable to inspect** (open a viewer listing the discarded cards).
+- **Score** shown prominently (per the sketch, at the right / on each player's side)
+  so the round's scoring is legible at a glance.
+- The **whole battlefield is the drop zone** — dropping a card anywhere in the play
+  area plays it (to the active player's side); specific mood/player targets still
+  work for targeted cards.
+**Open question (blocking the plan):** mood arrangement —
+- **(Split by owner, recommended):** opponent moods in the top half (near their
+  hand), yours in the bottom half (near your hand), each side showing its running
+  score. Implies fixed seats + play-from-your-own-edge ⇒ **resolves F2 as option A**.
+- **(Single shared pool):** all moods intermixed in one grid.
+**Plan:** _pending answers (arrangement + F2 A/B)._
+**Sub-notes:** discard viewer = a click-to-open panel/modal listing discard-pile
+cards (also useful for "play from discard" cards later).
