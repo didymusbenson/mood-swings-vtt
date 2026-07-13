@@ -9,8 +9,8 @@ and implement. Status legend: 🆕 new · 📋 planned · 🔧 in progress · �
 | F1 | 🆕 | engine | "Play an additional mood on a future turn" cards don't grant the extra play | Known gap: `playsRemaining` resets to 1 each turn with no cross-turn carry. Affects #120, #121, #124, #125 (#135 is 3+‑player, out of 2p MVP scope). |
 | F2 | 📋 | layout | Fix P1 bottom / P2 top; glow the active player's zone instead of swapping seats | **Resolved: option A** (fixed seats, each plays from their own edge) — implied by F3. |
 | F3 | 📋 | layout | Replace stacked bands with a single readable "battlefield" (round state + scoring at a glance); whole battlefield is the drop zone; deck+discard column, discard click-to-inspect | Keep Preview (left) + Log (right). **Arrangement resolved:** moods grouped by owner ("facing the player who played it") — yours bottom, oppo top. Rendering upright for readability (confirm if you want literal 180° rotation). |
-| F4 | 🆕 | targeting UX | Target selection must be an in-your-face **modal overlay** (dims background), not the current subtle inline flow | ❓ Open: avatar style + names picked vs auto (Q1); confirm-button home (Q2). Depends on **new: player avatars**. |
-| F4a | 🆕 | asset | **Player avatars** (new) — needed for the targeting overlay's player picker (and generally) | ❓ Open: style (initial badge / sketch faces / user art) + pick-on-start vs auto. |
+| F4 | 📋 | targeting UX | Target selection must be an in-your-face **modal overlay** (dims background), not the current subtle inline flow | **Resolved:** confirm/submit buttons live in a dedicated slot **above the hand, off to the right** (never over cards). |
+| F4a | 📋 | asset | **Player avatars** — **emoji placeholders** for now (real art TBD), auto-assigned per player | Used by the F4 player picker + seat identity. |
 
 ---
 
@@ -110,13 +110,16 @@ collide with the rest of the UI. *Proposal:* modal Cancel/Submit at the
 `choices` object the engine already consumes (via `specFor`/`legalTargets`); the
 per-card target **specs already exist** and drive which slots/targets the overlay
 shows.
-**Open questions:** Q1 avatars (style + pick-vs-auto) · Q2 confirm-button home.
-**Plan:** _pending Q1/Q2._
+**Confirm-button home (RESOLVED):** all confirm/submit/Play buttons live in a
+dedicated **action slot above the player's hand, off to the right** — never over
+the cards. Applies to the modal Submit/Cancel and the non-modal manual "Play".
+**Avatars (RESOLVED):** emoji placeholders per player for now (real art later).
+**Plan:** _to be written in the planning pass (implements with F2/F3 battlefield)._
 
 ### F4a — Player avatars (new asset/component)  (🆕)
 **What:** Need player avatars — used by F4's player-target picker and generally to
 identify seats. **Must be original** (no copyrighted art).
-**Open question:** style — (a) initial/colour badge, (b) small set of hand-drawn
-sketch-face avatars matching the aesthetic (auto-assigned), (c) user-provided art;
-and whether name/avatar is chosen on the start screen or auto-assigned P1/P2.
-**Plan:** _pending Q1._
+**Resolved:** use **emoji placeholders** per player as a stand-in (auto-assigned);
+real avatar art to be decided later. Avatars appear in the seat headers and come
+forward in F4's player-target picker.
+**Plan:** _to be written in the planning pass._
