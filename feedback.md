@@ -4,6 +4,17 @@ Running list of interface fixes and jank to address. The user adds items; each i
 documented here as it comes in. Once the list is complete we turn it into a plan
 and implement. Status legend: 🆕 new · 📋 planned · 🔧 in progress · ✅ done.
 
+**Implementation plan (agent team, in progress):**
+- **Agent A — engine (F1):** persistent per-player extra-play mechanism —
+  one-time pending grants (Joy #125 self, Generosity #120 chosen opponent) applied
+  at that player's next turn start, and recurring while-in-play grants
+  (Hope #124 normal, Grace #121 discard+color-match) re-evaluated each of the
+  owner's turn starts. Engine-only; new tests; update effect-gaps.md.
+- **Agent B — app (F2+F3+F4+F4a):** fixed seats + glow, unified battlefield
+  (by-owner moods, deck+discard column w/ inspector, whole-field drop zone),
+  modal targeting overlay (emoji avatars, discard fan), confirm slot above the
+  hand (right). App-only; preserve engine wiring + fixed-screen no-scroll.
+
 | # | Status | Area | Item | Notes / open questions |
 |---|--------|------|------|------------------------|
 | F1 | 🆕 | engine | "Play an additional mood on a future turn" cards don't grant the extra play | Known gap: `playsRemaining` resets to 1 each turn with no cross-turn carry. Affects #120, #121, #124, #125 (#135 is 3+‑player, out of 2p MVP scope). |
