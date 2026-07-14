@@ -7,10 +7,8 @@
 // individual target to name (Rage, Wrath): the acting player opts in by passing
 // choices.option === 'all'.
 //
-// NOTE ON THRESHOLDS: a few red cards' rules text in data/cards.json uses a lower
-// value threshold than docs/card-notes.md's transcription (Anger [3] vs note [5];
-// Hostility/Rage/Shock [2] vs note [3]). We encode the values shipped in
-// data/cards.json (the data the engine actually loads); see the flag in the report.
+// THRESHOLDS: encoded per the authoritative MaRo Card Notes (matching the corrected
+// data/cards.json): Anger total ≤[5]; Hostility/Rage/Shock ≤[3]; Embarrassment {4,5,6}.
 import type { Mood } from '../types.js';
 import type { ReadContext } from '../effects.js';
 import { registerEffects } from './registry.js';
@@ -196,9 +194,13 @@ registerEffects(94, {
     const col = ctx.colorOf(sac);
     if (col !== 'black' && col !== 'green') return;
     ctx.discardMoodToPile(sac);
+    // RULES.md worked example: let "While in play" re-settle after the sacrifice so
+    // the value-gated second effect sees CURRENT values (read currentValue, not the
+    // frozen valueOf snapshot).
+    ctx.restabilize();
     for (const uid of uids.slice(1, 3)) {
       const t = byUid(ctx, uid);
-      if (t && ctx.valueOf(t) <= 3) ctx.discardMoodToPile(t);
+      if (t && t.currentValue <= 3) ctx.discardMoodToPile(t);
     }
   },
 });
@@ -218,23 +220,21 @@ registerEffects(95, {
   },
 });
 
-// #96 Instability — [2]. You may choose two moods from the same opponent; they
-// give you one, then you give them one of yours. (The opponent's sub-choice is
-// auto-resolved: they hand over the lower-value of the two — see flag.)
+// #96 Instability — [2]. You may take one of an opponent's moods (in hotseat, the
+// opponent — sitting at the same screen — designates which of theirs transfers, per
+// the note "the player who has the moods chooses which one you get"), then give them
+// one of yours. `choices.moods` holds the opponent's mood (theirs to pick) and your
+// give-back; no auto-resolution.
 registerEffects(96, {
   afterPlaying: (ctx) => {
-    const uids = ctx.choices.moods ?? [];
-    const a = byUid(ctx, uids[0]);
-    const b = byUid(ctx, uids[1]);
-    if (!a || !b) return;
-    const opp = a.owner;
-    if (opp === ctx.me || b.owner !== opp) return; // two moods of one opponent
-    const give = ctx.valueOf(a) <= ctx.valueOf(b) ? a : b;
-    ctx.steal(give, ctx.me);
-    const mine = ctx.moodsOf(ctx.me).filter((m) => m.uid !== ctx.self.uid && m.uid !== give.uid);
-    const back =
-      mine.find((m) => uids.includes(m.uid)) ??
-      mine.slice().sort((x, y) => ctx.valueOf(x) - ctx.valueOf(y))[0];
+    const chosen = (ctx.choices.moods ?? [])
+      .map((u) => byUid(ctx, u))
+      .filter((m): m is Mood => m != null);
+    const take = chosen.find((m) => m.owner !== ctx.me); // the opponent's mood you receive
+    if (!take) return;
+    const opp = take.owner;
+    const back = chosen.find((m) => m.owner === ctx.me && m.uid !== ctx.self.uid);
+    ctx.steal(take, ctx.me);
     if (back) ctx.giveMood(back, opp);
   },
 });

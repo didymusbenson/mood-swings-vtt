@@ -197,9 +197,12 @@ registerEffects(21, {
 registerEffects(22, {
   afterPlaying: (ctx) => {
     const p = ctx.choices.players?.[0];
-    if (!p) return;
-    const target = ctx.moodsOf(p).length;
-    if (target > ctx.moodsOf(ctx.me).length) ctx.grantConditionalMood({ kind: 'whileMoodCountBelow', target });
+    if (!p || p === ctx.me) return;
+    // Repeatable grant keyed to the chosen player: you may keep playing while your
+    // mood count is below theirs — re-checked live, so shrinking their board counts.
+    if (ctx.moodsOf(p).length > ctx.moodsOf(ctx.me).length) {
+      ctx.grantConditionalMood({ kind: 'whileMoodCountBelow', player: p });
+    }
   },
 });
 

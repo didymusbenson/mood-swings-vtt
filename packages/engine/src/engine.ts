@@ -241,7 +241,7 @@ export class Engine {
     };
   }
 
-  private mutationApi(state: GameState, me: PlayerId, choices: Choices): MutationApi {
+  private mutationApi(state: GameState, self: Mood, me: PlayerId, choices: Choices): MutationApi {
     const db = this.db;
     const removeMood = (mood: Mood): Mood | undefined => {
       for (const p of state.players) {
@@ -266,6 +266,7 @@ export class Engine {
         if (m) {
           state.discard.push(m.card);
           state.discardedThisRound += 1;
+          clearSuppressionsBy(state, m.uid); // sustained suppressions end when the suppressor leaves play
           push(`${pname(owner)}'s ${label} is discarded`, 'discard');
         }
       },
@@ -275,6 +276,7 @@ export class Engine {
         const m = removeMood(mood);
         if (m) {
           (state.hands[to ?? m.owner] ??= []).push(m.card);
+          clearSuppressionsBy(state, m.uid);
           push(`${label} returns to ${pname(to ?? m.owner)}'s hand`, 'return');
         }
       },
@@ -302,6 +304,7 @@ export class Engine {
         const m = removeMood(mood);
         if (m) {
           state.deck.push(m.card);
+          clearSuppressionsBy(state, m.uid);
           push(`${label} is put on the bottom of the deck`, 'bottomdeck');
         }
       },
@@ -322,7 +325,9 @@ export class Engine {
       },
       suppress: (mood, duration, bySelf = false) => {
         mood.suppressed = duration;
-        mood.suppressedBy = bySelf ? me : null;
+        // For 'sustained', remember the SUPPRESSING mood (self) so the suppression can
+        // be lifted when that mood leaves play / changes owner. (turn/round clear by timer.)
+        mood.suppressedBy = bySelf ? self.uid : null;
         push(`${pname(me)} suppresses ${nm(mood)}`, 'suppress');
       },
       steal: (mood, to) => {
@@ -333,6 +338,7 @@ export class Engine {
         if (m) {
           m.owner = to;
           state.moods[to]!.push(m);
+          clearSuppressionsBy(state, m.uid); // changing owner ends any sustained suppression it caused
           push(`${pname(to)} takes ${label} from ${pname(from)}`, 'steal');
         }
       },
@@ -344,6 +350,7 @@ export class Engine {
           m.owner = to;
           m.stolenFrom = null;
           state.moods[to]!.push(m);
+          clearSuppressionsBy(state, m.uid);
           push(`${pname(from)} gives ${label} to ${pname(to)}`, 'give');
         }
       },
@@ -355,12 +362,13 @@ export class Engine {
         state.seed = r.seed;
         return Math.floor(r.value * maxExclusive);
       },
+      restabilize: () => this.stabilise(state),
       log: (message) => state.log.push({ round: state.round, message, kind: 'info', actor: me }),
     };
   }
 
   private playContext(state: GameState, self: Mood, me: PlayerId, choices: Choices): PlayContext {
-    return { ...this.readContext(state, self, snapshot(state)), ...this.mutationApi(state, me, choices) };
+    return { ...this.readContext(state, self, snapshot(state)), ...this.mutationApi(state, self, me, choices) };
   }
 
   /**
@@ -540,13 +548,15 @@ export class Engine {
       case 'colorSharedWithControllerMoods':
         return sharesColor();
       case 'whileMoodCountBelow':
-        return (state.moods[me] ?? []).length < c.target;
+        // Live: your count vs the chosen player's CURRENT count (shrinking their board
+        // mid-turn lowers your remaining allowance, per Pride's note).
+        return (state.moods[me] ?? []).length < (state.moods[c.player] ?? []).length;
     }
   }
 
   /** Cost context: the mood is not yet in play, so effects act on existing board. */
   private costContext(state: GameState, self: Mood, me: PlayerId, choices: Choices): PlayContext {
-    return { ...this.readContext(state, self, snapshot(state)), ...this.mutationApi(state, me, choices) };
+    return { ...this.readContext(state, self, snapshot(state)), ...this.mutationApi(state, self, me, choices) };
   }
 
   // ---- turn / round progression ----------------------------------------
@@ -753,6 +763,21 @@ export class Engine {
 
 function snapshot(state: GameState): Map<string, number> {
   return new Map(allMoods(state).map((m) => [m.uid, m.currentValue]));
+}
+
+/**
+ * Lift every 'sustained' suppression that was imposed by the mood `uid` — used when
+ * that suppressing mood leaves play or changes owner (RULES.md: sustained suppression
+ * lasts "as long as the suppressing card stays in play on your side; stops if that
+ * card changes owner"). 'turn'/'round' suppressions are timer-based and untouched.
+ */
+function clearSuppressionsBy(state: GameState, uid: string): void {
+  for (const m of allMoods(state)) {
+    if (m.suppressed === 'sustained' && m.suppressedBy === uid) {
+      m.suppressed = 'none';
+      m.suppressedBy = null;
+    }
+  }
 }
 
 /** Play-order key from a mood uid (`m<n>`): higher = played more recently. */

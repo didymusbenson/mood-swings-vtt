@@ -3,10 +3,9 @@
 // players = ids, cards = card numbers in hand/discard, option/colors = misc).
 // "May" effects are opt-in: if the required choice is absent, nothing happens.
 //
-// NOTE on printed value vs. Card Notes: data/cards.json (the engine's source of
-// truth) prints Envy "+[1] per moodiest opponent mood", Sadness "+[1] per discard
-// card" and Vanity "+[1] / +[2] per your mood". The MaRo Card Notes page quotes
-// [2]/[2]/[3] respectively. We encode the printed cards.json numbers. See report.
+// VALUES: encoded per the authoritative MaRo Card Notes (and the corrected
+// data/cards.json): Envy +[2] per moodiest-opponent mood, Sadness +[2] per discard
+// card, Vanity +[1] per your mood (+[3] when your hand is empty).
 import type { Color, Mood } from '../types.js';
 import type { ReadContext } from '../effects.js';
 import { registerEffects } from './registry.js';
@@ -52,6 +51,9 @@ registerEffects(56, {
     ctx.self.data.given = m.uid;
   },
   afterScoring: (ctx) => {
+    // The reclaim is a one-time, this-round effect ("after scoring, that mood becomes
+    // yours again if it's still in play") — don't re-pull it in later rounds.
+    if ((ctx.self.data.playedRound as number | undefined) !== ctx.state.round) return;
     const m = byUid(ctx, ctx.self.data.given as string | undefined);
     if (m) ctx.giveMood(m, ctx.self.owner);
   },

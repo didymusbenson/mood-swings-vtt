@@ -913,17 +913,8 @@ input:focus-visible {
   background: linear-gradient(to top, rgba(47, 111, 176, 0.1), rgba(47, 111, 176, 0));
 }
 
-/* The acting edge's hand + action slot ride above the targeting overlay scrim so
-   the confirm controls stay reachable while the battlefield is dimmed (F4). */
-.edge--acting {
-  overflow: visible;
-  z-index: 40;
-}
-.edge--acting .actionslot,
-.edge--acting .hand {
-  position: relative;
-  z-index: 60;
-}
+/* During a targeting flow the modal overlay owns the confirm controls and dims the
+   rest, so the acting edge no longer needs to escape above the scrim. */
 
 .seat__head {
   display: flex;
@@ -1423,6 +1414,15 @@ input:focus-visible {
   font-size: 0.8rem;
   margin: 0.7rem 0 0;
   text-align: center;
+}
+/* The modal's own confirm controls, at the bottom of the overlay panel. */
+.overlay__actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1.5px dashed var(--line);
 }
 
 /* Player avatar picker (F4a comes forward as clickable avatars). */

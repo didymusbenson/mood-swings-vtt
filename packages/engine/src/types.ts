@@ -79,7 +79,7 @@ export type PlayConstraint =
   | { kind: 'primaryValueIn'; values: number[] } // top-right printed value in set
   | { kind: 'colorNotSharedWithControllerMoods' } // Benevolence
   | { kind: 'colorSharedWithControllerMoods' } // Eagerness #114, Grace #121 (discard)
-  | { kind: 'whileMoodCountBelow'; target: number }; // Pride — repeatable until met
+  | { kind: 'whileMoodCountBelow'; player: PlayerId }; // Pride — repeatable while below the chosen player's LIVE mood count
 
 export interface ConditionalGrant {
   constraint: PlayConstraint;

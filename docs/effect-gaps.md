@@ -1,8 +1,35 @@
 # Effect encoding — known gaps & data notes
 
 Status of full-automation encoding. All 130 playable cards are registered and fully
-modelled — there are **no remaining approximations**. This file is now a record of the
-engine primitives that were added to reach 100% fidelity (see "Recently closed").
+modelled. A rules-fidelity audit (against `RULES.md` + `card-notes.md`) then found and
+fixed several timing/lifecycle bugs — see "Rules-fidelity fixes" below. This file is a
+record of the engine primitives added to reach fidelity (see "Recently closed").
+
+## Rules-fidelity fixes (from the audit against RULES.md + card-notes.md)
+
+An independent audit grounded only in the authoritative docs found the value/data layer
+faithful but several **timing/lifecycle** bugs. All fixed (tests in `test/fidelity.test.ts`):
+
+1. **Sustained suppression now clears** when the suppressor leaves play or changes owner
+   (Faith #12, Guilt #14, Meekness #19, Pacifism #20, Shame #25). `suppress(..,'sustained')`
+   records the suppressing mood's uid (`suppressedBy`); `clearSuppressionsBy(uid)` lifts it
+   from discard/bottom-deck/return/steal/give. Previously sustained suppression was permanent.
+2. **Sneakiness #51** swaps scores only the round it was played (added a `playedRound` gate);
+   it was re-swapping every round it stayed in play.
+3. **Hostility #94 / Worry #52** re-settle "While in play" values between their two sub-effects
+   via the new `ctx.restabilize()`, then read `currentValue` (RULES.md's worked example). They
+   previously used a frozen snapshot, inverting the documented result.
+4. **Bashfulness #30** self-bottom-decks only on the round it was played (`playedRound` gate);
+   it was triggering on any later round it won.
+5. **Instability #96** now transfers the explicitly-chosen opponent mood (the opponent's pick at
+   the shared hotseat screen) instead of auto-picking the lower-value one.
+6. **Betrayal #56** reclaim is gated to the round played (was ungated across rounds).
+7. **Pride #22** allowance tracks the chosen player's LIVE mood count (constraint stores the
+   player, not a frozen target), so shrinking their board mid-turn lowers your remaining plays.
+
+Note (#8, no code change): Meekness's card rules line says "all moods" (which the engine
+follows) while one notes bullet says "your moods" — an internal contradiction in the notes;
+the primary rules line governs.
 
 ## Data correction — inline rules-text values (RESOLVED via card-notes)
 

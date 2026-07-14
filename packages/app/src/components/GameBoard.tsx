@@ -241,23 +241,10 @@ function HandRow({ player, state, ctx, pos }: { player: PlayerState; state: Game
  *   - during a flow:  Submit / Skip / Cancel for the modal targeting overlay.
  */
 function ActionSlot({ pc, state }: { pc: PlayController; state: GameState }) {
+  // During a targeting flow, the modal overlay owns the Submit/Skip/Cancel controls
+  // (they're part of the overlay, above the scrim) — the action slot stays out of it.
   if (pc.flow) {
-    return (
-      <div className="actionslot actionslot--flow">
-        <span className="actionslot__hint">Make your choice in the panel, then</span>
-        <button className="btn btn--primary" disabled={!pc.canConfirm} onClick={() => pc.confirm()}>
-          Submit
-        </button>
-        {pc.canSkip && (
-          <button className="btn" onClick={() => pc.skip()}>
-            Skip
-          </button>
-        )}
-        <button className="btn" onClick={() => pc.cancel()}>
-          Cancel
-        </button>
-      </div>
-    );
+    return <div className="actionslot actionslot--empty" aria-hidden />;
   }
 
   const playedExtra = (state.playedThisTurn?.length ?? 0) > 0;
@@ -593,7 +580,21 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
             </div>
           )}
         </div>
-        <p className="overlay__foot muted">Confirm with Submit (top-right, above your hand) — or Cancel to abort.</p>
+        {/* The modal owns its own confirm controls (part of the overlay, above the
+            scrim) — never the player-bar action slot, which the scrim covers. */}
+        <div className="overlay__actions">
+          <button className="btn btn--primary" disabled={!pc.canConfirm} onClick={() => pc.confirm()}>
+            Submit
+          </button>
+          {pc.canSkip && (
+            <button className="btn" onClick={() => pc.skip()}>
+              Skip
+            </button>
+          )}
+          <button className="btn" onClick={() => pc.cancel()}>
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );

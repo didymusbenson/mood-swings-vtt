@@ -63,7 +63,7 @@ registerSpec(95, {
 // #96 Instability — may choose two moods from one opponent; swap a mood each way.
 // One 'moods' array: the two opponent moods, then the mood you give back — from:'any'.
 registerSpec(96, {
-  slots: [{ key: 'moods', kind: 'mood', min: 0, max: 3, mood: { from: 'any' }, label: "Choose two of one opponent's moods (optional)", optional: true }],
+  slots: [{ key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any' }, label: "Take an opponent's mood, then give one of yours back (optional)", optional: true }],
 });
 
 // #98 Rage — may discard all other moods worth [3] or less (opt-in via option='all').

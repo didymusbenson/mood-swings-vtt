@@ -71,9 +71,8 @@ registerEffects(109, {
   },
 });
 
-// #110 Cheer — [3]/[5]. Discard a hand card printed [0]–[3] (top-right) to make
-// this [5]. (data/cards.json rulesText says [0],[1],[2],[3]; note: card-notes.md
-// quotes [0],[2],[4],[6] — following the cards.json rulesText per task.)
+// #110 Cheer — [3]/[5]. Discard a hand card printed {0,2,4,6} (top-right) to make
+// this [5]. (Value set per the authoritative MaRo Card Notes.)
 registerEffects(110, {
   intrinsicValue: (ctx) => (ctx.self.data.boost ? 5 : 3),
   afterPlaying: (ctx) => {
@@ -84,9 +83,8 @@ registerEffects(110, {
   },
 });
 
-// #111 Delight — [3]/[5]. Discard a hand card printed [1]–[3] (top-right) to make
-// this [5]. (data/cards.json rulesText says [1],[2],[3]; note: card-notes.md
-// quotes [1],[3],[5] — following the cards.json rulesText per task.)
+// #111 Delight — [3]/[5]. Discard a hand card printed {1,3,5} (top-right) to make
+// this [5]. (Value set per the authoritative MaRo Card Notes.)
 registerEffects(111, {
   intrinsicValue: (ctx) => (ctx.self.data.boost ? 5 : 3),
   afterPlaying: (ctx) => {
@@ -273,8 +271,8 @@ registerEffects(132, {
 });
 
 // #133 Wonder — [0]. Choose a colour; +N for each mood of that colour and each
-// card in the discard pile of that colour. (data/cards.json rulesText says +[1]
-// per; note: card-notes.md says +[2] per — following the cards.json rulesText.)
+// card in the discard pile of that colour. (+[2] per, the authoritative MaRo Card
+// Notes value.)
 registerEffects(133, {
   afterPlaying: (ctx) => {
     const c = (ctx.choices.colors as Color[] | undefined)?.[0];

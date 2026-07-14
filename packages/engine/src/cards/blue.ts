@@ -68,6 +68,9 @@ registerEffects(29, {
 // #30 Bashfulness — [6]; after scoring, if you won the round, bottom-deck this and draw.
 registerEffects(30, {
   afterScoring: (ctx) => {
+    // "Bashfulness only goes to the bottom of the deck if you win the turn you play
+    // it. If you win a later turn, Bashfulness does not." — gate to the round played.
+    if ((ctx.self.data.playedRound as number | undefined) !== ctx.state.round) return;
     if (roundLeader(ctx) !== ctx.self.owner) return;
     const owner = ctx.self.owner;
     ctx.putOnBottomOfDeck(ctx.self);
@@ -405,6 +408,9 @@ registerEffects(51, {
     if (p && p !== ctx.me) ctx.self.data.swapWith = p;
   },
   afterScoring: (ctx) => {
+    // "This change only happens for this round. The scores go back for all future
+    // rounds." — so swap only in the round Sneakiness was played, not every round.
+    if ((ctx.self.data.playedRound as number | undefined) !== ctx.state.round) return;
     const p = ctx.self.data.swapWith as PlayerId | undefined;
     if (!p) return;
     const st = ctx.state;
@@ -423,11 +429,14 @@ registerEffects(52, {
     const cost = byUid(ctx, uids[0]);
     if (!cost || cost.owner !== ctx.me || !['white', 'black'].includes(ctx.colorOf(cost))) return;
     ctx.returnMoodToHand(cost);
+    // RULES.md worked example: re-settle "While in play" after the first sub-effect so
+    // the value-gated second effect reads CURRENT values (currentValue, not valueOf).
+    ctx.restabilize();
     let placed = 0;
     for (const uid of uids.slice(1)) {
       if (placed >= 2) break;
       const m = byUid(ctx, uid);
-      if (m && m.uid !== ctx.self.uid && ctx.valueOf(m) <= 3) {
+      if (m && m.uid !== ctx.self.uid && m.currentValue <= 3) {
         ctx.returnMoodToHand(m);
         placed++;
       }

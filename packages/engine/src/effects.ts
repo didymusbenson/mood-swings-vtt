@@ -60,7 +60,20 @@ export interface MutationApi {
   draw(player: PlayerId, n?: number): void;
   /** Put a mood on the bottom of the shared deck (leaves play). */
   putOnBottomOfDeck(mood: Mood): void;
+  /**
+   * Force a mood to value 0 for the given duration. For 'sustained', pass
+   * `bySelf: true` so the engine records THIS mood (`ctx.self`) as the suppressor;
+   * the suppression then clears automatically when this mood leaves play or changes
+   * owner (RULES.md: "stops if that card changes owner").
+   */
   suppress(mood: Mood, duration: 'turn' | 'round' | 'sustained', bySelf?: boolean): void;
+  /**
+   * Re-settle every mood's "While in play" value right now. Two-part "after playing"
+   * cards (Hostility #94, Worry #52) MUST call this between their two sub-effects so
+   * the second sub-effect (which cares about current values) sees the board AFTER the
+   * first sub-effect — read `mood.currentValue` afterwards, not the frozen `valueOf`.
+   */
+  restabilize(): void;
   steal(mood: Mood, to: PlayerId): void;
   giveMood(mood: Mood, to: PlayerId): void;
   rotateToSecondary(mood: Mood, on?: boolean): void;
