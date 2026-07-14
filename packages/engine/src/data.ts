@@ -46,6 +46,7 @@ export function normaliseCard(raw: RawCard): CardData {
     rulesText: raw.rulesText,
     image: raw.image,
     set: raw.set,
+    artist: raw.artist ?? null,
   };
 }
 
