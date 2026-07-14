@@ -37,11 +37,24 @@ Split the Preview into two stacked regions:
     computed value + modifiers, but **only from information that is static and
     already known** — i.e. the value the card would have on entry given the board
     **as it currently is**. Scope rules:
+    - **Self-include.** The card counts **itself** as if already in play — playing
+      it *is* a fact, so count-based values reflect its own presence. E.g. you have
+      2 moods and the opponent has 3; the would-be for Superiority (`[6][1]` if you
+      have more moods in play) reflects the 3–3 board its entry creates. (Implements
+      as a dry-run of the engine's existing `stabilise()` fixpoint with the card
+      hypothetically added.)
+    - **This-turn values apply.** If a card has a "this turn it's played" value
+      (e.g. Patience is `[5]` normally but `[1]` the turn played), the would-be
+      shows the **this-turn** value (`[1]`).
     - **No post-resolution projection.** Do not simulate how the board changes
       after the card enters (its *After playing this mood* effects, re-settling,
-      chains). Just the current computed value before any board changes happen.
-    - **No target-dependent projection.** If the would-be value depends on which
-      targets the player would choose, don't show it.
+      chains) — only the direct consequence of it entering.
+    - **No target-dependent projection.** If the would-be depends on which targets
+      the player would choose, don't show it (but see the decision-modal preview
+      below, where selections *are* known).
+    - **Play costs are unknowable.** Costs that change the board to play the card
+      (e.g. Self-Loathing discarding one of your moods) are player choices → the
+      would-be **ignores costs**.
     - **Do show static field modifiers.** If something already on the field would
       statically modify the card (e.g. an opposing mood that suppresses/drops a
       color or type currently in play), that's known information — reflect it.
@@ -66,6 +79,36 @@ met:
 (The bottom region still shows the printed details: Color Red, Value/Secondary
 dice, Rarity Uncommon, and the full printed rules text.)
 
+## Computed-value indicator (on the card itself)
+
+Beyond the Preview, a card should *visually signal* when its value is computed /
+modified rather than its printed default:
+
+- A card whose current value is **computed or modified** (differs from its printed
+  die, or is dynamically derived) renders its value with a **glow / highlight**
+  (or similar treatment) marking it as computed.
+- A card whose value is **unmodified** renders its plain default die symbol as
+  today.
+- **Inspiration:** Slay the Spire's treatment of upgraded cards / modified costs —
+  a modified number is visually distinguished from its default so the player knows
+  at a glance it isn't the printed value.
+
+## Pre-submit computed preview (during target/cost decisions)
+
+For cards that require choices to submit (targeting, costs), let the player make
+**all** their selections and *then* see the resulting computed value **before they
+hit Submit** — so they commit with full knowledge.
+
+- The card being played appears in the **decision modal**, on the **left-hand side
+  like a Preview**, labeled **"Playing {CARDNAME}"**.
+- As the player makes selections, the **preview updates** to reflect them —
+  including the resulting computed value.
+- This is the one place target-dependent outcomes *can* be shown, because the
+  targets/costs are now known (chosen), unlike the passive would-be projection for
+  a card sitting in hand.
+- Builds on the existing modal targeting overlay (F4), which already holds the
+  played card in the Preview rail.
+
 ## Score explanation in the game log
 
 The value transparency also extends to the **game log**: each round's entry should
@@ -82,38 +125,24 @@ at).
 _(To be filled during refinement — answers may arrive via chat and can bleed
 into other features.)_
 
-### Would-be edge cases to rule on
+### Would-be edge cases — rulings
 
-These test whether "current computed value, static/known only" is fully defined:
-
-1. **Self-inclusion in count-based values (the big one).** Many values depend on
-   counts the card's own entry changes — "moods in play", *moodiest*, *most common
-   color*, "you have more moods than…". Example: Superiority is `[6][1]` if you
-   have more moods in play. If you have 2 and the opponent has 3, playing
-   Superiority makes it 3–3. Does the would-be count the card **as if already in
-   play** (include itself) or evaluate against the board **without** it? "State
-   when played" argues include-self; "before board changes" argues exclude-self —
-   these conflict, so this needs an explicit call.
-2. **This-turn / secondary values.** Patience is `[5]` normally but `[1]` the turn
-   it's played. Since it *would* be played this turn, the would-be value should be
-   the this-turn face (`[1]`), then it'd become `[5]` next turn. Confirm the
-   would-be shows the this-turn value. (Deterministic, not target-based — a good
-   fit for would-be.)
-3. **Play costs.** Some cards cost board changes to play (e.g. Self-Loathing:
-   discard one of your moods to play it; cards that return moods to hand). Paying
-   the cost changes counts *before* the card enters, and which mood you sacrifice
-   is a player choice. Per the rules above this is target/board-change dependent →
-   the would-be **ignores costs**. Confirm.
-4. **Copy (Creativity).** Creativity's value is whatever mood it copies — a target
-   choice. Target-dependent → no would-be value projected (show its base/none until
-   played). Confirm.
-5. **External modifier flipped by the card's own entry.** An opposing mood that
-   "suppresses the most common color" might start applying (or stop) once your card
-   enters and shifts which color is most common. Same crux as #1 — resolved by the
-   self-inclusion ruling.
-6. **v2 hidden information.** Animosity keys off opponent *hand size* (a count —
-   public). A future card keying off hidden *hand contents* couldn't be projected
-   in v2. Note only: would-be uses public/known info; skip if it needs hidden info.
+1. **Self-inclusion — RULED: include self.** The card counts itself as if in play
+   (playing it is a fact). Superiority previewed at a 2-vs-3 board shows the value
+   for the 3–3 board its entry creates.
+2. **This-turn / secondary values — RULED: show this-turn value.** Patience's
+   would-be is `[1]` (its this-turn face), not `[5]`.
+3. **Play costs — RULED: ignore.** Costs represent unknown/unknowable choices; the
+   would-be doesn't attempt to reflect them.
+4. **Copy (Creativity) — RULED (implied): target-dependent, no passive would-be.**
+   Its value depends on which mood it copies (a choice), so it isn't projected in
+   the hand preview. It *would* resolve in the decision-modal preview once the copy
+   target is chosen. (Flag if you want it handled differently.)
+5. **External modifier flipped by the card's own entry — RULED via #1.** Because we
+   self-include, an opposing "suppress the most-common-color" that starts/stops
+   applying due to this card's entry is reflected.
+6. **v2 hidden information — noted.** Would-be uses public/known info only; a value
+   depending on hidden info (once v2 hides hands) simply isn't projected.
 
 ### Other open questions
 
@@ -122,8 +151,10 @@ These test whether "current computed value, static/known only" is fully defined:
   computes values but may not currently expose that provenance — likely the "pain"
   called out above. How precise should the highlight be (exact clause vs. whole
   rules text)?
-- **Live updates.** If the board changes while a card is previewed, does the
-  game-state region update live, or is it a snapshot?
+- **Live updates — likely resolved.** The engine's `stabilise()` keeps every
+  mood's `currentValue` live in state (recomputed on every play, at scoring, and
+  after draws), so the Preview just reads the current value — no snapshotting
+  needed. Confirm no special handling wanted.
 - **Would-be trigger.** How is the "considered" hand card chosen — hover, select?
   And does the projection also apply to cards playable from the **discard pile**?
 - Relationship to the Animations **point-value reveal** — the reveal is the moment
@@ -137,9 +168,16 @@ These test whether "current computed value, static/known only" is fully defined:
   under Current value (self-modification uses the rules-text highlight instead).
 - **No plain zone labels** ("in your hand" / "in discard" dropped as noise).
 - Instead, a hand card being considered shows a **would-be** projection: the value
-  and modifiers it would have when played, but **only from static/known info** —
-  no post-play resolution, no target-dependent outcomes; static field modifiers
-  already in play **are** shown.
+  and modifiers it would have when played, from **static/known info** — **self
+  included** (counts itself as in play), **this-turn values** shown, **costs
+  ignored**, no post-play resolution, no target-dependent outcomes; static field
+  modifiers already in play **are** shown.
+- A **computed-value indicator** glows/highlights a card's value when it's
+  computed/modified vs. its printed die (Slay-the-Spire-style); unmodified values
+  render the plain default.
+- A **pre-submit computed preview** in the decision modal: the card being played
+  shows on the modal's left as "Playing {CARDNAME}" and updates the computed value
+  live as targets/costs are selected, so the player sees the result before Submit.
 - The **game log** gains a per-round **score explanation**, collapsed by default
   and expanded by clicking the round; depth = **each mood with its computed
   value**, no deeper.
