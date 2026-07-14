@@ -754,8 +754,13 @@ input:focus-visible {
   flex: 1;
   min-width: 0;
 }
-/* Turn is shown by the "Your turn" badge + a solid accent edge (see .edge--turn),
-   NOT by a glow/tint — glow is reserved for selected/targetable cards. */
+/* The active player's half is softly tinted (turn cue) — a wash, not a box. */
+.bf__half--top.is-turn {
+  background: linear-gradient(to top, rgba(47, 111, 176, 0.11), rgba(47, 111, 176, 0));
+}
+.bf__half--bottom.is-turn {
+  background: linear-gradient(to bottom, rgba(47, 111, 176, 0.11), rgba(47, 111, 176, 0));
+}
 
 /* ---------- Top bar ---------- */
 .topbar {
@@ -812,8 +817,8 @@ input:focus-visible {
   background: rgba(246, 242, 231, 0.72);
 }
 .scoretag.is-turn {
-  /* Solid accent border marks the active player — no glow (reserved for selection). */
   border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 .scoretag__name {
   font-size: 0.92rem;
@@ -900,16 +905,12 @@ input:focus-visible {
   border-radius: 12px;
   transition: background 0.18s ease, box-shadow 0.18s ease;
 }
-/* Active player's turn is marked by a crisp SOLID accent line on their outer edge
-   (plus the "Your turn" badge) — a flat marker, not a glow. Glow means "selected". */
-.edge--turn {
-  box-shadow: none;
-}
+/* Active player's edge is softly tinted (turn cue) — a wash, not a box. */
 .edge--top.edge--turn {
-  border-top: 3px solid var(--accent);
+  background: linear-gradient(to bottom, rgba(47, 111, 176, 0.1), rgba(47, 111, 176, 0));
 }
 .edge--bottom.edge--turn {
-  border-bottom: 3px solid var(--accent);
+  background: linear-gradient(to top, rgba(47, 111, 176, 0.1), rgba(47, 111, 176, 0));
 }
 
 /* During a targeting flow the modal overlay owns the confirm controls and dims the

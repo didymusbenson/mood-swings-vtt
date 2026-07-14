@@ -515,7 +515,6 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
                       mood={found.mood}
                       value={found.mood.currentValue}
                       tile
-                      highlighted
                       targetSelected={pc.moodSelected(uid)}
                       onClick={() => pc.onMoodClick(uid)}
                       onPointerEnter={() => ctx.setPreview({ card: db.get(found.mood.card), mood: found.mood, value: found.mood.currentValue })}
@@ -534,7 +533,6 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
                   <Card
                     card={db.get(card)}
                     tile
-                    highlighted
                     targetSelected={pc.handCardSelected(card)}
                     onClick={() => pc.onHandCardClick(card)}
                     onPointerEnter={() => ctx.setPreview({ card: db.get(card) })}
