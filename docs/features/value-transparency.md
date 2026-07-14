@@ -1,6 +1,7 @@
 # Feature: Value Transparency (computed value in Preview)
 
-> **Status:** Refined (first pass).
+> **Status:** Refined. (Minor build-time details remain: exact-clause vs.
+> whole-text highlight granularity; confirm no snapshot behavior on live updates.)
 
 ## Summary
 
@@ -208,9 +209,11 @@ into other features.)_
   mood's `currentValue` live in state (recomputed on every play, at scoring, and
   after draws), so the Preview just reads the current value — no snapshotting
   needed. Confirm no special handling wanted.
-- Relationship to the Animations **point-value reveal** — the reveal is the moment
-  a value appears after a play; this is the persistent inspect view. Shared
-  component/formatting?
+- **Animations point-value reveal — RESOLVED: shared element.** The computed value
+  graphic (e.g. the computed **die graphic**) is a single shared component; the
+  Animations "point value appears after a play" reveal *animates that same element*
+  rather than a separate one. So the number looks identical whether it's animating
+  in or sitting in the Preview / on the board.
 
 **Resolved:**
 - Preview = printed details (bottom) + game-state details (top).
@@ -242,3 +245,5 @@ into other features.)_
 - **Computed vs. printed by context:** computed shows in **actionable** contexts
   (moods in play; playable hand cards; play-from-discard). A card merely **read**
   (discard inspector, revealed card, info-only) shows its **printed** value.
+- **Shared value element with Animations:** the computed value/die graphic is one
+  component; the point-value reveal animates that same element.

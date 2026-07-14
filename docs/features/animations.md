@@ -28,6 +28,10 @@ only feedback is static (the log, highlights). Add animations so players can
 - **Point value reveal:** a played card's point value appears *after* it has
   landed and its effect has finished resolving. For many moods this is a
   *calculated* value, so the reveal reflects the computed number.
+  - **Shared element with Value Transparency:** the reveal animates the *same*
+    computed value/die graphic component used across the interface (see
+    `value-transparency.md`), not a separate one — so the number looks identical
+    animating in vs. sitting on the board / in the Preview.
 
 ### Interaction feedback (drag-to-play)
 
