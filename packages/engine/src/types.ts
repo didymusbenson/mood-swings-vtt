@@ -32,6 +32,8 @@ export interface CardData {
   rulesText: string | null;
   image: string;
   set: string;
+  /** Mark Rosewater's clarifications, joined at load from data/card-notes.json. */
+  notes?: string[];
 }
 
 export type PlayerId = string;
