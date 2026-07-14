@@ -52,6 +52,10 @@ edition symbol, collector number, color, artist, rarity).
   will live (see [`settings.md`](settings.md)).
 - Opens a **how-to-play reference modal** containing the **simplified rules**
   (the printed rules card + card-back scoring text). Transcribed content below.
+- **Simplified-only — no jump-off.** The modal does **not** link out to the full
+  rules view or the external site. Rationale: avoid any popup/redirect that could
+  risk disrupting in-progress game state, and the engine enforces the rules
+  anyway, so players only need the basics mid-game.
 
 ## Simplified rules content (for the modal)
 
@@ -97,9 +101,10 @@ _For additional rules information, please visit: SecretLair.Wizards.com/MoodSwin
 
 - Confirm the **reconstruction** approach (own-rendered example cards, text from
   `docs/RULES.md`) vs. a literal PDF rip — see Recommended build above.
-- Should the in-game **(?)** modal also offer a "full rules" jump-off (to the
-  dedicated rules view and/or the external link), or stay simplified-only?
 
-**Resolved:** Main-menu How to Play is a **dedicated full-screen view** (not a
-modal). Source content confirmed available and fully captured in
-`docs/RULES.md`; PDF not committed (IP).
+**Resolved:**
+- Main-menu How to Play is a **dedicated full-screen view** (not a modal).
+- Source content confirmed available and fully captured in `docs/RULES.md`; PDF
+  not committed (IP).
+- In-game **(?)** modal is **simplified-only** — no jump-off to the full rules
+  view or external site (avoid disrupting game state; engine enforces the rules).
