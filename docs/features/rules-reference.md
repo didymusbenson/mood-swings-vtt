@@ -13,12 +13,20 @@ reference in the in-game toolbar.
 
 ### 1. Main menu — "How to Play" (out of game)
 
-- A **How to Play** entry on the **main menu** (pre-game / out-of-game).
-- Presents the **comprehensive rules** — the project's extended-rules copy in
-  [`docs/RULES.md`](../RULES.md) (a faithful extraction of Mark Rosewater's
-  *Mood Swings Extended Rules*).
+- A **How to Play** entry on the **main menu** (pre-game / out-of-game) that
+  opens a **dedicated rules view** (a full screen, not a modal).
+- Content: copy the relevant comprehensive-rules information into this view. It's
+  acceptable for it to be either a **direct rip of the original extended-rules
+  PDF**, or a **reconstruction of it with example cards**.
 - **Links back to MaRo's post** on the Wizards site:
   <https://magic.wizards.com/en/news/feature/mood-swings-extended-rules>
+
+> **Source note:** The original PDF is **not in the repo** (it was uploaded in an
+> earlier session to produce `docs/RULES.md` but never committed, so it's not
+> available this session). To build the view we either (a) re-upload the PDF for a
+> faithful rip, or (b) reconstruct from [`docs/RULES.md`](../RULES.md), which is
+> mechanically complete but condensed and carries some build/authoring notes to
+> strip. Decision pending.
 
 ### 2. In-game toolbar — "(?)" simplified reference
 
@@ -69,9 +77,11 @@ _For additional rules information, please visit: SecretLair.Wizards.com/MoodSwin
 
 ## Open questions / to refine
 
-- The main-menu comprehensive view: render `docs/RULES.md` **as-is**, or author a
-  cleaned player-facing version? (The current doc is a build-oriented extraction
-  with some engine/authoring notes mixed in.)
-- Main-menu How to Play: a dedicated screen, or a modal like the in-game one?
+- **Source for the dedicated view (pending):** re-upload the original PDF for a
+  faithful rip, or reconstruct from `docs/RULES.md` (+ example cards)? See the
+  Source note above.
 - Should the in-game **(?)** modal also offer a "full rules" jump-off (to the
-  comprehensive view and/or the external link), or stay simplified-only?
+  dedicated rules view and/or the external link), or stay simplified-only?
+
+**Resolved:** Main-menu How to Play is a **dedicated full-screen view** (not a
+modal). Content may be a direct PDF rip or a reconstruction with example cards.
