@@ -182,11 +182,15 @@ into other features.)_
 
 ### Other open questions
 
-- **Highlight mechanism.** Identifying *which clause* to highlight means mapping a
-  computed value back to the specific rule/condition that produced it. The engine
-  computes values but may not currently expose that provenance — likely the "pain"
-  called out above. How precise should the highlight be (exact clause vs. whole
-  rules text)?
+- **Highlight provenance — approach decided (build-time spike).** Mapping a
+  computed value back to the exact clause/condition that produced it is the hard
+  part. Plan: when this piece is built, run a **research spike / agent team** that
+  parses **each card** and answers, per card, which rules-text span(s) and
+  condition(s) are highlightable. If needed, **hard-code the highlightable text and
+  conditions per individual card** — an acceptable fallback. (Natural home: attach
+  the highlight span/condition metadata to each card's existing effect registration
+  in `packages/engine/src/cards/*.ts`.) Still to decide: exact-clause vs.
+  whole-responsible-card-text as the v1 granularity.
 - **Live updates — likely resolved.** The engine's `stabilise()` keeps every
   mood's `currentValue` live in state (recomputed on every play, at scoring, and
   after draws), so the Preview just reads the current value — no snapshotting
@@ -222,3 +226,6 @@ into other features.)_
   and shown whether previewed or not (engine cost permitting). Preview detail opens
   on **mouse hover >1s** or an **instant tap/click** (mobile-friendly). No separate
   "considered for play" designation is needed — computation is always live.
+- **Highlight provenance:** handled at build time by a per-card research spike /
+  agent team; per-card hard-coded highlight text + conditions is an acceptable
+  fallback, attached to each card's effect registration.
