@@ -184,10 +184,16 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
 
   const currentSlot = flow ? flow.spec.slots[flow.slotIndex] ?? null : null;
 
-  const legalNow = useMemo(
-    () => (flow && currentSlot ? legalTargets(currentSlot, state, me, cardLookup) : null),
-    [flow, currentSlot, state, me],
-  );
+  const legalNow = useMemo(() => {
+    if (!flow || !currentSlot) return null;
+    const legal = legalTargets(currentSlot, state, me, cardLookup);
+    // The card being played is a mood-to-be, not a hand card — never offer it as a
+    // hand-cost discard/reveal (matters when copying a discard-cost card via Creativity).
+    if (currentSlot.kind === 'handCard' && legal.cards) {
+      return { ...legal, cards: legal.cards.filter((c) => c !== flow.card) };
+    }
+    return legal;
+  }, [flow, currentSlot, state, me]);
 
   // --- Begin a play (either immediately or by opening the targeting flow) ---
   const beginPlay = useCallback(
