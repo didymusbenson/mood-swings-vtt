@@ -1921,6 +1921,266 @@ input:focus-visible {
 }
 
 /* ============================================================================
+   Rules reference (main-menu How to Play + in-game "(?)" modal)
+   ========================================================================== */
+/* A round icon button (the in-game "(?)"). */
+.btn--icon {
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.start__howto {
+  margin-top: 0.6rem;
+}
+
+/* --- The dedicated full-screen How to Play view --- */
+.howto {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+.howto__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.4rem;
+  border-bottom: 2px solid var(--line-strong);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+.howto__titles {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+.howto__header h1 {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  margin: 0;
+  transform: rotate(-1deg);
+}
+.howto__tag {
+  font-family: var(--font-hand);
+  color: var(--ink-soft);
+  margin: 0;
+  font-size: 1rem;
+}
+.howto__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.2rem;
+  max-width: 980px;
+  width: 100%;
+  margin: 0 auto;
+}
+.howto__sec h2 {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  border-bottom: 2px dashed var(--line);
+  padding-bottom: 0.2rem;
+  margin-bottom: 0.7rem;
+}
+.howto__sec h3 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  margin: 1rem 0 0.4rem;
+}
+.howto__sec p,
+.howto__sec li {
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+.howto__sec ul,
+.howto__sec ol {
+  padding-left: 1.3rem;
+  margin: 0.4rem 0;
+}
+.howto__sec li {
+  margin-bottom: 0.35rem;
+}
+.howto__link a,
+.howto__foot a {
+  color: var(--accent);
+  font-family: var(--font-hand);
+  font-size: 1.05rem;
+}
+.howto__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2em;
+  height: 1.2em;
+  margin: 0 0.15em;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  font-size: 0.8em;
+  font-family: var(--font-display);
+  vertical-align: baseline;
+}
+.howto__glossary {
+  margin: 0;
+}
+.howto__gloss-row {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) 1fr;
+  gap: 0.4rem 1rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px dotted var(--line);
+}
+.howto__gloss-row dt {
+  font-family: var(--font-hand);
+  font-weight: 400;
+  color: var(--ink);
+  font-size: 1rem;
+}
+.howto__gloss-row dd {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.howto__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1.4rem 0 0.5rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--line-strong);
+}
+
+/* --- Example-card figures (shared) --- */
+.rules-figrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0.8rem 0;
+  align-items: flex-start;
+}
+.rules-fig {
+  margin: 0;
+  width: var(--card-w);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.rules-fig__card {
+  display: flex;
+}
+.rules-fig__cap {
+  font-family: var(--font-hand);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+.rules-fig__name {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 1rem;
+  color: var(--ink);
+}
+.rules-fig__text {
+  display: block;
+  margin-top: 0.2rem;
+}
+.rules-fig__note {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* --- Anatomy of a card (labeled figure) --- */
+.rules-anatomy {
+  display: flex;
+  gap: 1.4rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin: 0.8rem 0;
+}
+.rules-anatomy__card {
+  margin: 0;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: center;
+  font-family: var(--font-hand);
+  font-size: 0.85rem;
+}
+.rules-anatomy__legend {
+  flex: 1;
+  min-width: 260px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.rules-anatomy__legend li {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px dotted var(--line);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+.rules-anatomy__pin {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  background: var(--accent-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+.rules-anatomy__body strong {
+  font-family: var(--font-hand);
+}
+
+/* --- Simplified rules (in-game modal body) --- */
+.rules-simple__lede {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  margin: 0 0 0.6rem;
+}
+.rules-simple__sec {
+  margin-bottom: 0.7rem;
+}
+.rules-simple__title {
+  font-family: var(--font-hand);
+  font-size: 1.1rem;
+  margin: 0 0 0.15rem;
+  color: var(--ink);
+}
+.rules-simple__body {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+/* ============================================================================
    Responsive
    ========================================================================== */
 /* Below the fixed-layout target range, fall back to a scrolling stack so the

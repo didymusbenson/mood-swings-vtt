@@ -8,6 +8,7 @@ import { Card, CardBack, Die } from './Card.js';
 import { PreviewPane, type PreviewTarget } from './PreviewPane.js';
 import { ActivityLog } from './ActivityLog.js';
 import { Starburst } from './Starburst.js';
+import { RulesModal } from './RulesModal.js';
 import { usePlayInteraction, type PlayController } from '../hooks/usePlayInteraction.js';
 import { useHandOrder } from '../hooks/useHandOrder.js';
 import { useHandDrag, type HandDragApi } from '../hooks/useHandDrag.js';
@@ -656,6 +657,7 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
   const handDrag = useHandDrag(pc, (from, to) => reorder(pc.me, from, to));
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   const gameOver = state.phase === 'gameOver';
   const winnerName = state.players.find((p) => p.id === state.winner)?.name;
@@ -707,6 +709,14 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
 
         <div className="topbar__actions">
           {gameOver && <span className="topbar__winner">{winnerName} wins!</span>}
+          <button
+            className="btn btn--icon"
+            onClick={() => setRulesOpen(true)}
+            aria-label="How to play"
+            title="How to play"
+          >
+            ?
+          </button>
           <button className="btn btn--primary" onClick={onNewGame}>
             New game
           </button>
@@ -726,6 +736,7 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
 
       <TargetOverlay pc={pc} state={state} ctx={ctx} />
       {discardOpen && <DiscardInspector state={state} onClose={() => setDiscardOpen(false)} setPreview={setPreview} />}
+      {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
       <DragGhost handDrag={handDrag} />
     </div>
   );

@@ -1,6 +1,6 @@
 # Feature: In-App Rules Reference
 
-> **Status:** Refined (first pass).
+> **Status:** Implemented.
 
 ## Summary
 
@@ -8,6 +8,57 @@ Players need to reference the rules without leaving the game, and new players
 need a comprehensive on-ramp before starting. Provide two surfaces: a
 comprehensive **How to Play** from the main menu, and a quick **(?)** simplified
 reference in the in-game toolbar.
+
+## Implementation
+
+Both surfaces are built and wired; the simplified rules are factored into a
+shared component so the modal is a single source of truth.
+
+**(A) Main-menu "How to Play" — full-screen view**
+- Reached from the main menu: the **How to Play** button in the start-screen
+  header (`packages/app/src/components/StartScreen.tsx`, `showRules` state swaps
+  the start content for the full view).
+- View: `packages/app/src/components/HowToPlay.tsx` — a `position:fixed`
+  full-screen shell (not a modal) with an internally-scrolling body and a
+  "← Back to menu" button in both the header and footer. Text reconstructed from
+  [`docs/RULES.md`](../RULES.md) (anatomy, deck, setup, round structure, taking a
+  turn incl. the three effect types / order of operations / the
+  Worry·Hostility·Superiority worked example, scoring, after-scoring incl.
+  Recklessness·Bashfulness·Sneakiness, and the vocabulary glossary). Links out to
+  MaRo's post twice (intro + footer).
+- Figures: `packages/app/src/components/rules/figures.tsx` — `ExampleFigure`
+  renders each named card with the app's **own** `<Card>` renderer (from
+  `data/cards.json`, never lifted WotC art), and `AnatomyFigure` shows a rendered
+  card beside a numbered 1–12 callout legend. All 11 named example cards are
+  present (Creativity, Self-Loathing, Patience, Disgust, Rage, Superiority,
+  Worry, Hostility, Bashfulness, Recklessness, Sneakiness).
+
+**(B) In-game "(?)" — simplified-only modal**
+- Reached from the in-game top toolbar: the round `?` icon button in
+  `.topbar__actions` (left of "New game") in
+  `packages/app/src/components/GameBoard.tsx` (`rulesOpen` state).
+- Modal: `packages/app/src/components/RulesModal.tsx` — reuses the
+  `DiscardInspector` overlay pattern (`role="dialog" aria-modal`, dismiss via
+  Esc / scrim / Close) and never touches game state. **Simplified-only**: no
+  link to the full view or any external site.
+- Content: `packages/app/src/components/rules/simplified.tsx`
+  (`SIMPLIFIED_RULES` + `SimplifiedRulesBody`), transcribed from the simplified
+  rules below.
+
+**Styles:** a "Rules reference" block appended to
+`packages/app/src/styles.css` (`.btn--icon`, `.howto*`, `.rules-fig*`,
+`.rules-anatomy*`, `.rules-simple*`), reusing the existing overlay / inspector /
+panel / btn classes.
+
+**Verification:** `npm run typecheck`, `npm run build`, and
+`npm run test --workspace @mood-swings/app` (28 tests) all pass. Both components
+were additionally server-rendered in a throwaway test to confirm they mount and
+that the modal contains no anchors / external links / full-view jump-off.
+
+> **Minor note:** the modal omits the transcribed closing line _"For additional
+> rules information, please visit: SecretLair.Wizards.com/MoodSwings"_ — dropped
+> deliberately to honor the simplified-only "no jump-off" rule (a printed URL
+> could invite navigation mid-game). All five rule sections are otherwise verbatim.
 
 ## Spec
 
