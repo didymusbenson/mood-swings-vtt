@@ -1,7 +1,15 @@
 # Feature: Value Transparency (computed value in Preview)
 
-> **Status:** Refined. (Minor build-time details remain: exact-clause vs.
-> whole-text highlight granularity; confirm no snapshot behavior on live updates.)
+> **Status:** Implemented. All eight spec'd surfaces are built and verified
+> (engine + app typecheck clean, 98/98 engine tests, 28/28 app tests, production
+> build succeeds). Build-time details are resolved: highlight granularity is
+> **exact-clause** (see audit doc); live updates read `stabilise()`'s live
+> `currentValue` with no snapshotting. Partial: the decision-modal preview does
+> not re-simulate post-resolution board effects (consistent with the
+> "no post-resolution projection" ruling); no play-from-discard *selection*
+> surface exists yet, though the `handWouldBe` plumbing already accepts that path.
+> A runtime headless-browser check was not run (no browser tooling available in
+> the CI environment); coverage rests on the app vitest suite + build.
 
 ## Summary
 
@@ -15,6 +23,33 @@ number on the board can be hard to trust or understand. Surface a card's
 > tiles, the Preview, the decision modal, the log — a computed/modified value is
 > shown and marked as such. The Preview and log are the deepest surfaces, but the
 > treatment (e.g. the computed-value indicator) applies everywhere a value renders.
+
+## Implementation
+
+Engine primitives live in **`packages/engine/src/value-transparency.ts`**
+(`wouldBeValue`, `valueProvenance`, `TARGET_DEPENDENT_VALUE_CARDS`), re-exported
+from `packages/engine/src/index.ts`. The highlight-metadata module is
+**`packages/engine/src/cards/highlights.ts`** (`highlightFor` / `registerHighlight`
+/ `HighlightMeta`, registered via `cards/index.ts`). App code calls these through
+thin wrappers in **`packages/app/src/game/value.ts`** (`moodProvenance`,
+`moodComputed`, `handWouldBe`).
+
+Files per surface:
+
+| Surface | Files | Engine API used |
+|---------|-------|-----------------|
+| Two-region Preview (Controlled by / Current value / self-highlight / "Modified by {card}") | `packages/app/src/components/PreviewPane.tsx` | `valueProvenance`, `highlightFor`, `wouldBeValue` |
+| Would-be for playable hand cards (self-include) | `packages/app/src/components/GameBoard.tsx`, `game/value.ts` | `wouldBeValue` |
+| Computed vs. printed by context (read-only → printed) | `PreviewPane.tsx` (`readOnly`), `GameBoard.tsx` (discard inspector, top-of-discard) | `moodComputed` / `wouldBeValue` gated on actionable context |
+| Always-on computed-value indicator (glow) | `packages/app/src/components/Card.tsx` (`DiceValue` `computed` flag), `styles.css` (`.dice--computed`) | `moodComputed`, `wouldBeValue().computed` |
+| Preview triggers (mouse hover >1s / instant tap-pen) | `GameBoard.tsx` (`hoverPreview`/`endHover`) | — |
+| Pre-submit decision-modal preview ("Playing {name}") | `GameBoard.tsx` (targeting overlay left rail) | `wouldBeValue` with `{ copy, wonderColor }` choices |
+| Collapsible per-round log score explanation | `packages/app/src/components/ActivityLog.tsx`; engine snapshot in `engine/src/engine.ts` `score()` + `ScoreMood`/`ScoreBreakdown` in `engine/src/types.ts` (`LogEntry.scores?`) | reads `LogEntry.scores` |
+| Shared value/die element | `Card.tsx` `DiceValue` (single component; Animations reveal animates it) | — |
+
+Per-card highlight granularity, the valueKind breakdown, and any engine/rules
+discrepancies flagged for human review are recorded in the audit doc:
+**`docs/value-transparency-card-audit.md`**.
 
 ## Brief (captured)
 

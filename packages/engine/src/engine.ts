@@ -608,10 +608,22 @@ export class Engine {
         if (points) state.roundScores[player] = (state.roundScores[player] ?? 0) + points;
       }
     }
+    // Snapshot the per-mood value breakdown NOW — moods leave play at round end,
+    // so the log keeps its own copy for the expandable score explanation.
+    const scores = state.players.map((p) => ({
+      player: p.id,
+      playerName: this.pname(state, p.id),
+      total: state.roundScores[p.id] ?? 0,
+      moods: (state.moods[p.id] ?? []).map((m) => ({
+        name: this.db.get(resolveCardNumber(m)).name,
+        value: m.currentValue,
+      })),
+    }));
     this.logPush(
       state,
       `Scoring — ${state.players.map((p) => `${this.pname(state, p.id)} ${state.roundScores[p.id]}`).join(', ')}`,
-      'score'
+      'score',
+      { scores }
     );
     this.afterScoring(state);
   }

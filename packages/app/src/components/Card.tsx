@@ -12,6 +12,12 @@ interface CardProps {
   mood?: Mood;
   /** Live value to show as the headline number (falls back to printed value). */
   value?: number;
+  /**
+   * Marks the headline value as computed/modified from the printed die → renders
+   * the computed-value glow. Set in actionable contexts (a mood in play, a
+   * playable hand card's would-be, the decision-modal preview).
+   */
+  computed?: boolean;
   onClick?: () => void;
   disabled?: boolean;
   /** Compact discard-pile / list rendering. */
@@ -29,8 +35,11 @@ interface CardProps {
   pointerDraggable?: boolean;
   /** Pointer-drag start (see useHandDrag). */
   onPointerDown?: (e: React.PointerEvent) => void;
-  /** Hover / focus for the left preview pane. */
-  onPointerEnter?: () => void;
+  /** Hover / focus for the left preview pane (receives the pointer event so the
+   *  caller can distinguish mouse hover from an instant touch/pen tap). */
+  onPointerEnter?: (e: React.PointerEvent) => void;
+  /** Pointer left the card — cancel a pending hover-to-preview timer. */
+  onPointerLeave?: () => void;
   onFocus?: () => void;
   /** Large, non-interactive rendering for the preview pane. */
   large?: boolean;
@@ -83,11 +92,29 @@ export function Die({ value, dieColor, className }: { value: number; dieColor: D
 /**
  * Render a card value as one or two pip-dice. Printed values 7..12 show as two
  * dice added together (a 6 plus the remainder), matching the physical cards.
+ *
+ * This is the SINGLE shared value element used everywhere a card value renders
+ * (board tiles, preview, decision modal). When `computed` is set — the current
+ * value is calculated/modified rather than the printed die — it gains a glow
+ * (Slay-the-Spire-style computed-value indicator). The forthcoming Animations
+ * point-value reveal animates this same element.
  */
-export function DiceValue({ value, dieColor, className }: { value: number; dieColor: DieColor; className?: string }) {
+export function DiceValue({
+  value,
+  dieColor,
+  className,
+  computed,
+}: {
+  value: number;
+  dieColor: DieColor;
+  className?: string;
+  /** Mark the value as computed/modified from printed → render the glow. */
+  computed?: boolean;
+}) {
+  const cls = `dice${computed ? ' dice--computed' : ''}${className ? ` ${className}` : ''}`;
   if (value > 6) {
     return (
-      <span className={`dice${className ? ` ${className}` : ''}`}>
+      <span className={cls}>
         <Die value={6} dieColor={dieColor} />
         <span className="dice__plus" aria-hidden>+</span>
         <Die value={value - 6} dieColor={dieColor} />
@@ -95,7 +122,7 @@ export function DiceValue({ value, dieColor, className }: { value: number; dieCo
     );
   }
   return (
-    <span className={`dice${className ? ` ${className}` : ''}`}>
+    <span className={cls}>
       <Die value={value} dieColor={dieColor} />
     </span>
   );
@@ -132,14 +159,14 @@ export function CardBack({ className }: { className?: string }) {
 }
 
 /** The CSS/SVG fallback face — a recreation of the printed frame (no CDN art). */
-function FallbackFace({ card, headline, mood }: { card: CardData; headline: number; mood?: Mood }) {
+function FallbackFace({ card, headline, mood, computed }: { card: CardData; headline: number; mood?: Mood; computed?: boolean }) {
   const secondaryActive = mood?.usingSecondary ?? false;
   return (
     <>
       <header className="card__head">
         <span className="card__name">{card.name}</span>
         <span className="card__die" title={`${card.dieColor} die`}>
-          <DiceValue value={headline} dieColor={card.dieColor} />
+          <DiceValue value={headline} dieColor={card.dieColor} computed={computed} />
         </span>
       </header>
 
@@ -186,7 +213,7 @@ function FallbackFace({ card, headline, mood }: { card: CardData; headline: numb
  * pip-die and a small doodle — no rules text (that lives in the Previewer).
  * Keeps the coloured frame border + pip-die so a tile still reads as a card.
  */
-function TileFace({ card, headline, mood }: { card: CardData; headline: number; mood?: Mood }) {
+function TileFace({ card, headline, mood, computed }: { card: CardData; headline: number; mood?: Mood; computed?: boolean }) {
   const secondaryActive = mood?.usingSecondary ?? false;
   const suppressed = mood && mood.suppressed !== 'none';
   return (
@@ -194,7 +221,7 @@ function TileFace({ card, headline, mood }: { card: CardData; headline: number; 
       <header className="card__head">
         <span className="card__name">{card.name}</span>
         <span className="card__die" title={`${card.dieColor} die`}>
-          <DiceValue value={headline} dieColor={card.dieColor} />
+          <DiceValue value={headline} dieColor={card.dieColor} computed={computed} />
         </span>
       </header>
 
@@ -230,6 +257,7 @@ export function Card({
   card,
   mood,
   value,
+  computed,
   onClick,
   disabled,
   compact,
@@ -241,6 +269,7 @@ export function Card({
   pointerDraggable,
   onPointerDown,
   onPointerEnter,
+  onPointerLeave,
   onFocus,
   large,
   tile,
@@ -274,6 +303,7 @@ export function Card({
   const interactionProps = {
     onPointerDown,
     onPointerEnter,
+    onPointerLeave,
     onFocus,
   };
 
@@ -282,7 +312,7 @@ export function Card({
       <button type="button" className={classes} onClick={onClick} disabled={disabled} title={card.rulesText ?? ''} {...interactionProps}>
         <span className="card__swatch" aria-hidden />
         <span className="card__compact-name">{card.name}</span>
-        <span className="card__compact-value">{dieLabel(headline)}</span>
+        <span className={`card__compact-value${computed ? ' card__compact-value--computed' : ''}`}>{dieLabel(headline)}</span>
       </button>
     );
   }
@@ -296,15 +326,15 @@ export function Card({
           <img src={src!} alt={card.name} loading="lazy" onError={onError} />
           {/* A pip-die overlay keeps the value legible even over the official art. */}
           <span className="card__die card__die--overlay" title={`${card.dieColor} die`}>
-            <DiceValue value={headline} dieColor={card.dieColor} />
+            <DiceValue value={headline} dieColor={card.dieColor} computed={computed} />
           </span>
           {suppressed && <span className="card__art-flag">suppressed</span>}
           {secondaryActive && <span className="card__art-flag card__art-flag--alt">flipped</span>}
         </div>
       ) : tile ? (
-        <TileFace card={card} headline={headline} mood={mood} />
+        <TileFace card={card} headline={headline} mood={mood} computed={computed} />
       ) : (
-        <FallbackFace card={card} headline={headline} mood={mood} />
+        <FallbackFace card={card} headline={headline} mood={mood} computed={computed} />
       )}
     </button>
   );

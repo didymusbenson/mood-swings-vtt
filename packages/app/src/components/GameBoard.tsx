@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
-import type { Action, GameState, Mood, PlayerState } from '@mood-swings/engine';
+import type { Action, Color, GameState, Mood, PlayerState } from '@mood-swings/engine';
 import { ROUNDS_TO_WIN, type ChoiceSlot } from '@mood-swings/engine';
 import { db } from '../game/db.js';
+import { handWouldBe, moodComputed } from '../game/value.js';
 import { assignAvatars } from '../game/avatars.js';
-import { Card, CardBack, Die } from './Card.js';
+import { Card, CardBack, Die, DiceValue } from './Card.js';
 import { PreviewPane, type PreviewTarget } from './PreviewPane.js';
 import { ActivityLog } from './ActivityLog.js';
 import { Starburst } from './Starburst.js';
@@ -27,7 +28,16 @@ interface PanelCtx {
   pc: PlayController;
   handDrag: HandDragApi;
   orderedHand: (pid: string) => number[];
+  /** Show a preview immediately (focus, programmatic). */
   setPreview: (t: PreviewTarget | null) => void;
+  /**
+   * Pointer-enter handler factory implementing the Preview open triggers: a mouse
+   * hover opens the detailed preview only after >1s; a touch/pen tap opens it
+   * instantly (mobile-friendly). Pair with `endHover` on pointer-leave.
+   */
+  hoverPreview: (t: PreviewTarget | null) => (e: React.PointerEvent) => void;
+  /** Cancel a pending hover-open timer (pointer left before the delay elapsed). */
+  endHover: () => void;
   avatars: Record<string, string>;
   openDiscard: () => void;
 }
@@ -139,18 +149,22 @@ function MoodTableau({ player, state, ctx, pos }: { player: PlayerState; state: 
         {moods.map((m) => {
           const legal = pc.moodHighlighted(m.uid);
           const clickable = legal && pc.dragCard == null; // clicking picks a flow target
+          // A mood in play is always an actionable context → show its computed value.
+          const preview: PreviewTarget = { card: db.get(m.card), mood: m, value: m.currentValue };
           return (
             <div key={m.uid} className="mood-drop" data-drop="mood" data-mood-uid={m.uid}>
               <Card
                 card={db.get(m.card)}
                 mood={m}
                 value={m.currentValue}
+                computed={moodComputed(m)}
                 tile
                 highlighted={legal}
                 targetSelected={pc.moodSelected(m.uid)}
                 dimmed={dragging && !legal}
-                onPointerEnter={() => setPreview({ card: db.get(m.card), mood: m, value: m.currentValue })}
-                onFocus={() => setPreview({ card: db.get(m.card), mood: m, value: m.currentValue })}
+                onPointerEnter={ctx.hoverPreview(preview)}
+                onPointerLeave={ctx.endHover}
+                onFocus={() => setPreview(preview)}
                 onClick={clickable ? () => pc.onMoodClick(m.uid) : undefined}
               />
             </div>
@@ -195,19 +209,29 @@ function HandRow({ player, state, ctx, pos }: { player: PlayerState; state: Game
     // During a targeting flow, hand-card targets are surfaced in the overlay, so
     // here we only need tap-to-select (drag hook handles it) outside a flow.
     const clickable = interactive && pc.flow != null;
+    // A playable hand card (the active player's, outside a flow) is actionable →
+    // show its objective would-be value with the computed glow. Cards being read
+    // (the idle opponent hand) keep their printed die.
+    const playable = isActive && pc.flow == null;
+    const wb = playable ? handWouldBe(state, pid, card) : null;
+    const showWb = !!(wb && wb.objective && wb.value != null);
+    const preview: PreviewTarget = { card: db.get(card), handOwner: playable ? pid : undefined };
     handChildren.push(
       <div key={`${card}-${idx}`} className="hand__slot" data-hand-index={idx} style={fanVars(idx, order.length, isActive, pos)}>
         <Card
           card={db.get(card)}
           tile
+          value={showWb ? wb!.value! : undefined}
+          computed={showWb && wb!.computed}
           disabled={!interactive}
           selected={isActive && pc.isSelected(card)}
           highlighted={!!targetLegal}
           targetSelected={flowHandSlot && pc.handCardSelected(card)}
           pointerDraggable={canDragHand}
           onPointerDown={canDragHand ? (e) => handDrag.onCardPointerDown(e, card, idx) : undefined}
-          onPointerEnter={() => setPreview({ card: db.get(card) })}
-          onFocus={() => setPreview({ card: db.get(card) })}
+          onPointerEnter={ctx.hoverPreview(preview)}
+          onPointerLeave={ctx.endHover}
+          onFocus={() => setPreview(preview)}
           onClick={clickable ? () => pc.onHandCardClick(card) : undefined}
         />
       </div>,
@@ -324,7 +348,7 @@ function PlayerEdge({ player, state, ctx, pos }: { player: PlayerState; state: G
 
 /** Deck stack + discard pile column at the battlefield's left edge (F3). */
 function PileColumn({ state, ctx }: { state: GameState; ctx: PanelCtx }) {
-  const { setPreview, openDiscard } = ctx;
+  const { openDiscard } = ctx;
   const top = state.discard[state.discard.length - 1];
   return (
     <div className="bf__pile">
@@ -345,7 +369,8 @@ function PileColumn({ state, ctx }: { state: GameState; ctx: PanelCtx }) {
         onClick={openDiscard}
         disabled={state.discard.length === 0}
         title="Inspect the discard pile"
-        onPointerEnter={() => top != null && setPreview({ card: db.get(top) })}
+        onPointerEnter={(e) => { if (top != null) ctx.hoverPreview({ card: db.get(top), readOnly: true })(e); }}
+        onPointerLeave={ctx.endHover}
       >
         <div className="pile__discard-top">
           {top == null ? (
@@ -468,10 +493,34 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
   const legal = pc.legalNow;
   const sel = pc.flow.sel;
 
+  // Pre-submit computed preview: the card being played, with its would-be value
+  // updating live as targets/costs are chosen. Target-dependent cards (Creativity
+  // copy / Wonder colour) resolve once their choice is made.
+  const playedCard = db.get(pc.flow.card);
+  const wb = handWouldBe(state, pc.me, pc.flow.card, {
+    copy: sel.copy ?? undefined,
+    wonderColor: (sel.colors[0] as Color | undefined),
+  });
+  const showValue = wb.objective && wb.value != null;
+
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label={chooseHeading(slot)}>
       <div className="overlay__scrim" />
-      <div className="overlay__panel">
+      <div className="overlay__panel overlay__panel--playing">
+        <aside className="overlay__playing">
+          <span className="overlay__playing-label">Playing</span>
+          <h3 className="overlay__playing-name">{playedCard.name}</h3>
+          <Card card={playedCard} large showArt value={showValue ? wb.value! : undefined} computed={showValue && wb.computed} />
+          {showValue ? (
+            <p className="overlay__playing-value">
+              <span>Computed value</span>
+              <DiceValue value={wb.value!} dieColor={playedCard.dieColor} className="dice--mini" computed={wb.computed} />
+            </p>
+          ) : (
+            <p className="overlay__playing-value muted">Value resolves once chosen.</p>
+          )}
+        </aside>
+        <div className="overlay__main">
         <h2 className="overlay__title">{chooseHeading(slot)}</h2>
         {slot.label && <p className="overlay__sub">{slot.label}</p>}
         {pc.slotProgress && pc.slotProgress.max > 1 && (
@@ -515,6 +564,7 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
                       card={db.get(found.mood.card)}
                       mood={found.mood}
                       value={found.mood.currentValue}
+                      computed={moodComputed(found.mood)}
                       tile
                       targetSelected={pc.moodSelected(uid)}
                       onClick={() => pc.onMoodClick(uid)}
@@ -594,6 +644,7 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
             Cancel
           </button>
         </div>
+        </div>
       </div>
     </div>
   );
@@ -659,6 +710,29 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
   const [discardOpen, setDiscardOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
 
+  // Preview open triggers: mouse hover opens the detail panel only after >1s; a
+  // touch/pen tap opens it instantly. `hoverPreview` returns the pointer handler;
+  // `endHover` cancels a pending timer when the pointer leaves early.
+  const hoverTimer = useRef<number | null>(null);
+  const endHover = useCallback(() => {
+    if (hoverTimer.current != null) {
+      window.clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  }, []);
+  const hoverPreview = useCallback(
+    (t: PreviewTarget | null) => (e: React.PointerEvent) => {
+      endHover();
+      if (e.pointerType === 'mouse') {
+        hoverTimer.current = window.setTimeout(() => setPreview(t), 1000);
+      } else {
+        setPreview(t); // touch / pen: instant (mobile-friendly)
+      }
+    },
+    [endHover],
+  );
+  useEffect(() => endHover, [endHover]);
+
   const gameOver = state.phase === 'gameOver';
   const winnerName = state.players.find((p) => p.id === state.winner)?.name;
   const dragging = pc.dragCard != null;
@@ -677,7 +751,7 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
     return preview;
   }, [handDrag.drag, pc.flow, preview]);
 
-  const ctx: PanelCtx = { pc, handDrag, orderedHand, setPreview, avatars, openDiscard: () => setDiscardOpen(true) };
+  const ctx: PanelCtx = { pc, handDrag, orderedHand, setPreview, hoverPreview, endHover, avatars, openDiscard: () => setDiscardOpen(true) };
   const fieldOver = !!(handDrag.drag?.active && handDrag.drag.over.kind === 'field');
 
   return (
@@ -724,7 +798,7 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
       </header>
 
       <div className="board">
-        <PreviewPane target={previewTarget} />
+        <PreviewPane target={previewTarget} state={state} />
         {/* Center column, three stacked bands (F5): opponent edge / battlefield / your edge. */}
         <div className="playfield">
           <PlayerEdge player={top} state={state} ctx={ctx} pos="top" />
