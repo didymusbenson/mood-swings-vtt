@@ -667,6 +667,17 @@ input:focus-visible {
   overflow: hidden;
 }
 
+/* Center column stacked into three bands (F5): opponent edge (auto) / battlefield
+   (fills) / your edge (auto). The battlefield is the single shared play zone. */
+.playfield {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0.35rem;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
 /* ============================================================================
    Battlefield (F3): a single readable play area. Deck+discard column at the
    left edge; fixed top/bottom seats (F2); the whole area is the drop zone.
@@ -720,11 +731,35 @@ input:focus-visible {
   color: var(--ink);
   font-weight: 700;
 }
-.seat--top {
-  grid-area: top;
+
+/* The two owner halves of the single battlefield (F5). No per-player boxes — just a
+   faint centre split. Opponent's moods cluster toward the centre from the top; yours
+   from the bottom, so both sets meet around the middle where they're "played". */
+.bf__half {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: 12px;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
 }
-.seat--bottom {
+.bf__half--top {
+  grid-area: top;
+  border-bottom: 1.5px dashed var(--line);
+}
+.bf__half--bottom {
   grid-area: bot;
+}
+.bf__half > .tableau {
+  flex: 1;
+  min-width: 0;
+}
+/* The active player's half is softly tinted (turn cue) — a wash, not a box. */
+.bf__half--top.is-turn {
+  background: linear-gradient(to top, rgba(47, 111, 176, 0.11), rgba(47, 111, 176, 0));
+}
+.bf__half--bottom.is-turn {
+  background: linear-gradient(to bottom, rgba(47, 111, 176, 0.11), rgba(47, 111, 176, 0));
 }
 
 /* ---------- Top bar ---------- */
@@ -854,43 +889,38 @@ input:focus-visible {
 /* ============================================================================
    Seats (fixed top/bottom) + tableau + hand
    ========================================================================== */
-.seat {
+/* ============================================================================
+   Player edge bands (F5): info + action slot + hand, pinned outside the play
+   area — opponent at the very top, you at the very bottom. The hand hugs the
+   battlefield; the info bar sits at the outer edge. No boxed container.
+   ========================================================================== */
+.edge {
   position: relative;
   min-height: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  background: rgba(246, 242, 231, 0.66);
-  border: 2px solid var(--line-strong);
-  border-radius: 14px 11px 13px 12px / 12px 13px 11px 14px;
-  padding: 0.3rem 0.5rem;
-  transition: box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  gap: 0.15rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 12px;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
 }
-.seat--top {
-  transform: rotate(-0.2deg);
+/* Active player's edge is softly tinted (turn cue) — a wash, not a box. */
+.edge--top.edge--turn {
+  background: linear-gradient(to bottom, rgba(47, 111, 176, 0.1), rgba(47, 111, 176, 0));
 }
-.seat--bottom {
-  transform: rotate(0.2deg);
-}
-/* Active player's zone glows (F2 — no seat swapping). */
-.seat--turn {
-  border-color: var(--accent);
-  background: rgba(47, 111, 176, 0.08);
-  box-shadow: 0 0 0 2px var(--accent-soft), 0 0 22px rgba(47, 111, 176, 0.35), var(--shadow);
+.edge--bottom.edge--turn {
+  background: linear-gradient(to top, rgba(47, 111, 176, 0.1), rgba(47, 111, 176, 0));
 }
 
-/* The acting seat's hand + action slot ride above the targeting overlay scrim
-   so the confirm controls stay reachable while the battlefield is dimmed (F4).
-   The seat's decorative rotate() would trap those children in its own stacking
-   context (leaving them under the scrim), so we drop it while acting and let the
-   action slot / hand escape to the table's stacking context above the overlay. */
-.seat--acting {
-  transform: none;
+/* The acting edge's hand + action slot ride above the targeting overlay scrim so
+   the confirm controls stay reachable while the battlefield is dimmed (F4). */
+.edge--acting {
   overflow: visible;
+  z-index: 40;
 }
-.seat--acting .actionslot,
-.seat--acting .hand {
+.edge--acting .actionslot,
+.edge--acting .hand {
   position: relative;
   z-index: 60;
 }
@@ -915,7 +945,7 @@ input:focus-visible {
   background: var(--paper);
   box-shadow: 1px 1px 0 rgba(44, 42, 37, 0.35);
 }
-.seat--turn .seat__avatar {
+.edge--turn .seat__avatar {
   border-color: var(--accent);
 }
 /* Avatar is the player drop/target (drag-to-player + F4 player picker). */
@@ -1006,14 +1036,14 @@ input:focus-visible {
   flex-direction: column;
   justify-content: flex-start;
 }
-.seat--bottom .tableau {
-  justify-content: flex-end;
-}
+/* Each player's moods cluster toward their own edge/hand (facing them). */
 .tableau--bottom {
+  justify-content: flex-end;
   --card-w: var(--tile-you-w);
   --card-h: var(--tile-you-h);
 }
 .tableau--top {
+  justify-content: flex-start;
   --card-w: var(--tile-opp-w);
   --card-h: var(--tile-opp-h);
 }

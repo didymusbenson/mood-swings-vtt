@@ -287,18 +287,24 @@ function ActionSlot({ pc, state }: { pc: PlayController; state: GameState }) {
   );
 }
 
-/** A whole fixed seat: header, its hand, its moods — ordered so the hand hugs the edge. */
-function Seat({ player, state, ctx, pos }: { player: PlayerState; state: GameState; ctx: PanelCtx; pos: SeatPos }) {
+/**
+ * A player's EDGE band — their info bar, action slot, and hand — pinned to the
+ * outside of the play area (opponent at the very top, you at the very bottom). The
+ * hand hugs the battlefield; the info bar sits at the outer edge; the action slot
+ * sits just above the hand (F4a). The played moods are NOT here — they live in the
+ * shared battlefield in the middle.
+ */
+function PlayerEdge({ player, state, ctx, pos }: { player: PlayerState; state: GameState; ctx: PanelCtx; pos: SeatPos }) {
   const { pc, avatars } = ctx;
   const pid = player.id;
   const isActive = isActiveSeat(state, pid);
   const dragging = pc.dragCard != null;
 
   const classes = [
-    'seat',
-    `seat--${pos}`,
-    isActive ? 'seat--turn' : '',
-    isActive && pc.flow ? 'seat--acting' : '',
+    'edge',
+    `edge--${pos}`,
+    isActive ? 'edge--turn' : '',
+    isActive && pc.flow ? 'edge--acting' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -306,26 +312,25 @@ function Seat({ player, state, ctx, pos }: { player: PlayerState; state: GameSta
   const header = <SeatHeader player={player} state={state} isActive={isActive} avatar={avatars[pid] ?? '🙂'} pc={pc} dragging={dragging} />;
   const actions = isActive ? <ActionSlot pc={pc} state={state} /> : <div className="actionslot actionslot--empty" aria-hidden />;
   const hand = <HandRow player={player} state={state} ctx={ctx} pos={pos} />;
-  const moods = <MoodTableau player={player} state={state} ctx={ctx} pos={pos} />;
 
+  // Top edge: info at the very top, hand nearest the battlefield. Bottom edge:
+  // hand nearest the battlefield, info at the very bottom; action slot above the hand.
   return (
-    <section className={classes}>
+    <div className={classes}>
       {pos === 'top' ? (
         <>
           {header}
           {actions}
           {hand}
-          {moods}
         </>
       ) : (
         <>
-          {moods}
-          {hand}
           {actions}
+          {hand}
           {header}
         </>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -369,7 +374,13 @@ function PileColumn({ state, ctx }: { state: GameState; ctx: PanelCtx }) {
   );
 }
 
-/** The unified battlefield: fixed top/bottom seats, deck+discard column, drop zone. */
+/**
+ * The unified battlefield (F5): a SINGLE play zone holding only the played moods,
+ * split into two halves by owner ("facing the player who played it") — the opponent's
+ * moods in the top half, yours in the bottom half — with the deck+discard column at
+ * the left edge. No per-player boxes; the whole area is the drop zone. Hands and info
+ * live in the edge bands above/below, not here.
+ */
 function Battlefield({
   state,
   ctx,
@@ -387,19 +398,25 @@ function Battlefield({
   fieldOver: boolean;
   gameOver: boolean;
 }) {
+  const topTurn = !gameOver && isActiveSeat(state, top.id);
+  const botTurn = !gameOver && isActiveSeat(state, bottom.id);
   return (
     <main
       className={`battlefield ${dragging ? 'is-armed' : ''} ${fieldOver ? 'is-over' : ''}`}
       data-drop={gameOver || ctx.pc.flow ? undefined : 'field'}
     >
       <PileColumn state={state} ctx={ctx} />
-      <Seat player={top} state={state} ctx={ctx} pos="top" />
+      <div className={`bf__half bf__half--top ${topTurn ? 'is-turn' : ''}`}>
+        <MoodTableau player={top} state={state} ctx={ctx} pos="top" />
+      </div>
       <div className="bf__center">
         <span className="bf__drop-msg">
           {dragging ? 'Release to play' : gameOver ? 'Game over' : 'Drop a card anywhere here to play'}
         </span>
       </div>
-      <Seat player={bottom} state={state} ctx={ctx} pos="bottom" />
+      <div className={`bf__half bf__half--bottom ${botTurn ? 'is-turn' : ''}`}>
+        <MoodTableau player={bottom} state={state} ctx={ctx} pos="bottom" />
+      </div>
     </main>
   );
 }
@@ -699,7 +716,12 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
 
       <div className="board">
         <PreviewPane target={previewTarget} />
-        <Battlefield state={state} ctx={ctx} top={top} bottom={bottom} dragging={dragging} fieldOver={fieldOver} gameOver={gameOver} />
+        {/* Center column, three stacked bands (F5): opponent edge / battlefield / your edge. */}
+        <div className="playfield">
+          <PlayerEdge player={top} state={state} ctx={ctx} pos="top" />
+          <Battlefield state={state} ctx={ctx} top={top} bottom={bottom} dragging={dragging} fieldOver={fieldOver} gameOver={gameOver} />
+          <PlayerEdge player={bottom} state={state} ctx={ctx} pos="bottom" />
+        </div>
         <ActivityLog log={state.log} />
       </div>
 
