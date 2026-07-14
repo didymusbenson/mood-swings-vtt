@@ -67,10 +67,10 @@
      with no page scroll. */
   --tile-hand-w: 82px;
   --tile-hand-h: 112px;
-  --tile-you-w: 68px;
-  --tile-you-h: 92px;
-  --tile-opp-w: 62px;
-  --tile-opp-h: 86px;
+  --tile-you-w: 136px;
+  --tile-you-h: 184px;
+  --tile-opp-w: 124px;
+  --tile-opp-h: 172px;
   --tile-opphand-w: 56px;
   --tile-opphand-h: 78px;
 
