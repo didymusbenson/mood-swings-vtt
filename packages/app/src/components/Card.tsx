@@ -1,6 +1,10 @@
 import type React from 'react';
+import { useState } from 'react';
 import type { CardData, Mood } from '@mood-swings/engine';
 import { useCardImage } from '../hooks/useCardImage.js';
+
+/** The official printed card back, hotlinked (never committed — same policy as fronts). */
+const CARD_BACK_URL = 'https://files.mtg.wiki/thumb/Mood_Swings_card_back.png/429px-Mood_Swings_card_back.png?20260609235227';
 
 interface CardProps {
   card: CardData;
@@ -97,21 +101,32 @@ export function DiceValue({ value, dieColor, className }: { value: number; dieCo
   );
 }
 
-/** The sketch card back: black frame, white centre, wordmark, colour-wave corners. */
+/**
+ * The card back: the official printed back hotlinked from mtg.wiki; if it can't load
+ * (offline, blocked CDN), fall back to the CSS/SVG homage (black frame, white centre,
+ * wordmark, colour-wave corners) — mirroring how card fronts fall back to the frame.
+ */
 export function CardBack({ className }: { className?: string }) {
+  const [failed, setFailed] = useState(false);
   return (
     <div className={`cardback${className ? ` ${className}` : ''}`} aria-hidden>
-      <svg className="cardback__waves" viewBox="0 0 120 168" preserveAspectRatio="none">
-        {/* Colour-wave corner accents (four of the five card colours). */}
-        <path d="M0 0 H48 Q30 20 46 40 Q26 54 40 78 L0 60 Z" fill="var(--c-blue)" opacity="0.9" />
-        <path d="M120 0 H72 Q92 22 76 44 Q98 58 82 82 L120 62 Z" fill="var(--c-red)" opacity="0.9" />
-        <path d="M0 168 H46 Q28 148 44 126 Q24 112 38 90 L0 108 Z" fill="var(--c-green)" opacity="0.9" />
-        <path d="M120 168 H74 Q94 146 78 124 Q100 110 84 88 L120 106 Z" fill="var(--c-white)" opacity="0.9" />
-      </svg>
-      <div className="cardback__center">
-        <span className="cardback__mark">Mood</span>
-        <span className="cardback__mark cardback__mark--alt">Swings</span>
-      </div>
+      {!failed ? (
+        <img className="cardback__img" src={CARD_BACK_URL} alt="" onError={() => setFailed(true)} />
+      ) : (
+        <>
+          <svg className="cardback__waves" viewBox="0 0 120 168" preserveAspectRatio="none">
+            {/* Colour-wave corner accents (four of the five card colours). */}
+            <path d="M0 0 H48 Q30 20 46 40 Q26 54 40 78 L0 60 Z" fill="var(--c-blue)" opacity="0.9" />
+            <path d="M120 0 H72 Q92 22 76 44 Q98 58 82 82 L120 62 Z" fill="var(--c-red)" opacity="0.9" />
+            <path d="M0 168 H46 Q28 148 44 126 Q24 112 38 90 L0 108 Z" fill="var(--c-green)" opacity="0.9" />
+            <path d="M120 168 H74 Q94 146 78 124 Q100 110 84 88 L120 106 Z" fill="var(--c-white)" opacity="0.9" />
+          </svg>
+          <div className="cardback__center">
+            <span className="cardback__mark">Mood</span>
+            <span className="cardback__mark cardback__mark--alt">Swings</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

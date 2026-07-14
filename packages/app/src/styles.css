@@ -610,6 +610,16 @@ input:focus-visible {
   align-items: center;
   justify-content: center;
 }
+/* The official hotlinked back fills the tile; the frame/inset above only shows
+   through as a thin border while the CSS homage is the fallback. */
+.cardback__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .cardback__waves {
   position: absolute;
   inset: 0;

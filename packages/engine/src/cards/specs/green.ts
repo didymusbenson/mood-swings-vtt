@@ -1,8 +1,8 @@
 // Target specs for green cards (#107–#134). See ../choice-spec.ts and ./white.ts.
-// Only cards whose effect reads ctx.choices get a spec; pure auto/intrinsic-value
-// and best-effort/unsupported cards without a choice (#109, #112, #113, #114, #115,
-// #116, #117, #119, #122, #124, #125, #126, #127, #129, #130, #131, #132, #134)
-// play immediately. Slots mirror the choices fields each effect in ../green.ts reads.
+// Only cards whose effect reads ctx.choices get a spec. Cards with no player decision
+// — pure intrinsic-value or automatic effects (#109, #112, #113, #114, #115, #116,
+// #117, #119, #122, #124, #125, #126, #127, #129, #130, #131, #132, #134) — need no
+// spec and play immediately. Slots mirror the choices each effect in ../green.ts reads.
 //
 // NOTE: #121 Grace, #123 Harmony, and #128 Nostalgia read choices.cards from the
 // DISCARD pile, and #118 Fascination gives a card to another player; slot kind
