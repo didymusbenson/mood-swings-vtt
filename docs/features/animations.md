@@ -29,6 +29,19 @@ only feedback is static (the log, highlights). Add animations so players can
   landed and its effect has finished resolving. For many moods this is a
   *calculated* value, so the reveal reflects the computed number.
 
+### Interaction feedback (drag-to-play)
+
+- **Pre-commit drag feedback:** when a player drags a card toward the
+  battlefield, there must be enough visual feedback to signal *"releasing here
+  will play this card"* **before** they commit — so an unintentional drag is
+  obvious in time to abort it.
+
+> **Note — misclick recovery (no undo):** This is a player-vs-player game, so
+> there is **no undo** feature. Misclick recovery is handled entirely at the
+> point of action: the **Play / Submit** button confirms, and for cards that
+> require choices **Cancel** backs out; drag-to-play gets the pre-commit feedback
+> above so a stray drag can be avoided rather than reversed.
+
 ## Open questions / to refine
 
 _(To be filled during refinement — answers may arrive via chat and can bleed

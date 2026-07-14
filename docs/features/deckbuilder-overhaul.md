@@ -40,6 +40,13 @@ to view and modify.
 > minimums / limits) and wire them into the builder — see `REQUIREMENTS.md` and
 > `docs/RULES.md`.
 
+### Deck persistence & sharing
+
+- **Save decks to local storage** — persist built decks in the browser so they
+  survive between sessions. _(Spec out during refinement.)_
+- **Import decks from a text list** — build/load a deck by pasting a plain-text
+  card list. _(Spec out during refinement — format TBD.)_
+
 ## Open questions / to refine
 
 _(To be filled during refinement — answers may arrive via chat and can bleed
