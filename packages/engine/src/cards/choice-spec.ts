@@ -8,8 +8,13 @@ import type { CardData, Color, GameState, Mood, PlayerId } from '../types.js';
 import { allMoods, resolveCardNumber } from '../queries.js';
 
 /** Which `choices` field a slot fills. */
-export type ChoiceKey = 'moods' | 'players' | 'cards' | 'colors' | 'option';
-export type TargetKind = 'mood' | 'player' | 'handCard' | 'color' | 'number' | 'choice';
+export type ChoiceKey = 'moods' | 'players' | 'cards' | 'colors' | 'option' | 'copy';
+/**
+ * `copy` is a special board target (Creativity #32): the player clicks a mood in
+ * play, but the slot records the CARD NUMBER of that mood into `choices.copy` (not a
+ * uid into `choices.moods`), and the UI then walks the copied card's own spec.
+ */
+export type TargetKind = 'mood' | 'player' | 'handCard' | 'color' | 'number' | 'choice' | 'copy';
 
 /** Filter over moods in play (serializable). Values use current (stabilised) value. */
 export interface MoodFilter {
@@ -69,9 +74,9 @@ export function hasRequiredTargets(cardNumber: number): boolean {
   return !!spec && spec.slots.some((s) => s.min > 0);
 }
 
-/** The first slot that targets a board object (mood/player) — used by drag-to-play. */
+/** The first slot that targets a board object (mood/copy/player) — used by drag-to-play. */
 export function firstBoardSlot(spec: ChoiceSpec): ChoiceSlot | undefined {
-  return spec.slots.find((s) => s.kind === 'mood' || s.kind === 'player');
+  return spec.slots.find((s) => s.kind === 'mood' || s.kind === 'player' || s.kind === 'copy');
 }
 
 /** A single-target card: exactly one slot, targeting one board object. */
@@ -91,7 +96,10 @@ export function legalTargets(
   card: CardLookup
 ): { moods?: string[]; players?: PlayerId[]; cards?: number[]; colors?: Color[]; numbers?: number[]; options?: string[] } {
   switch (slot.kind) {
-    case 'mood': {
+    case 'mood':
+    case 'copy': {
+      // 'copy' presents the same in-play moods as a mood slot (the player clicks a
+      // mood to copy); the UI translates the chosen mood to a card number.
       const f = slot.mood ?? {};
       const scope: Mood[] =
         f.from === 'own'
@@ -147,7 +155,10 @@ export function isLegalDrop(
 ): boolean {
   const spec = specByNumber.get(cardNumber);
   if (!spec) return false;
-  const slot = spec.slots.find((s) => s.kind === targetKind);
+  // A mood drop also satisfies a 'copy' slot (Creativity: drop onto the mood to copy).
+  const slot = spec.slots.find((s) =>
+    targetKind === 'mood' ? s.kind === 'mood' || s.kind === 'copy' : s.kind === 'player',
+  );
   if (!slot) return false;
   const legal = legalTargets(slot, state, actingPlayer, card);
   return targetKind === 'mood' ? !!legal.moods?.includes(targetId) : !!legal.players?.includes(targetId);

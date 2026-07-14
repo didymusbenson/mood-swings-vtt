@@ -108,6 +108,13 @@ export interface Choices {
   cards?: number[];
   /** Which of two values to take, etc. */
   option?: string | number;
+  /**
+   * The card number a copy effect adopts (Creativity #32: "play this card as a copy
+   * of any mood"). Kept separate from `moods`/`cards` so the copied card's OWN target
+   * choices (which use `moods`/`players`/`cards`/…) are never confused with the pick
+   * of what to copy.
+   */
+  copy?: number;
   [key: string]: unknown;
 }
 

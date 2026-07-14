@@ -4,13 +4,22 @@ import { fileURLToPath } from 'node:url';
 import { Engine } from '../src/engine.js';
 import { loadCardDB, type RawCard } from '../src/data.js';
 import type { CardDB } from '../src/cards/registry.js';
-import type { GameState } from '../src/types.js';
+import type { GameState, Mood, PlayerId } from '../src/types.js';
 import { colorOf } from '../src/queries.js';
 import '../src/cards/blue.js';
+import '../src/cards/white.js'; // Conviction #6 (copied by a Creativity test)
 
 const path = fileURLToPath(new URL('../../../data/cards.json', import.meta.url));
 const db: CardDB = loadCardDB(JSON.parse(readFileSync(path, 'utf8')) as RawCard[]);
 const P = [{ id: 'p1', name: 'P1' }, { id: 'p2', name: 'P2' }];
+
+let uid = 0;
+function mkMood(card: number, owner: PlayerId): Mood {
+  return {
+    uid: `t${uid++}`, card, owner, stolenFrom: null, usingSecondary: false,
+    suppressed: 'none', suppressedBy: null, copyOf: null, currentValue: 0, data: {},
+  };
+}
 
 // Handy neutral cards: 5 Complacency (white,4 vanilla), 55 Apathy (black,4 vanilla),
 // 83 Boredom (red,4 vanilla), 44 Indifference (blue,4 vanilla).
@@ -159,12 +168,11 @@ describe('blue cards', () => {
   });
 
   it('#32 Creativity copies a mood in play — value, colour, and identity adopted', () => {
-    // r1: p1 plays a red Boredom(83, [4]); r2: Creativity copies it.
+    // r1: p1 plays a red Boredom(83, [4]); r2: Creativity copies it (choices.copy = 83).
     const { e, s } = game(rig([83, 32], [5]));
     let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 83 });
     g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 (4) leads r2
-    const target = g.moods.p1!.find((m) => m.card === 83)!.uid;
-    g = e.apply(g, { type: 'play', player: 'p1', card: 32, choices: { moods: [target] } });
+    g = e.apply(g, { type: 'play', player: 'p1', card: 32, choices: { copy: 83 } });
     const copy = g.moods.p1!.find((m) => m.card === 32)!;
     expect(copy.copyOf).toBe(83); // identity adopted
     expect(copy.currentValue).toBe(4); // Boredom's printed value, not Creativity's [0]
@@ -176,12 +184,31 @@ describe('blue cards', () => {
     const { e, s } = game(rig([27, 32], [83], 83));
     let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 27 }); // Ambivalence [6]
     g = e.apply(g, { type: 'play', player: 'p2', card: 83 }); // one red; r1 ends, p1 (6) leads
-    const amb = g.moods.p1!.find((m) => m.card === 27)!.uid;
-    g = e.apply(g, { type: 'play', player: 'p1', card: 32, choices: { moods: [amb] } }); // copy Ambivalence
+    g = e.apply(g, { type: 'play', player: 'p1', card: 32, choices: { copy: 27 } }); // copy Ambivalence
     // p2 plays a second red → two red moods → both Ambivalence-like cards drop to [3].
     g = e.apply(g, { type: 'play', player: 'p2', card: 83 });
     expect(g.moods.p1!.find((m) => m.card === 27)!.currentValue).toBe(3);
     expect(g.moods.p1!.find((m) => m.card === 32)!.currentValue).toBe(3); // copy adopted the ability
     expect(colorOf(g.moods.p1!.find((m) => m.card === 32)!, db)).toBe('blue'); // Ambivalence's colour
+  });
+
+  it('#32 Creativity copies a card that ITSELF targets a mood (copy target ≠ effect target)', () => {
+    // The previously-broken case: copy Conviction #6 ("chosen mood's player bottom-
+    // decks it and draws"). `choices.copy` picks WHAT to copy; `choices.moods` is
+    // entirely the copied card's own target — no positional collision.
+    const { e, s } = game(rig([32], [126]));
+    s.moods.p1 = [mkMood(6, 'p1')]; // a Conviction in play, so it's a legal copy source
+    s.moods.p2 = [mkMood(5, 'p2')]; // p2's white mood — Conviction's target
+    e.stabilise(s);
+    const victim = s.moods.p2![0]!.uid;
+    const p2HandBefore = s.hands.p2!.length;
+    const g: GameState = e.apply(s, {
+      type: 'play', player: 'p1', card: 32, choices: { copy: 6, moods: [victim] },
+    });
+    const copy = g.moods.p1!.find((m) => m.card === 32)!;
+    expect(copy.copyOf).toBe(6); // became Conviction
+    expect(g.moods.p2!.some((m) => m.uid === victim)).toBe(false); // Conviction bottom-decked it
+    expect(g.deck[g.deck.length - 1]).toBe(5); // #5 went to the bottom of the deck
+    expect(g.hands.p2!.length).toBe(p2HandBefore + 1); // its owner drew
   });
 });

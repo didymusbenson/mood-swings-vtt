@@ -35,9 +35,24 @@ interface Selections {
   cards: number[];
   colors: string[];
   option: string | number | null;
+  /** Creativity #32: the card number being copied (from the chosen mood). */
+  copy: number | null;
+  /** The uid of the copied mood, kept only to highlight it in the picker. */
+  copyUid: string | null;
 }
 
-const emptySelections = (): Selections => ({ moods: [], players: [], cards: [], colors: [], option: null });
+const emptySelections = (): Selections => ({
+  moods: [], players: [], cards: [], colors: [], option: null, copy: null, copyUid: null,
+});
+
+/** The card number a mood in play currently represents (copies resolve to their source). */
+function copyCardOf(state: GameState, uid: string): number | null {
+  for (const p of state.players) {
+    const m = (state.moods[p.id] ?? []).find((x) => x.uid === uid);
+    if (m) return m.copyOf ?? m.card;
+  }
+  return null;
+}
 
 interface Flow {
   card: number;
@@ -126,6 +141,8 @@ function countForSlot(slot: ChoiceSlot, sel: Selections): number {
       return sel.colors.length;
     case 'option':
       return sel.option != null ? 1 : 0;
+    case 'copy':
+      return sel.copy != null ? 1 : 0;
   }
 }
 
@@ -136,6 +153,7 @@ function assembleChoices(sel: Selections): Choices {
   if (sel.cards.length) choices.cards = sel.cards;
   if (sel.colors.length) choices.colors = sel.colors;
   if (sel.option != null) choices.option = sel.option;
+  if (sel.copy != null) choices.copy = sel.copy;
   return choices;
 }
 
@@ -183,11 +201,15 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
       if (preselect) {
         if (preselect.key === 'moods') sel.moods = [preselect.value];
         else if (preselect.key === 'players') sel.players = [preselect.value];
+        else if (preselect.key === 'copy') {
+          sel.copyUid = preselect.value;
+          sel.copy = copyCardOf(state, preselect.value);
+        }
       }
       setFlow({ card, spec, slotIndex: 0, sel });
       setSelectedCard(null);
     },
-    [me, onAction],
+    [me, onAction, state],
   );
 
   const play = useCallback(() => {
@@ -202,12 +224,19 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
   // --- Flow controls ---
   const finishOrAdvance = useCallback(
     (f: Flow) => {
-      const isLast = f.slotIndex >= f.spec.slots.length - 1;
+      // After a Creativity copy slot resolves, splice the copied card's OWN spec in
+      // right after it so the flow then walks the copied card's targets.
+      let spec = f.spec;
+      if (f.spec.slots[f.slotIndex]?.kind === 'copy') {
+        const copied = f.sel.copy != null ? specFor(f.sel.copy)?.slots ?? [] : [];
+        spec = { slots: [...f.spec.slots.slice(0, f.slotIndex + 1), ...copied] };
+      }
+      const isLast = f.slotIndex >= spec.slots.length - 1;
       if (isLast) {
         onAction({ type: 'play', player: me, card: f.card, choices: assembleChoices(f.sel) });
         setFlow(null);
       } else {
-        setFlow({ ...f, slotIndex: f.slotIndex + 1 });
+        setFlow({ ...f, spec, slotIndex: f.slotIndex + 1 });
       }
     },
     [me, onAction],
@@ -228,6 +257,7 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
     else if (currentSlot.key === 'cards') sel.cards = [];
     else if (currentSlot.key === 'colors') sel.colors = [];
     else if (currentSlot.key === 'option') sel.option = null;
+    else if (currentSlot.key === 'copy') { sel.copy = null; sel.copyUid = null; }
     finishOrAdvance({ ...flow, sel });
   }, [flow, currentSlot, finishOrAdvance]);
 
@@ -267,11 +297,18 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
   // --- Board target clicks (only meaningful inside the flow) ---
   const onMoodClick = useCallback(
     (uid: string) => {
-      if (!flow || !currentSlot || currentSlot.kind !== 'mood') return;
+      if (!flow || !currentSlot) return;
       if (!legalNow?.moods?.includes(uid)) return;
+      if (currentSlot.kind === 'copy') {
+        // Clicking a mood picks WHAT Creativity copies (its card number).
+        const copy = copyCardOf(state, uid);
+        setFlow((f) => (f ? { ...f, sel: { ...f.sel, copy, copyUid: uid } } : f));
+        return;
+      }
+      if (currentSlot.kind !== 'mood') return;
       setFlow((f) => (f ? { ...f, sel: { ...f.sel, moods: toggleBounded(f.sel.moods, uid, currentSlot.max) } } : f));
     },
-    [flow, currentSlot, legalNow],
+    [flow, currentSlot, legalNow, state],
   );
 
   const onPlayerClick = useCallback(
@@ -298,11 +335,15 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
   const moodHighlighted = useCallback(
     (uid: string) => {
       if (dragCard != null) return dragLegalMoodImpl(dragCard, uid, state, me);
-      return !!(flow && currentSlot?.kind === 'mood' && legalNow?.moods?.includes(uid));
+      const kind = currentSlot?.kind;
+      return !!(flow && (kind === 'mood' || kind === 'copy') && legalNow?.moods?.includes(uid));
     },
     [dragCard, flow, currentSlot, legalNow, state, me],
   );
-  const moodSelected = useCallback((uid: string) => !!flow?.sel.moods.includes(uid), [flow]);
+  const moodSelected = useCallback(
+    (uid: string) => !!flow?.sel.moods.includes(uid) || flow?.sel.copyUid === uid,
+    [flow],
+  );
 
   const playerHighlighted = useCallback(
     (pid: string) => {
@@ -348,7 +389,9 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
       if (isSingleTarget(spec)) {
         onAction({ type: 'play', player: me, card, choices: { moods: [uid] } });
       } else {
-        beginPlay(card, { key: 'moods', value: uid });
+        // Creativity's first board slot is a 'copy' slot — the dropped mood is what to copy.
+        const key = firstBoardSlot(spec)?.kind === 'copy' ? 'copy' : 'moods';
+        beginPlay(card, { key, value: uid });
       }
     },
     [state, me, onAction, beginPlay],

@@ -30,11 +30,12 @@ registerSpec(31, {
   ],
 });
 
-// #32 Creativity — may play as a copy of any mood in play (choices.moods[0] = the
-// copied mood). Further moods[1..] feed the copied card's own targets, so max is
-// generous. Optional: declining leaves a plain [0] blue mood.
+// #32 Creativity — may play as a copy of any mood in play. The dedicated `copy` slot
+// records the chosen mood's CARD NUMBER into `choices.copy`; the UI then walks the
+// copied card's OWN spec (its targets fill moods/players/cards/… independently).
+// Optional: declining leaves a plain [0] blue mood.
 registerSpec(32, {
-  slots: [{ key: 'moods', kind: 'mood', min: 0, max: 3, mood: { from: 'any' }, label: 'Copy a mood (optional)', optional: true }],
+  slots: [{ key: 'copy', kind: 'copy', min: 0, max: 1, mood: { from: 'any' }, label: 'Copy a mood in play (optional)', optional: true }],
 });
 
 // #33 Curiosity — may choose a player to reveal a random hand card.

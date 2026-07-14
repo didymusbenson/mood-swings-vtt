@@ -106,43 +106,39 @@ registerEffects(31, {
 // printed card (dice, colour, abilities) by resolving `copyOf` to that card's
 // number (copying a Creativity copies what *it* copies — resolveCardNumber chases
 // the chain). Because copyOf is set in canPlay (before the mood enters play), the
-// copied card's value/colour are live from the first stabilisation, and its
-// "To play this card" cost is honoured: Creativity delegates canPlay/payCost/
-// afterPlaying to the copied card. The copied card's own mood targets come from
-// choices.moods[1..] (index 0 is the copy target), while cards/players/colors/
-// option pass straight through. RESIDUAL: cards whose cost/effect needs a second
-// distinct mood-target list can't be disambiguated (rare); see report.
+// The copy target is the DEDICATED `choices.copy` field (the card number to copy),
+// chosen in the UI by clicking a mood in play. Because it is its own field, the
+// copied card's OWN targets flow through `choices.moods`/`players`/`cards`/… with no
+// positional collision — so a copied card that itself targets moods works cleanly.
+// The copied card's value/colour/abilities go live from the first stabilisation via
+// `copyOf` (every while-in-play / scoring hook the engine reads uses
+// `resolveCardNumber`), and its "To play this card" cost is honoured here by
+// delegating canPlay/payCost/afterPlaying to the copied card with the same context.
 const copyTarget = (ctx: PlayContext): number | undefined => {
-  const uid = ctx.choices.moods?.[0];
-  if (uid == null) return undefined; // "may": decline the copy → plain [0] blue
-  const target = ctx.allMoods().find((m) => m.uid === uid && m.uid !== ctx.self.uid);
-  return target ? resolveCardNumber(target) : undefined;
+  const n = ctx.choices.copy;
+  // "may": decline the copy, or (defensively) copying Creativity itself → plain [0] blue.
+  if (n == null || n === 32) return undefined;
+  return n;
 };
-// Context for the copied card's own hooks: drop the copy-target uid so the copied
-// effect reads its targets from the remaining moods.
-const copiedCtx = (ctx: PlayContext): PlayContext => ({
-  ...ctx,
-  choices: { ...ctx.choices, moods: (ctx.choices.moods ?? []).slice(1) },
-});
 registerEffects(32, {
   canPlay: (ctx) => {
     const n = copyTarget(ctx);
     if (n == null) return true;
     ctx.self.copyOf = n; // adopt identity before any cost/value resolves
     const eff = effectsFor(n);
-    return eff.canPlay ? eff.canPlay(copiedCtx(ctx)) : true;
+    return eff.canPlay ? eff.canPlay(ctx) : true;
   },
   payCost: (ctx) => {
     const n = copyTarget(ctx);
     if (n == null) return;
     ctx.self.copyOf = n;
-    effectsFor(n).payCost?.(copiedCtx(ctx));
+    effectsFor(n).payCost?.(ctx);
   },
   afterPlaying: (ctx) => {
     const n = copyTarget(ctx);
     if (n == null) return;
     ctx.self.copyOf = n;
-    effectsFor(n).afterPlaying?.(copiedCtx(ctx));
+    effectsFor(n).afterPlaying?.(ctx);
   },
 });
 

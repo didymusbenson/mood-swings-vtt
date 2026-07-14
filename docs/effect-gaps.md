@@ -1,8 +1,8 @@
 # Effect encoding — known gaps & data notes
 
-Status of full-automation encoding. All 130 cards are registered and the suite is
-green; this tracks the approximations and the primitives worth adding for 100%
-fidelity.
+Status of full-automation encoding. All 130 playable cards are registered and fully
+modelled — there are **no remaining approximations**. This file is now a record of the
+engine primitives that were added to reach 100% fidelity (see "Recently closed").
 
 ## Data correction — inline rules-text values (RESOLVED via card-notes)
 
@@ -87,18 +87,20 @@ Wonder (#133 +[2]). Printed `value`/`secondaryValue` were already correct.
 - **Round-scoped discard counter** — #132 Vulnerability. `GameState.discardedThisRound`
   counts discards from any zone this round (reset each round), so a pile carried over
   from prior rounds no longer wrongly triggers it.
+- **Creativity copy + independent copied-card targets** — #32 Creativity. The copy
+  target now lives in its OWN field, `choices.copy` (a card number), chosen in the UI
+  via a dedicated `copy` slot (`TargetKind: 'copy'`); the copied card's own targets flow
+  through `choices.moods`/`players`/`cards`/… with no positional collision, so a copied
+  card that itself targets moods (e.g. Conviction #6) resolves correctly. Creativity
+  delegates canPlay/payCost/afterPlaying to the copied card; every while-in-play /
+  scoring hook resolves through `copyOf` automatically. The app walks the copied card's
+  spec as a second stage after the copy is chosen (drag or manual). Verified end-to-end
+  in the browser (copy a [4] mood → the Creativity mood scores [4]) and by unit tests.
 
-## Missing engine primitives (best-effort today; flagged by encoders)
+## Missing engine primitives
 
-These effects are implemented as far as the current API allows (often logged or
-approximated) without crashing; adding the primitive would make them fully faithful.
-
-- **Creativity dual mood-target disambiguation** — #32 Creativity now copies a mood
-  in play (`choices.moods[0]`), adopts value/colour/abilities via `copyOf` set before
-  cost resolution, and DOES pay the copied card's "To play" cost (its canPlay/payCost
-  are delegated; `choices.moods[1..]` feed the copied card's own mood targets).
-  Residual: a copied card that needs two independent *mood-target lists* can't be
-  disambiguated from the single shared `moods` array (rare in the set).
+None. All 130 playable cards are faithfully modelled with no approximations. (#135
+Hurt Feelings remains the 3+-player, non-scoring helper — see below.)
 
 Hand-to-hand card passing (#31 Confusion, #49 Rationalization, #85 Chaos,
 #86 Compulsion, #106 Zeal) is done via direct `ctx.state` mutation (sanctioned by

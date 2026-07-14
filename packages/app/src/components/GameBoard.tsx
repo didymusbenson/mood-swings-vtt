@@ -425,6 +425,8 @@ function slotNoun(slot: ChoiceSlot, plural: boolean): string {
       return plural ? 'numbers' : 'a number';
     case 'choice':
       return plural ? 'options' : 'an option';
+    case 'copy':
+      return plural ? 'moods to copy' : 'a mood to copy';
   }
 }
 
@@ -494,7 +496,7 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
               );
             })}
 
-          {slot.kind === 'mood' && (
+          {(slot.kind === 'mood' || slot.kind === 'copy') && (
             <div className="target-fan">
               {(legal?.moods ?? []).length === 0 && <p className="muted">No valid moods.</p>}
               {(legal?.moods ?? []).map((uid) => {
