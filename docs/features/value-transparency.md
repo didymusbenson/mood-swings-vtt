@@ -161,8 +161,12 @@ into other features.)_
   mood's `currentValue` live in state (recomputed on every play, at scoring, and
   after draws), so the Preview just reads the current value — no snapshotting
   needed. Confirm no special handling wanted.
-- **Would-be trigger.** How is the "considered" hand card chosen — hover, select?
-  And does the projection also apply to cards playable from the **discard pile**?
+- **Would-be trigger (considered *for play*).** For a card in your **hand** that
+  you're weighing whether to play, how do you designate it so the Preview shows its
+  would-be value — **hover** or **select**? (Note "considered *as a target*" is a
+  different surface, already handled by the pre-submit decision-modal preview.)
+  Also: only the active player's own hand, and does it extend to cards playable
+  from the **discard pile**?
 - Relationship to the Animations **point-value reveal** — the reveal is the moment
   a value appears after a play; this is the persistent inspect view. Shared
   component/formatting?
