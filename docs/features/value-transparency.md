@@ -29,8 +29,12 @@ Split the Preview into two stacked regions:
   - **In play (a mood):**
     - **Controlled by:** which player currently controls the mood.
     - **Current value:** the computed value in the present board state.
-    - **Modifying rule highlighted:** the specific clause of the rules text that is
-      currently driving/modifying the value is highlighted.
+    - **Modifying rule highlighted:** when the card's *own* text drives its value,
+      the specific clause of its rules text is highlighted (e.g. Animosity below).
+    - **Modified by {cardname}:** when the value is changed by **another** card
+      (e.g. suppression or a value-drop from a different mood), show explanation
+      text under Current value naming the responsible card — e.g.
+      *"Modified by Disgust."* (More than one modifier may apply.)
   - **In a hand:** e.g. **"In your hand"** (or which player's hand).
   - **In the discard pile:** e.g. **"In discard."**
   - (Other zones/states may matter too — e.g. in the deck; see open questions.)
@@ -59,12 +63,6 @@ into other features.)_
 
 ### Things Claude wants to ask about
 
-- **External modifiers.** The Animosity example is *self*-modification (the card's
-  own text drives its value). But a value can be changed by **another** card —
-  suppression from an opposing mood, a value-drop from someone else's while-in-play
-  effect, a count-based query, etc. In those cases the modifying rule isn't on the
-  previewed card. What do we highlight then — nothing on this card, a "modified by
-  {other card}" note, or a pointer to the responsible mood?
 - **Highlight mechanism.** Identifying *which clause* to highlight means mapping a
   computed value back to the specific rule/condition that produced it. The engine
   computes values but may not currently expose that provenance — likely the "pain"
@@ -88,3 +86,5 @@ into other features.)_
 - The top region is **location-aware**: for a mood in play it shows Controlled by
   / Current value / modifying-rule highlight; for other zones it shows where the
   card is (e.g. "In your hand", "In discard") rather than being omitted.
+- **External modifiers** get an explanatory **"Modified by {cardname}"** line
+  under Current value (self-modification uses the rules-text highlight instead).
