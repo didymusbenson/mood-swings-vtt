@@ -39,10 +39,11 @@ Split the Preview into two stacked regions:
       (e.g. suppression or a value-drop from a different mood), show explanation
       text under Current value naming the responsible card — e.g.
       *"Modified by Disgust."* (More than one modifier may apply.)
-  - **Being considered for play (a card in hand):** the Preview shows a *would-be*
-    computed value + modifiers, but **only from information that is static and
-    already known** — i.e. the value the card would have on entry given the board
-    **as it currently is**. Scope rules:
+  - **A card in your hand (would-be value):** any hand card whose value is
+    **objectively computable** shows its *would-be* value **at all times** — not
+    only when previewed (see *Always-on computation* below). This uses **only
+    information that is static and already known** — the value the card would have
+    on entry given the board **as it currently is**. Scope rules:
     - **Self-include.** The card counts **itself** as if already in play — playing
       it *is* a fact, so count-based values reflect its own presence. E.g. you have
       2 moods and the opponent has 3; the would-be for Superiority (`[6][1]` if you
@@ -70,6 +71,35 @@ Split the Preview into two stacked regions:
 
 > Note: this reorganization (printed details on the bottom, live game-state on
 > top) may be the fiddly part.
+
+## Always-on computation & Preview triggers
+
+**Always-on computation.** Every card that *can* have an objective computed value
+**is** computed and displayed — whether or not it's in the Preview — unless doing
+so proves overwhelmingly taxing on the engine. So a hand card's objective would-be
+value and the computed-value indicator are visible on the card itself, not gated
+behind opening the Preview.
+
+- "Objective" = derivable from static/known state with no player choices: the
+  self-included would-be, this-turn values, and static field modifiers all
+  qualify. **Target/cost-dependent** values (e.g. Creativity's copy target) are
+  *not* objective, so they aren't computed passively — they resolve in the
+  decision-modal preview once the choices are made.
+- Fixed-value cards (plain white die, no dynamic logic) need no computation; they
+  just show their printed value.
+- **Engine-cost caveat:** a would-be is a dry-run of the existing `stabilise()`
+  fixpoint with the card hypothetically added; one per dynamic-value hand card per
+  state change. Expected to be cheap (small fixpoint over moods in play), but this
+  is the "unless overwhelmingly taxing" escape hatch if profiling says otherwise.
+
+**Opening the Preview (detail panel).** The detailed Preview is triggered by:
+
+- **Mouse:** hovering a card for **more than 1 second**.
+- **Touch / click:** a tap or click triggers it **instantly** (mobile-friendly).
+
+Designating a card for *play* is a separate gesture (click-then-"Play", or
+press-and-drag onto the field) and always runs the computation too — but since
+computation is always-on, no special "considering" state is needed for it.
 
 ### Worked example — Animosity
 
@@ -161,12 +191,9 @@ into other features.)_
   mood's `currentValue` live in state (recomputed on every play, at scoring, and
   after draws), so the Preview just reads the current value — no snapshotting
   needed. Confirm no special handling wanted.
-- **Would-be trigger (considered *for play*).** For a card in your **hand** that
-  you're weighing whether to play, how do you designate it so the Preview shows its
-  would-be value — **hover** or **select**? (Note "considered *as a target*" is a
-  different surface, already handled by the pre-submit decision-modal preview.)
-  Also: only the active player's own hand, and does it extend to cards playable
-  from the **discard pile**?
+- **Would-be scope beyond hand.** Does the always-on would-be also apply to cards
+  playable from the **discard pile** (some are), and to whose hand — active
+  player's only, or any hand card inspected?
 - Relationship to the Animations **point-value reveal** — the reveal is the moment
   a value appears after a play; this is the persistent inspect view. Shared
   component/formatting?
@@ -191,3 +218,7 @@ into other features.)_
 - The **game log** gains a per-round **score explanation**, collapsed by default
   and expanded by clicking the round; depth = **each mood with its computed
   value**, no deeper.
+- **Always-on computation:** every card with an objective computation is computed
+  and shown whether previewed or not (engine cost permitting). Preview detail opens
+  on **mouse hover >1s** or an **instant tap/click** (mobile-friendly). No separate
+  "considered for play" designation is needed — computation is always live.
