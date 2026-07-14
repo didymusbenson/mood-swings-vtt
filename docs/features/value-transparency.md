@@ -9,6 +9,12 @@ count-based queries like `moodiest` / `most common color` / `total value`), so a
 number on the board can be hard to trust or understand. Surface a card's
 **computed value** so players can see what a card is currently worth.
 
+> **Guiding principle:** value transparency is **consistent across the whole game
+> interface**, not just the Preview and log. Wherever a value appears — board
+> tiles, the Preview, the decision modal, the log — a computed/modified value is
+> shown and marked as such. The Preview and log are the deepest surfaces, but the
+> treatment (e.g. the computed-value indicator) applies everywhere a value renders.
+
 ## Brief (captured)
 
 - The transparency lives in the **Preview** area.
