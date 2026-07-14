@@ -29,5 +29,19 @@ export {
   type HandFilter,
   type CardLookup,
 } from './cards/choice-spec.js';
+export {
+  registerHighlight,
+  highlightFor,
+  type HighlightMeta,
+} from './cards/highlights.js';
+export {
+  wouldBeValue,
+  valueProvenance,
+  TARGET_DEPENDENT_VALUE_CARDS,
+  type WouldBeResult,
+  type WouldBeChoices,
+  type ValueProvenance,
+  type ExternalModifier,
+} from './value-transparency.js';
 // Importing the card index registers all effects AND specs as a side effect.
 import './cards/index.js';

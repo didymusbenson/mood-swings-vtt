@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import type { LogEntry } from '@mood-swings/engine';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { LogEntry, ScoreBreakdown } from '@mood-swings/engine';
 import { kindStyle, visibleMessage } from '../game/log.js';
 
 interface ActivityLogProps {
@@ -12,16 +12,66 @@ interface ActivityLogProps {
   viewerId?: string;
 }
 
+/** That round's collapsible per-mood score explanation (Value Transparency). */
+function RoundScore({ scores }: { scores: ScoreBreakdown[] }) {
+  return (
+    <div className="log__score">
+      {scores.map((s) => (
+        <div key={s.player} className="log__score-player">
+          <div className="log__score-head">
+            <span className="log__score-name">{s.playerName}</span>
+            <span className="log__score-total">{s.total}</span>
+          </div>
+          {s.moods.length === 0 ? (
+            <p className="log__score-empty muted">No moods.</p>
+          ) : (
+            <ul className="log__score-moods">
+              {s.moods.map((m, i) => (
+                <li key={i} className="log__score-mood">
+                  <span className="log__score-mood-name">{m.name}</span>
+                  <span className="log__score-mood-val">{m.value}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * Chat-style activity log: newest at the bottom, auto-scrolled into view,
- * subtly grouped by round and accented by kind.
+ * subtly grouped by round and accented by kind. Each scored round carries a
+ * per-mood score explanation — collapsed by default, expanded by clicking the
+ * round header.
  */
 export function ActivityLog({ log, viewerId }: ActivityLogProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
+  // Which rounds have their score explanation expanded (collapsed by default).
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  // A round's score breakdown lives on its 'score' entry — index it by round so
+  // the round header (rendered at the round's first entry) can reveal it.
+  const scoreByRound = useMemo(() => {
+    const map = new Map<number, ScoreBreakdown[]>();
+    for (const e of log) {
+      if (e.kind === 'score' && e.scores) map.set(e.round, e.scores);
+    }
+    return map;
+  }, [log]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [log.length]);
+
+  const toggle = (round: number) =>
+    setExpanded((cur) => {
+      const next = new Set(cur);
+      if (next.has(round)) next.delete(round);
+      else next.add(round);
+      return next;
+    });
 
   return (
     <div className="panel log">
@@ -32,13 +82,31 @@ export function ActivityLog({ log, viewerId }: ActivityLogProps) {
             const prev = log[i - 1];
             const newRound = !prev || prev.round !== entry.round;
             const style = kindStyle(entry.kind);
+            const scores = scoreByRound.get(entry.round);
+            const isOpen = expanded.has(entry.round);
             return (
               <li key={i} className="log__item">
-                {newRound && (
-                  <div className="log__round-sep" aria-hidden>
-                    <span>Round {entry.round}</span>
-                  </div>
-                )}
+                {newRound &&
+                  (scores ? (
+                    <>
+                      <button
+                        type="button"
+                        className={`log__round-sep log__round-sep--btn ${isOpen ? 'is-open' : ''}`}
+                        aria-expanded={isOpen}
+                        onClick={() => toggle(entry.round)}
+                      >
+                        <span className="log__round-caret" aria-hidden>
+                          {isOpen ? '▾' : '▸'}
+                        </span>
+                        <span>Round {entry.round}</span>
+                      </button>
+                      {isOpen && <RoundScore scores={scores} />}
+                    </>
+                  ) : (
+                    <div className="log__round-sep" aria-hidden>
+                      <span>Round {entry.round}</span>
+                    </div>
+                  ))}
                 <div className={`log__entry log__entry--${style.accent}`}>
                   <span className="log__icon" aria-hidden>
                     {style.icon}

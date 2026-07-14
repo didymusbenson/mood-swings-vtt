@@ -15,4 +15,7 @@ import './specs/black.js';
 import './specs/red.js';
 import './specs/green.js';
 
+// Value-highlight provenance (Value Transparency). Importing registers the map.
+import './highlights.js';
+
 export { registerEffects, effectsFor, CardDB } from './registry.js';

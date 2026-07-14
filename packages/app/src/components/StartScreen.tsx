@@ -4,6 +4,7 @@ import { randomBoxDeck, validateCustomDeck, minDeckSize } from '@mood-swings/eng
 import { db } from '../game/db.js';
 import { Card } from './Card.js';
 import { Starburst } from './Starburst.js';
+import { HowToPlay } from './HowToPlay.js';
 
 export interface StartConfig {
   players: { id: string; name: string }[];
@@ -33,6 +34,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
   const [p1, setP1] = useState('Player 1');
   const [p2, setP2] = useState('Player 2');
   const [tab, setTab] = useState<'random' | 'custom'>('random');
+  const [showRules, setShowRules] = useState(false);
 
   const [seed, setSeed] = useState<number>(() => randomSeed());
   const [randomDeck, setRandomDeck] = useState<number[]>(() => randomBoxDeck(db, seed).deck);
@@ -77,12 +79,19 @@ export function StartScreen({ onStart }: StartScreenProps) {
     });
   };
 
+  if (showRules) {
+    return <HowToPlay onBack={() => setShowRules(false)} />;
+  }
+
   return (
     <div className="start">
       <header className="start__header">
         <Starburst className="start__burst" label="1st Ed." />
         <h1>Mood Swings</h1>
         <p className="start__tag">Hotseat — two players, one screen</p>
+        <button className="btn start__howto" onClick={() => setShowRules(true)}>
+          How to Play
+        </button>
       </header>
 
       <section className="panel">

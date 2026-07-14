@@ -121,6 +121,27 @@ export type LogKind =
   | 'info';
 
 /**
+ * Per-mood contribution to a player's round score (Value Transparency: the log's
+ * expandable per-round score explanation). Depth is one line per mood with its
+ * computed value — no deeper modifier breakdown (that lives in the Preview).
+ */
+export interface ScoreMood {
+  /** Display name of the mood (resolves copies to their source card). */
+  name: string;
+  /** The mood's computed value at scoring time. */
+  value: number;
+}
+
+/** One player's round-score breakdown, attached to a 'score' log entry. */
+export interface ScoreBreakdown {
+  player: PlayerId;
+  playerName: string;
+  /** The player's final round total (includes any extra-scoring contributions). */
+  total: number;
+  moods: ScoreMood[];
+}
+
+/**
  * A single trace entry. `message` is the public text everyone sees. For hidden
  * information (e.g. a drawn card's identity), set `private` to the only player
  * who may see `message`; other viewers see `redacted` instead. In the v1 hotseat
@@ -134,6 +155,12 @@ export interface LogEntry {
   actor?: PlayerId;
   private?: PlayerId;
   redacted?: string;
+  /**
+   * Present on `kind: 'score'` entries: the per-player, per-mood value breakdown
+   * captured at scoring time (moods leave play at round end, so the log retains
+   * its own snapshot). Drives the log's expandable per-round score explanation.
+   */
+  scores?: ScoreBreakdown[];
 }
 
 export interface GameState {

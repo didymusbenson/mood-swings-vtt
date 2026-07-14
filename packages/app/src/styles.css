@@ -40,6 +40,11 @@
   --ok: #3f9d5a;
   --bad: #c0392b;
 
+  /* Value Transparency — computed-value indicator (glow on a modified value). */
+  --computed: #c77d16;
+  --computed-glow: rgba(199, 125, 22, 0.7);
+  --computed-wash: rgba(199, 125, 22, 0.14);
+
   /* The five card border colours + colourless */
   --c-white: #b8952f;
   --c-blue: #2f6fb0;
@@ -1921,6 +1926,266 @@ input:focus-visible {
 }
 
 /* ============================================================================
+   Rules reference (main-menu How to Play + in-game "(?)" modal)
+   ========================================================================== */
+/* A round icon button (the in-game "(?)"). */
+.btn--icon {
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.start__howto {
+  margin-top: 0.6rem;
+}
+
+/* --- The dedicated full-screen How to Play view --- */
+.howto {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+.howto__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.4rem;
+  border-bottom: 2px solid var(--line-strong);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+.howto__titles {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+.howto__header h1 {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  margin: 0;
+  transform: rotate(-1deg);
+}
+.howto__tag {
+  font-family: var(--font-hand);
+  color: var(--ink-soft);
+  margin: 0;
+  font-size: 1rem;
+}
+.howto__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.2rem;
+  max-width: 980px;
+  width: 100%;
+  margin: 0 auto;
+}
+.howto__sec h2 {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  border-bottom: 2px dashed var(--line);
+  padding-bottom: 0.2rem;
+  margin-bottom: 0.7rem;
+}
+.howto__sec h3 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  margin: 1rem 0 0.4rem;
+}
+.howto__sec p,
+.howto__sec li {
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+.howto__sec ul,
+.howto__sec ol {
+  padding-left: 1.3rem;
+  margin: 0.4rem 0;
+}
+.howto__sec li {
+  margin-bottom: 0.35rem;
+}
+.howto__link a,
+.howto__foot a {
+  color: var(--accent);
+  font-family: var(--font-hand);
+  font-size: 1.05rem;
+}
+.howto__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2em;
+  height: 1.2em;
+  margin: 0 0.15em;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  font-size: 0.8em;
+  font-family: var(--font-display);
+  vertical-align: baseline;
+}
+.howto__glossary {
+  margin: 0;
+}
+.howto__gloss-row {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) 1fr;
+  gap: 0.4rem 1rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px dotted var(--line);
+}
+.howto__gloss-row dt {
+  font-family: var(--font-hand);
+  font-weight: 400;
+  color: var(--ink);
+  font-size: 1rem;
+}
+.howto__gloss-row dd {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.howto__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1.4rem 0 0.5rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--line-strong);
+}
+
+/* --- Example-card figures (shared) --- */
+.rules-figrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0.8rem 0;
+  align-items: flex-start;
+}
+.rules-fig {
+  margin: 0;
+  width: var(--card-w);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.rules-fig__card {
+  display: flex;
+}
+.rules-fig__cap {
+  font-family: var(--font-hand);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+.rules-fig__name {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 1rem;
+  color: var(--ink);
+}
+.rules-fig__text {
+  display: block;
+  margin-top: 0.2rem;
+}
+.rules-fig__note {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* --- Anatomy of a card (labeled figure) --- */
+.rules-anatomy {
+  display: flex;
+  gap: 1.4rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin: 0.8rem 0;
+}
+.rules-anatomy__card {
+  margin: 0;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: center;
+  font-family: var(--font-hand);
+  font-size: 0.85rem;
+}
+.rules-anatomy__legend {
+  flex: 1;
+  min-width: 260px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.rules-anatomy__legend li {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px dotted var(--line);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+.rules-anatomy__pin {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  background: var(--accent-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+.rules-anatomy__body strong {
+  font-family: var(--font-hand);
+}
+
+/* --- Simplified rules (in-game modal body) --- */
+.rules-simple__lede {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  margin: 0 0 0.6rem;
+}
+.rules-simple__sec {
+  margin-bottom: 0.7rem;
+}
+.rules-simple__title {
+  font-family: var(--font-hand);
+  font-size: 1.1rem;
+  margin: 0 0 0.15rem;
+  color: var(--ink);
+}
+.rules-simple__body {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+/* ============================================================================
    Responsive
    ========================================================================== */
 /* Below the fixed-layout target range, fall back to a scrolling stack so the
@@ -1958,5 +2223,224 @@ input:focus-visible {
   }
   .starburst svg {
     animation: none;
+  }
+}
+
+/* ============================================================================
+   Value Transparency
+   ========================================================================== */
+
+/* Computed-value indicator — a modified/calculated value glows (Slay-the-Spire
+   style) so it reads as "not the printed die" at a glance. The shared DiceValue
+   element carries this, so the board tiles, preview, and decision modal all match
+   (and the Animations point-value reveal will animate the same element). */
+.dice--computed {
+  border-radius: 8px;
+  background: radial-gradient(closest-side, var(--computed-wash), transparent);
+  outline: 1.5px solid var(--computed-glow);
+  outline-offset: 1px;
+}
+.dice--computed .die {
+  filter: drop-shadow(0 0 3px var(--computed-glow)) drop-shadow(1px 1px 0 rgba(44, 42, 37, 0.25));
+}
+.dice--computed .dice__plus {
+  color: var(--computed);
+}
+.card__die--overlay .dice--computed {
+  outline: none;
+  background: none;
+}
+.card__die--overlay .dice--computed .die {
+  filter: drop-shadow(0 0 3px var(--computed-glow)) drop-shadow(1px 1px 0 rgba(44, 42, 37, 0.4));
+}
+.card__compact-value--computed {
+  color: var(--computed);
+  font-weight: 700;
+  text-shadow: 0 0 5px var(--computed-glow);
+}
+
+/* Preview — top (dynamic game-state) region above the printed details. */
+.preview__state {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.45rem 0.55rem;
+  border: 1.5px dashed var(--computed-glow);
+  border-radius: 8px;
+  background: var(--computed-wash);
+}
+.preview__state-facts {
+  margin: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.6rem;
+  font-size: 0.85rem;
+}
+.preview__state-facts > div {
+  display: contents;
+}
+.preview__state-facts dt {
+  font-family: var(--font-hand);
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  align-self: center;
+}
+.preview__state-facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+.preview__modby {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.preview__modby strong {
+  color: var(--computed);
+}
+/* The self-modifying clause highlighted inside the printed rules text. */
+.preview__hl {
+  background: var(--computed-wash);
+  color: inherit;
+  border-bottom: 2px solid var(--computed-glow);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+/* Decision modal — "Playing {CARDNAME}" left rail with the live computed value. */
+.overlay__panel--playing {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  max-width: min(94vw, 860px);
+}
+.overlay__main {
+  min-width: 0;
+  flex: 1;
+}
+.overlay__playing {
+  flex: none;
+  width: calc(var(--card-w) + 1.2rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border-right: 1.5px dashed var(--line-strong);
+}
+.overlay__playing-label {
+  font-family: var(--font-hand);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.overlay__playing-name {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  margin: 0;
+  text-align: center;
+  line-height: 1.05;
+}
+.overlay__playing-value {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.15rem 0 0;
+  font-family: var(--font-hand);
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+/* Activity log — expandable per-round score explanation. */
+.log__round-sep--btn {
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--font-hand);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0;
+}
+.log__round-sep--btn:hover {
+  color: var(--ink);
+}
+.log__round-caret {
+  flex: none;
+  color: var(--ok);
+  font-size: 0.9em;
+}
+.log__score {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.15rem 0 0.4rem;
+  padding: 0.4rem 0.5rem;
+  border-left: 2px solid var(--ok);
+  background: rgba(63, 157, 90, 0.07);
+  border-radius: 4px;
+}
+.log__score-player {
+  flex: 1 1 45%;
+  min-width: 120px;
+}
+.log__score-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.1rem;
+  margin-bottom: 0.15rem;
+}
+.log__score-name {
+  font-family: var(--font-hand);
+  font-weight: 600;
+}
+.log__score-total {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--ok);
+}
+.log__score-moods {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.log__score-mood {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  padding: 0.02rem 0;
+}
+.log__score-mood-val {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+.log__score-empty {
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+/* On a narrow / stacked layout the modal rail sits on top, not beside. */
+@media (max-width: 640px) {
+  .overlay__panel--playing {
+    flex-direction: column;
+  }
+  .overlay__playing {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1.5px dashed var(--line-strong);
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 }
