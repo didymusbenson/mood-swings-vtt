@@ -74,11 +74,24 @@ Split the Preview into two stacked regions:
 
 ## Always-on computation & Preview triggers
 
-**Always-on computation.** Every card that *can* have an objective computed value
-**is** computed and displayed — whether or not it's in the Preview — unless doing
-so proves overwhelmingly taxing on the engine. So a hand card's objective would-be
-value and the computed-value indicator are visible on the card itself, not gated
-behind opening the Preview.
+**Playable vs. read-only (what governs whether a value is computed).** Computed
+values appear only where a card is *actionable*; a card merely being **read** shows
+its **printed** value.
+
+- **Computed** shows for:
+  - a **mood in play** → its current computed value;
+  - a card you could **play** → a card in **your hand**, or a card in a
+    **play-from-discard** selection → its would-be computed value.
+- **Printed only** shows for a card being **read**, not acted on — browsing the
+  **discard inspector**, a **revealed** card, or inspecting purely for information.
+- Example: **play from discard → computed**; **view that same card in the discard
+  inspector → printed.**
+
+**Always-on computation.** Within the actionable contexts above, every card that
+*can* have an objective computed value **is** computed and displayed — whether or
+not it's in the Preview — unless doing so proves overwhelmingly taxing on the
+engine. So a playable hand card's objective would-be value and the computed-value
+indicator are visible on the card itself, not gated behind opening the Preview.
 
 - "Objective" = derivable from static/known state with no player choices: the
   self-included would-be, this-turn values, and static field modifiers all
@@ -195,9 +208,6 @@ into other features.)_
   mood's `currentValue` live in state (recomputed on every play, at scoring, and
   after draws), so the Preview just reads the current value — no snapshotting
   needed. Confirm no special handling wanted.
-- **Would-be scope beyond hand.** Does the always-on would-be also apply to cards
-  playable from the **discard pile** (some are), and to whose hand — active
-  player's only, or any hand card inspected?
 - Relationship to the Animations **point-value reveal** — the reveal is the moment
   a value appears after a play; this is the persistent inspect view. Shared
   component/formatting?
@@ -229,3 +239,6 @@ into other features.)_
 - **Highlight provenance:** handled at build time by a per-card research spike /
   agent team; per-card hard-coded highlight text + conditions is an acceptable
   fallback, attached to each card's effect registration.
+- **Computed vs. printed by context:** computed shows in **actionable** contexts
+  (moods in play; playable hand cards; play-from-discard). A card merely **read**
+  (discard inspector, revealed card, info-only) shows its **printed** value.
