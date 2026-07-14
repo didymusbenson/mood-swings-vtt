@@ -21,12 +21,30 @@ reference in the in-game toolbar.
 - **Links back to MaRo's post** on the Wizards site:
   <https://magic.wizards.com/en/news/feature/mood-swings-extended-rules>
 
-> **Source note:** The original PDF is **not in the repo** (it was uploaded in an
-> earlier session to produce `docs/RULES.md` but never committed, so it's not
-> available this session). To build the view we either (a) re-upload the PDF for a
-> faithful rip, or (b) reconstruct from [`docs/RULES.md`](../RULES.md), which is
-> mechanically complete but condensed and carries some build/authoring notes to
-> strip. Decision pending.
+> **Source note:** The original PDF was re-supplied and reviewed in full (15
+> pages). Its mechanical content is **already fully captured** in
+> [`docs/RULES.md`](../RULES.md) — anatomy of a card, deck/setup, round
+> structure, the effect-resolution pipeline (incl. the Worry/Hostility and Rage
+> worked examples), scoring/after-scoring/Sneakiness, and the complete vocabulary
+> glossary. So the view's **text** can be built from `docs/RULES.md` without
+> needing the PDF again. The PDF is **not committed** (WotC IP + 1.4 MB), same
+> policy as the card art.
+>
+> **Recommended build:** a **reconstruction** — lay out the rules text from
+> `docs/RULES.md`, and render the example-card figures with the app's **own card
+> renderer** (from `data/cards.json`) rather than lifting the PDF's WotC art, to
+> stay consistent with the "don't commit card art" policy. (A literal PDF rip
+> would re-introduce that art.)
+
+### Example cards used by the extended rules (for figures)
+
+The extended rules illustrate points with these specific cards — reconstruct
+them with our renderer where the view references them:
+**Creativity**, **Self-Loathing**, **Patience**, **Disgust**, **Rage**,
+**Superiority**, **Worry**, **Hostility**, **Bashfulness**, **Recklessness**,
+**Sneakiness** — plus the **"anatomy of a card"** labeled diagram (callouts
+1–12: name, frame, reminder icon, value, art, rules text, secondary value, first
+edition symbol, collector number, color, artist, rarity).
 
 ### 2. In-game toolbar — "(?)" simplified reference
 
@@ -77,11 +95,11 @@ _For additional rules information, please visit: SecretLair.Wizards.com/MoodSwin
 
 ## Open questions / to refine
 
-- **Source for the dedicated view (pending):** re-upload the original PDF for a
-  faithful rip, or reconstruct from `docs/RULES.md` (+ example cards)? See the
-  Source note above.
+- Confirm the **reconstruction** approach (own-rendered example cards, text from
+  `docs/RULES.md`) vs. a literal PDF rip — see Recommended build above.
 - Should the in-game **(?)** modal also offer a "full rules" jump-off (to the
   dedicated rules view and/or the external link), or stay simplified-only?
 
 **Resolved:** Main-menu How to Play is a **dedicated full-screen view** (not a
-modal). Content may be a direct PDF rip or a reconstruction with example cards.
+modal). Source content confirmed available and fully captured in
+`docs/RULES.md`; PDF not committed (IP).
