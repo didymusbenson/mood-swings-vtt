@@ -1,11 +1,19 @@
 # Feature: Deckbuilder Overhaul
 
-> **Status:** Refined — fully locked, implementation underway. All product forks
-> resolved via chat; rulings recorded below. **Desktop-first** — mobile is a
-> separate deferred feature (`docs/features/mobile-responsive.md`). Lives in the
-> **Deckbuilder** tab of `StartScreen`
-> (`packages/app/src/components/StartScreen.tsx`); engine helpers in
-> `packages/engine/src/deck.ts`.
+> **Status:** Implemented & verified. All product forks resolved via chat
+> (rulings below) and built. Typecheck clean; engine 102/102; app 116/116 (72
+> foundation + 44 new module tests); production build succeeds; a headless-browser
+> smoke drove the real flow (tab open, reminder banner, all four views, add +
+> editable stepper, full-text search, detail modal with Rosewater notes, hover
+> preview, unsaved-changes guard, and the View-in-deckbuilder 45-card bridge) with
+> no JS errors. **Desktop-first** — mobile is a separate deferred feature
+> (`docs/features/mobile-responsive.md`).
+>
+> **Files:** engine `packages/engine/src/{types,data,deck,index}.ts`; data tool
+> `tools/merge-notes.mjs` → `data/card-notes.json`; app modules
+> `packages/app/src/game/{deckModel,browse,deckText,deckStorage}.ts`; UI
+> `packages/app/src/components/deckbuilder/**` (+ `views/*`); wired into
+> `StartScreen.tsx`; styles under the `.dbx-` prefix in `styles.css`.
 
 ## Summary
 
