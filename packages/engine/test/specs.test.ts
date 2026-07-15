@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { loadCardDB, type RawCard } from '../src/data.js';
-import { specFor, legalTargets, playedMoodQualifies, slotApplies, type ChoiceSlot } from '../src/cards/choice-spec.js';
+import { specFor, legalTargets, playedMoodQualifies, slotApplies, SELF_TARGET, type ChoiceSlot } from '../src/cards/choice-spec.js';
 import type { GameState, Mood } from '../src/types.js';
 import '../src/cards/index.js'; // registers all effects + specs
 
@@ -178,6 +178,38 @@ describe('card target specs', () => {
       expect(legal).toEqual(['m2a']); // only p2's mood
       expect(legal).not.toContain('m1a'); // NOT the acting player p1 — the reported bug
       expect(legal).not.toContain('m3a'); // NOT an unchosen third seat
+    });
+
+    // Anxiety #28 is the only reported-again card that is BOTH `from: 'chosen'` AND
+    // `selfTargetable`. The UI's `legalNow` wraps `legalTargets` with a self-target
+    // branch (usePlayInteraction.ts): it prepends the SELF_TARGET sentinel ONLY when
+    // the acting player is among the chosen. This faithfully replays that branch to
+    // prove that choosing p2 (not p1) never surfaces p1's own moods — the exact report.
+    const legalNowMoods = (num: number, me: string, chosen: string[]): string[] => {
+      const spec = specFor(num)!;
+      const slot = spec.slots[1]!;
+      const legal = legalTargets(slot, board, me, look, { players: chosen });
+      let moods = legal.moods ?? [];
+      if (slot.kind === 'mood' && slot.selfTargetable) {
+        const hasPlayerSlot = spec.slots.some((s) => s.kind === 'player');
+        const iAmChosen = !hasPlayerSlot || chosen.includes(me);
+        // The played mood's would-be value isn't modelled here; p1's m1a is [3] (odd),
+        // so a self-target would qualify — the guard is `iAmChosen`, which is what matters.
+        if (iAmChosen && playedMoodQualifies(slot, look(28), 3)) moods = [SELF_TARGET, ...moods];
+      }
+      return moods;
+    };
+
+    it('Anxiety #28 (from:chosen + selfTargetable): choosing p2 never offers p1 moods', () => {
+      const slot = specFor(28)!.slots[1]!;
+      expect(slot).toMatchObject({ mood: { from: 'chosen', valueParity: 'odd' }, selfTargetable: true });
+      // p1 acting, chose only p2 → only p2's odd mood; p1's own odd mood must NOT appear.
+      const legal = legalNowMoods(28, 'p1', ['p2']);
+      expect(legal).toEqual(['m2a']);
+      expect(legal).not.toContain('m1a'); // p1's odd mood — the reported bug
+      expect(legal).not.toContain(SELF_TARGET); // p1 not chosen → no self-target
+      // Sanity: if p1 DOES choose itself, its own moods + self-target become legal.
+      expect(legalNowMoods(28, 'p1', ['p1'])).toEqual([SELF_TARGET, 'm1a']);
     });
 
     it('spans the union of chosen players and still honours the value filter', () => {
