@@ -34,6 +34,23 @@ const game = (deck: number[]) => {
 };
 
 describe('blue cards', () => {
+  it('#31 Confusion passes each player’s OWN chosen card (pooled choices.cards)', () => {
+    // p1 hand: [31, 44, ...5]; p2 hand: [83, ...5]. p1 plays Confusion and both players
+    // pass a card. `choices.cards` pools both picks; each must move that player's card.
+    const { e, s } = game(rig([31, 44], [83]));
+    const g: GameState = e.apply(s, {
+      type: 'play',
+      player: 'p1',
+      card: 31,
+      choices: { option: 'right', cards: [44, 83] },
+    });
+    // p1 passed 44 to p2; p2 passed 83 to p1 (2-player: both directions swap).
+    expect(g.hands.p2).toContain(44);
+    expect(g.hands.p1).toContain(83);
+    expect(g.hands.p1).not.toContain(44);
+    expect(g.hands.p2).not.toContain(83);
+  });
+
   it('#27 Ambivalence is [6] alone, [3] with two red/green moods', () => {
     // p1 plays Ambivalence; p2 brings two red (Boredom) moods into play.
     const { e, s } = game(rig([27], [83, 83], 83));

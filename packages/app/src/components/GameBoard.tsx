@@ -24,6 +24,8 @@ interface GameBoardProps {
   localSeat: PlayerId;
   /** The seat pinned to the bottom of the table for this client (orientation). */
   viewerSeat: PlayerId;
+  /** Networked play: stop the active player's flow before opponent-owned slots. */
+  delegate?: boolean;
 }
 
 /** Fixed seat position on the table (F2 — never swaps by turn). */
@@ -772,8 +774,8 @@ function DragGhost({ handDrag }: { handDrag: HandDragApi }) {
   );
 }
 
-export function GameBoard({ state, onAction, onNewGame, localSeat, viewerSeat }: GameBoardProps) {
-  const pc = usePlayInteraction(state, onAction, localSeat);
+export function GameBoard({ state, onAction, onNewGame, localSeat, viewerSeat, delegate }: GameBoardProps) {
+  const pc = usePlayInteraction(state, onAction, localSeat, { delegate });
   const { orderedHand, reorder } = useHandOrder(state);
   const handDrag = useHandDrag(pc, (from, to) => reorder(pc.me, from, to));
   const [preview, setPreview] = useState<PreviewTarget | null>(null);

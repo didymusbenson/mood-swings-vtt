@@ -3111,3 +3111,66 @@ input:focus-visible {
   color: var(--c-red, #b23);
   font-size: 1.1rem;
 }
+
+/* ---- v2 delegated opponent-choice overlay --------------------------------- */
+.delegate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 18, 14, 0.55);
+  padding: 1rem;
+}
+.delegate-panel {
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 18px 12px 16px 11px / 11px 16px 12px 18px;
+  box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.2);
+  padding: 1.3rem 1.4rem;
+  max-width: min(680px, 92vw);
+  max-height: 88vh;
+  overflow: auto;
+  text-align: center;
+}
+.delegate-panel__title {
+  font-family: var(--font-hand);
+  margin: 0 0 0.2rem;
+}
+.delegate-panel__sub {
+  opacity: 0.75;
+  margin: 0 0 1rem;
+}
+.delegate-panel__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  justify-content: center;
+  margin-bottom: 1.1rem;
+}
+.delegate-card {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.delegate-panel__actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+}
+.waiting-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 1.4rem;
+  transform: translateX(-50%);
+  z-index: 55;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-hand);
+  font-size: 1.05rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 12px 9px 12px 9px / 9px 12px 9px 12px;
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.2);
+}

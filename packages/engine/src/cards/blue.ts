@@ -92,11 +92,12 @@ registerEffects(31, {
     st.players.forEach((p, i) => {
       const hand = st.hands[p.id] ?? [];
       if (hand.length === 0) return;
-      let card = hand[0]!;
-      if (p.id === ctx.me) {
-        const want = ctx.choices.cards?.[0];
-        if (want != null && hand.includes(want)) card = want;
-      }
+      // Each player chooses which of THEIR cards to pass. `choices.cards` is a pooled
+      // list (one entry per player, in their own hand) so networked play can collect
+      // every player's pick; in hotseat only the active player's pick is present, and
+      // the others fall back to their first card. (Mirrors Suspicion #78's pooling.)
+      const want = (ctx.choices.cards ?? []).find((c) => hand.includes(c));
+      const card = want ?? hand[0]!;
       picks.push({ card, from: p.id, to: ids[(i + step + ids.length) % ids.length]! });
     });
     for (const pk of picks) st.hands[pk.from]!.splice(st.hands[pk.from]!.indexOf(pk.card), 1);

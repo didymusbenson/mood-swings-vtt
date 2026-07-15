@@ -7,6 +7,7 @@ import { GameBoard } from './components/GameBoard.js';
 import { ModeChooser, type PlayMode } from './components/ModeChooser.js';
 import { JoinScreen } from './components/JoinScreen.js';
 import { Lobby } from './components/Lobby.js';
+import { DelegatedChoiceOverlay } from './components/DelegatedChoiceOverlay.js';
 import { GoldfishSession, HostSession, JoinSession, type Session } from './net/session.js';
 import { generateRoomCode } from './net/peer.js';
 
@@ -91,6 +92,7 @@ export function App() {
         onNewGame={leave}
         localSeat={session.localSeat}
         viewerSeat={session.viewerSeat}
+        delegate={session.delegatesChoices}
       />
     );
   } else if (session) {
@@ -109,6 +111,21 @@ export function App() {
   return (
     <div className="app">
       {body}
+
+      {session && view && session.pendingChoice && (
+        <DelegatedChoiceOverlay
+          request={session.pendingChoice}
+          view={view}
+          localSeat={session.localSeat}
+          onAnswer={(choices) => session.answerChoice(choices)}
+        />
+      )}
+
+      {session && view && session.waitingForChoice && !session.pendingChoice && (
+        <div className="waiting-banner" role="status">
+          Waiting for your opponent to choose…
+        </div>
+      )}
 
       {error && (
         <div className="toast" role="alert">

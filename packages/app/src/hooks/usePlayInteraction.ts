@@ -27,6 +27,7 @@ import {
 } from '@mood-swings/engine';
 import { db } from '../game/db.js';
 import { handWouldBe } from '../game/value.js';
+import { isDelegated } from '../net/delegation.js';
 
 export type PlayMode = 'manual' | 'drag';
 
@@ -188,7 +189,9 @@ export function usePlayInteraction(
   state: GameState,
   onAction: (a: Action) => void,
   localSeat: string,
+  opts: { delegate?: boolean } = {},
 ): PlayController {
+  const delegate = opts.delegate ?? false;
   const [mode, setMode] = useState<PlayMode>('manual');
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [flow, setFlow] = useState<Flow | null>(null);
@@ -297,7 +300,11 @@ export function usePlayInteraction(
         const copied = f.sel.copy != null ? specFor(f.sel.copy)?.slots ?? [] : [];
         spec = { slots: [...f.spec.slots.slice(0, f.slotIndex + 1), ...copied] };
       }
-      const isLast = f.slotIndex >= spec.slots.length - 1;
+      // In a networked game the last slot of a delegated card belongs to the OTHER
+      // seat(s); the active player stops one slot early and submits a partial action,
+      // and the host collects the delegated slot from the right player(s).
+      const lastForMe = delegate && isDelegated(f.card) ? spec.slots.length - 2 : spec.slots.length - 1;
+      const isLast = f.slotIndex >= lastForMe;
       if (isLast) {
         onAction({
           type: 'play',
@@ -311,7 +318,7 @@ export function usePlayInteraction(
         setFlow({ ...f, spec, slotIndex: f.slotIndex + 1 });
       }
     },
-    [me, onAction],
+    [me, onAction, delegate],
   );
 
   const confirm = useCallback(() => {

@@ -11,7 +11,7 @@
 // The orchestration (partial action → choice-request → collect → atomic apply) lives
 // in HostSession; this module defines the shared contract and the card catalog.
 
-import type { Choices, PlayerId } from '@mood-swings/engine';
+import { specFor, type Choices, type GameState, type PlayerId } from '@mood-swings/engine';
 
 /**
  * Cards whose resolution requires a sub-choice from a seat OTHER than the active
@@ -36,6 +36,15 @@ export const SIMULTANEOUS_CARDS: ReadonlySet<number> = new Set([31, 78, 29]);
 
 export function isDelegated(card: number): boolean {
   return DELEGATED_CARDS.has(card);
+}
+
+/**
+ * How many things a SINGLE chooser picks for the delegated slot. Usually the slot's
+ * own max, except Suspicion #78, whose slot max (8) is the hotseat pooled cap across
+ * all chosen players — per chooser it is one card.
+ */
+export function maxPerChooser(card: number, slotMax: number): number {
+  return card === 78 ? 1 : slotMax;
 }
 
 /** Host → a seat: "fill this one slot of the card being played." */
@@ -63,4 +72,90 @@ export interface ChoiceResponse {
   id: string;
   seat: PlayerId;
   choices: Choices;
+}
+
+// --- Pure orchestration helpers (host-side). Unit-tested in net/delegation.test. ---
+
+function moodsOf(state: GameState, pid: PlayerId): number {
+  return (state.moods[pid] ?? []).length;
+}
+function handSize(state: GameState, pid: PlayerId): number {
+  return (state.hands[pid] ?? []).length;
+}
+
+/** The delegated slot is always the LAST slot of a delegated card's spec. */
+export function delegatedSlotIndex(card: number): number {
+  const spec = specFor(card);
+  return spec ? spec.slots.length - 1 : -1;
+}
+
+/**
+ * Given the active player's assembled prior choices, which seats must each fill the
+ * delegated (last) slot for themselves? Empty ⇒ no delegation is needed (the engine
+ * would no-op or the active player already covered it), so the host can apply the
+ * action as-is. More than one ⇒ a simultaneous collection (see SIMULTANEOUS_CARDS).
+ */
+export function computeChoosers(
+  card: number,
+  state: GameState,
+  activeSeat: PlayerId,
+  prior: Choices,
+): PlayerId[] {
+  const allWithMoods = () => state.players.map((p) => p.id).filter((p) => moodsOf(state, p) > 0);
+  const allWithCards = () => state.players.map((p) => p.id).filter((p) => handSize(state, p) > 0);
+  switch (card) {
+    case 86: {
+      // Compulsion — the chosen victim picks a card from their own hand to give.
+      const v = prior.players?.[0];
+      return v && v !== activeSeat && handSize(state, v) > 0 ? [v] : [];
+    }
+    case 68: {
+      // Malice — the chosen 2+-mood player picks which two of their moods.
+      const p = prior.players?.[0];
+      return p && moodsOf(state, p) >= 2 ? [p] : [];
+    }
+    case 78:
+      // Suspicion — each chosen player with cards discards one of their choice.
+      return (prior.players ?? []).filter((p) => handSize(state, p) > 0);
+    case 29:
+      // Avoidance — every player with a mood passes one of their choice.
+      return allWithMoods();
+    case 31:
+      // Confusion — every player with a card passes one of their choice.
+      return allWithCards();
+    default:
+      return [];
+  }
+}
+
+/**
+ * The `priorChoices` to put in a chooser's request. For a `cardsFrom:'chosen'` slot,
+ * scope `players` to just this chooser so their picker enumerates only THEIR OWN hand
+ * (never the pooled set of chosen players' hands). Other slots pass prior through.
+ */
+export function scopedPriorForChooser(card: number, chooser: PlayerId, prior: Choices): Choices {
+  const idx = delegatedSlotIndex(card);
+  const slot = specFor(card)?.slots[idx];
+  if (slot && slot.kind === 'handCard' && slot.cardsFrom === 'chosen') {
+    return { ...prior, players: [chooser] };
+  }
+  return prior;
+}
+
+/**
+ * Merge the active player's prior choices with every chooser's contributed slice into
+ * the single pooled `Choices` the engine consumes. `players`/`option` come from prior
+ * (the active player's picks); `moods`/`cards` are the union across all choosers.
+ */
+export function mergeResponses(prior: Choices, contributions: Choices[]): Choices {
+  const merged: Choices = { ...prior };
+  const cards = [...(prior.cards ?? [])];
+  const moods = [...(prior.moods ?? [])];
+  for (const c of contributions) {
+    if (c.cards) cards.push(...c.cards);
+    if (c.moods) moods.push(...c.moods);
+  }
+  if (cards.length) merged.cards = cards;
+  if (moods.length) merged.moods = moods;
+  return merged;
 }

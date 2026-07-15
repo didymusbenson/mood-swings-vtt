@@ -5,7 +5,7 @@
 
 import Peer from 'peerjs';
 import type { DataConnection } from 'peerjs';
-import { Engine, type Action, type GameState, type PlayerId } from '@mood-swings/engine';
+import { Engine, specFor, type Action, type Choices, type GameState, type PlayerId } from '@mood-swings/engine';
 import { LocalHumanAgent, type PlayerAgent, type SeatView } from './agent.js';
 import { MatchRunner } from './matchRunner.js';
 import {
@@ -17,6 +17,15 @@ import {
   roomPeerId,
   type NetMsg,
 } from './peer.js';
+import {
+  computeChoosers,
+  delegatedSlotIndex,
+  isDelegated,
+  mergeResponses,
+  scopedPriorForChooser,
+  type ChoiceRequest,
+  type ChoiceResponse,
+} from './delegation.js';
 
 export type SessionMode = 'goldfish' | 'host' | 'join';
 export type SessionStatus = 'connecting' | 'active' | 'lost' | 'ended';
@@ -37,8 +46,20 @@ export interface Session {
   readonly error: string | null;
   /** Room code for host/join display + sharing; null for Goldfish. */
   readonly roomCode: string | null;
+  /**
+   * Whether this session delegates opponent-choice cards (redacted, networked play).
+   * When true the active player's flow stops before the delegated slot and the host
+   * collects it from the right seat(s). Goldfish is false — one driver fills everything.
+   */
+  readonly delegatesChoices: boolean;
+  /** A delegated sub-choice THIS client must make right now, or null. */
+  readonly pendingChoice: ChoiceRequest | null;
+  /** True when waiting on the OTHER player to make a delegated sub-choice. */
+  readonly waitingForChoice: boolean;
   /** Submit a play/pass for the local seat. */
   submit(action: Action): void;
+  /** Answer the current pendingChoice with the picked slice of choices. */
+  answerChoice(choices: Choices): void;
   /** Subscribe to view/status/error changes. Returns an unsubscribe fn. */
   subscribe(listener: () => void): () => void;
   clearError(): void;
@@ -56,6 +77,8 @@ export abstract class BaseSession implements Session {
   protected _status: SessionStatus = 'active';
   protected _error: string | null = null;
   protected _roomCode: string | null = null;
+  protected _pendingChoice: ChoiceRequest | null = null;
+  protected _waitingForChoice = false;
   private readonly listeners = new Set<() => void>();
 
   get view(): GameState | null {
@@ -70,8 +93,20 @@ export abstract class BaseSession implements Session {
   get roomCode(): string | null {
     return this._roomCode;
   }
+  get pendingChoice(): ChoiceRequest | null {
+    return this._pendingChoice;
+  }
+  get waitingForChoice(): boolean {
+    return this._waitingForChoice;
+  }
+  /** Overridden by networked sessions. */
+  get delegatesChoices(): boolean {
+    return false;
+  }
 
   abstract submit(action: Action): void;
+  /** No-op unless a networked session is awaiting a delegated choice from this client. */
+  answerChoice(_choices: Choices): void {}
 
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
@@ -152,6 +187,17 @@ export class HostSession extends BaseSession {
   private conn: DataConnection | null = null;
   private runner: MatchRunner | null = null;
   private remote: RemoteHumanAgent | null = null;
+  // An in-flight opponent-choice collection: the partial action plus the seats still
+  // to answer and the slices gathered so far. Only one runs at a time (turn-based).
+  private delegation: { action: Action; awaiting: Set<PlayerId>; contributions: Choices[] } | null = null;
+  private reqSeq = 0;
+
+  override get delegatesChoices(): boolean {
+    return true;
+  }
+  override get waitingForChoice(): boolean {
+    return this.delegation != null && this._pendingChoice == null;
+  }
 
   constructor(
     private readonly engine: Engine,
@@ -235,12 +281,81 @@ export class HostSession extends BaseSession {
         this.conn?.send({ t: 'error', message: 'You can only play your own seat.' } satisfies NetMsg);
         return;
       }
-      this.remote?.onAction(msg.action);
+      this.handleActiveAction(msg.action);
+    } else if (msg?.t === 'choice-response') {
+      this.collectResponse(msg.res.id, msg.res.seat, msg.res.choices);
     }
   }
 
+  /** The host's own play/pass. */
   submit(action: Action): void {
-    this.runner?.submit(action);
+    this.handleActiveAction(action);
+  }
+
+  /**
+   * Route an active player's action (host's own or the joiner's) into the engine — or,
+   * for a delegated card, hold it and collect the opponent-owned sub-choice(s) first.
+   */
+  private handleActiveAction(action: Action): void {
+    if (!this.runner) return;
+    if (action.type === 'play' && isDelegated(action.card)) {
+      const prior = action.choices ?? {};
+      const choosers = computeChoosers(action.card, this.runner.current, action.player, prior);
+      if (choosers.length > 0) {
+        this.beginDelegation(action, choosers);
+        return;
+      }
+    }
+    this.runner.submit(action);
+  }
+
+  private beginDelegation(action: Action, choosers: PlayerId[]): void {
+    if (action.type !== 'play') return;
+    const card = action.card;
+    const prior = action.choices ?? {};
+    const slotIndex = delegatedSlotIndex(card);
+    const label = specFor(card)?.slots[slotIndex]?.label ?? 'Make your choice';
+    this.delegation = { action, awaiting: new Set(choosers), contributions: [] };
+    for (const seat of choosers) {
+      const req: ChoiceRequest = {
+        id: `d${this.reqSeq++}`,
+        card,
+        seat,
+        slotIndex,
+        priorChoices: scopedPriorForChooser(card, seat, prior),
+        prompt: label,
+      };
+      if (seat === HOST_SEAT) this._pendingChoice = req;
+      else this.conn?.send({ t: 'choice-request', req } satisfies NetMsg);
+    }
+    this.emit();
+  }
+
+  /** The host answering ITS OWN delegated sub-choice. */
+  override answerChoice(choices: Choices): void {
+    const req = this._pendingChoice;
+    if (!req) return;
+    this._pendingChoice = null;
+    this.collectResponse(req.id, HOST_SEAT, choices);
+  }
+
+  private collectResponse(_id: string, seat: PlayerId, choices: Choices): void {
+    const d = this.delegation;
+    if (!d || !d.awaiting.has(seat)) return;
+    d.awaiting.delete(seat);
+    d.contributions.push(choices);
+    if (d.awaiting.size === 0) {
+      // All contributions in — assemble the single action and apply atomically. Nobody
+      // saw another's pick first: they lived only here until this moment.
+      const prior = (d.action.type === 'play' && d.action.choices) || {};
+      const full: Action =
+        d.action.type === 'play'
+          ? { ...d.action, choices: mergeResponses(prior, d.contributions) }
+          : d.action;
+      this.delegation = null;
+      this.runner?.submit(full);
+    }
+    this.emit();
   }
 
   override teardown(): void {
@@ -264,6 +379,16 @@ export class JoinSession extends BaseSession {
   private readonly peer: Peer;
   private conn: DataConnection | null = null;
   private _localSeat: PlayerId = JOINER_SEAT;
+  // Set when we've sent a delegated action / answered a sub-choice and are waiting for
+  // the host to resolve it; cleared when the next authoritative view arrives.
+  private _awaitingResolve = false;
+
+  override get delegatesChoices(): boolean {
+    return true;
+  }
+  override get waitingForChoice(): boolean {
+    return this._awaitingResolve && this._pendingChoice == null;
+  }
 
   constructor(code: string) {
     super();
@@ -311,10 +436,18 @@ export class JoinSession extends BaseSession {
       case 'state':
         this._view = msg.view;
         this._status = 'active';
+        this._pendingChoice = null; // a fresh view means any delegation resolved
+        this._awaitingResolve = false;
         this.emit();
         break;
       case 'error':
         this._error = msg.message;
+        this._awaitingResolve = false;
+        this.emit();
+        break;
+      case 'choice-request':
+        this._pendingChoice = msg.req;
+        this._awaitingResolve = false;
         this.emit();
         break;
     }
@@ -322,6 +455,20 @@ export class JoinSession extends BaseSession {
 
   submit(action: Action): void {
     this.conn?.send({ t: 'action', action } satisfies NetMsg);
+    if (action.type === 'play' && isDelegated(action.card)) {
+      this._awaitingResolve = true;
+      this.emit();
+    }
+  }
+
+  override answerChoice(choices: Choices): void {
+    const req = this._pendingChoice;
+    if (!req) return;
+    const res: ChoiceResponse = { id: req.id, seat: this._localSeat, choices };
+    this.conn?.send({ t: 'choice-response', res } satisfies NetMsg);
+    this._pendingChoice = null;
+    this._awaitingResolve = true;
+    this.emit();
   }
 
   override teardown(): void {
