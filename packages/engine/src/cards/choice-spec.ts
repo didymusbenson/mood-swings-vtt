@@ -67,6 +67,17 @@ export interface ChoiceSlot {
   numberRange?: [number, number]; // kind === 'number'
   options?: string[]; // kind === 'choice' → sets `option`
   /**
+   * Gate this slot on the value chosen in an EARLIER `option` slot of the flow.
+   * The slot is only presented when `choices.option` is one of these values; the
+   * flow skips it otherwise. Used by "choose one" cards whose follow-up target
+   * applies to only one branch — Corruption #60 ('cards' recovers discards, but
+   * the 'wins' branch takes no cards), Guilt #14 / Hesitation #41 / Contempt #59
+   * ('one' picks a mood, but 'all' takes none). A slot with no `showWhen` always
+   * applies, so Avoidance #29 / Confusion #31 (whose pass slot applies to both
+   * left and right) are unaffected.
+   */
+  showWhen?: { option: string[] };
+  /**
    * kind === 'mood': this is an `afterPlaying` slot whose "choose a mood" may pick the
    * mood being played (it is already in play by then). The flow offers the played mood
    * as an extra candidate (SELF_TARGET) whenever it passes the slot's filter — checked
@@ -100,6 +111,18 @@ export function registerSpec(cardNumber: number, spec: ChoiceSpec): void {
 
 export function specFor(cardNumber: number): ChoiceSpec | undefined {
   return specByNumber.get(cardNumber);
+}
+
+/**
+ * Does a slot apply given the choices gathered so far in the flow? A slot with a
+ * `showWhen` gate is only presented when the earlier `option` selection matches
+ * (Corruption #60's discard-recovery slot is skipped on the double-win branch).
+ * `option` is the value picked in the flow's `option` slot (null if not yet /
+ * never chosen); it is compared as a string so numeric options still match.
+ */
+export function slotApplies(slot: ChoiceSlot, option: string | number | null): boolean {
+  if (!slot.showWhen) return true;
+  return option != null && slot.showWhen.option.includes(String(option));
 }
 
 /** True if the card offers no interactive targets (just play it). */

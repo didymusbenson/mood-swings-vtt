@@ -43,7 +43,7 @@ registerSpec(12, {
 registerSpec(14, {
   slots: [
     { key: 'option', kind: 'choice', min: 1, max: 1, options: ['one', 'all'], label: 'Suppress one mood or all' },
-    { key: 'moods', kind: 'mood', min: 0, max: 1, mood: { from: 'any', colorIn: ['black', 'red'] }, label: 'Choose a black/red mood (if "one")', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 1, mood: { from: 'any', colorIn: ['black', 'red'] }, label: 'Choose a black/red mood (if "one")', optional: true, showWhen: { option: ['one'] } },
   ],
 });
 

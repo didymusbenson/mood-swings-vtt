@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { loadCardDB, type RawCard } from '../src/data.js';
-import { specFor, legalTargets, playedMoodQualifies, type ChoiceSlot } from '../src/cards/choice-spec.js';
+import { specFor, legalTargets, playedMoodQualifies, slotApplies, type ChoiceSlot } from '../src/cards/choice-spec.js';
 import type { GameState, Mood } from '../src/types.js';
 import '../src/cards/index.js'; // registers all effects + specs
 
@@ -147,6 +147,35 @@ describe('card target specs', () => {
       const slot = specFor(62)!.slots[0]!;
       expect(slot).toMatchObject({ kind: 'handCard', cardsFrom: 'discard' });
       expect(legalTargets(slot, withDiscard, 'p1', look).cards).toEqual([17, 33, 111]);
+    });
+  });
+
+  // Regression: an option-gated follow-up slot must only be presented on its own
+  // branch. Corruption #60's discard-recovery slot showed even when the double-win
+  // ('wins') branch was chosen, prompting "choose cards" with nothing to recover.
+  describe('showWhen gates a follow-up slot on the chosen option', () => {
+    it('Corruption #60 recovery slot applies only on the "cards" branch', () => {
+      const cardsSlot = specFor(60)!.slots[1]!;
+      expect(cardsSlot).toMatchObject({ showWhen: { option: ['cards'] } });
+      expect(slotApplies(cardsSlot, 'cards')).toBe(true);
+      expect(slotApplies(cardsSlot, 'wins')).toBe(false);
+      expect(slotApplies(cardsSlot, null)).toBe(false);
+    });
+
+    it.each([[14], [41], [59]] as const)('card #%i mood slot applies only on the "one" branch', (num) => {
+      const moodSlot = specFor(num)!.slots[1]!;
+      expect(moodSlot).toMatchObject({ showWhen: { option: ['one'] } });
+      expect(slotApplies(moodSlot, 'one')).toBe(true);
+      expect(slotApplies(moodSlot, 'all')).toBe(false);
+    });
+
+    it('an ungated follow-up slot always applies (Avoidance #29 / Confusion #31)', () => {
+      for (const num of [29, 31]) {
+        const follow = specFor(num)!.slots[1]!;
+        expect(follow.showWhen).toBeUndefined();
+        expect(slotApplies(follow, 'left')).toBe(true);
+        expect(slotApplies(follow, 'right')).toBe(true);
+      }
     });
   });
 

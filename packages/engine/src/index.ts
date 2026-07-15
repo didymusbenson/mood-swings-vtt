@@ -26,6 +26,7 @@ export {
   isSingleTarget,
   firstBoardSlot,
   playedMoodQualifies,
+  slotApplies,
   SELF_TARGET,
   type ChoiceSpec,
   type ChoiceSlot,

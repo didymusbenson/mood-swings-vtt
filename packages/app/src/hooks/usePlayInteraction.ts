@@ -20,6 +20,7 @@ import {
   isSingleTarget,
   firstBoardSlot,
   playedMoodQualifies,
+  slotApplies,
   queries,
   SELF_TARGET,
   type ChoiceSlot,
@@ -288,8 +289,12 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
         const copied = f.sel.copy != null ? specFor(f.sel.copy)?.slots ?? [] : [];
         spec = { slots: [...f.spec.slots.slice(0, f.slotIndex + 1), ...copied] };
       }
-      const isLast = f.slotIndex >= spec.slots.length - 1;
-      if (isLast) {
+      // Advance to the next slot that applies. Slots gated on an earlier `option`
+      // choice (Corruption #60's discard-recovery slot) are skipped when their
+      // branch wasn't chosen — so picking the double-win never prompts for cards.
+      let next = f.slotIndex + 1;
+      while (next < spec.slots.length && !slotApplies(spec.slots[next]!, f.sel.option)) next++;
+      if (next >= spec.slots.length) {
         onAction({
           type: 'play',
           player: me,
@@ -299,7 +304,7 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
         });
         setFlow(null);
       } else {
-        setFlow({ ...f, spec, slotIndex: f.slotIndex + 1 });
+        setFlow({ ...f, spec, slotIndex: next });
       }
     },
     [me, onAction],
