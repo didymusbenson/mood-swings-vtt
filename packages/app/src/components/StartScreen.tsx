@@ -16,6 +16,8 @@ export interface StartConfig {
 
 interface StartScreenProps {
   onStart: (config: StartConfig) => void;
+  /** Optional: return to the mode chooser (v2). Omitted in single-mode contexts. */
+  onBack?: () => void;
 }
 
 const MIN = minDeckSize(2);
@@ -31,7 +33,7 @@ function countsEqual(a: DeckCounts, b: DeckCounts): boolean {
   return true;
 }
 
-export function StartScreen({ onStart }: StartScreenProps) {
+export function StartScreen({ onStart, onBack }: StartScreenProps) {
   const [p1, setP1] = useState('Player 1');
   const [p2, setP2] = useState('Player 2');
   const [tab, setTab] = useState<'random' | 'custom'>('random');
@@ -118,9 +120,14 @@ export function StartScreen({ onStart }: StartScreenProps) {
   return (
     <div className="start">
       <header className="start__header">
+        {onBack && (
+          <button className="btn start__back" onClick={onBack}>
+            ← Back
+          </button>
+        )}
         <Starburst className="start__burst" label="1st Ed." />
         <h1>Mood Swings</h1>
-        <p className="start__tag">Hotseat — two players, one screen</p>
+        <p className="start__tag">Goldfish — two hands, one screen</p>
         <button className="btn start__howto" onClick={() => setShowRules(true)}>
           How to Play
         </button>

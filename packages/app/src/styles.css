@@ -2983,3 +2983,68 @@ input:focus-visible {
   .dbx-modal__body { grid-template-columns: 1fr; }
   .dbx-vdetail__row { grid-template-columns: 120px 1fr; }
 }
+
+/* A redacted opponent hand card (networked play): a face-down back sized like a
+   hand tile so the fan looks right without revealing anything. */
+.hand__hidden {
+  width: var(--card-w);
+  min-height: var(--card-h);
+}
+
+/* ---- v2 mode chooser ------------------------------------------------------ */
+.start__hero {
+  text-align: center;
+  margin: 2.5rem 0 2rem;
+}
+.modechooser {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.1rem;
+  max-width: 820px;
+  margin: 0 auto;
+}
+.modecard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  text-align: left;
+  padding: 1.4rem 1.3rem;
+  font-family: var(--font-hand);
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 16px 11px 15px 10px / 10px 15px 11px 16px;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.12);
+}
+.modecard:hover {
+  transform: translate(-1px, -2px);
+  box-shadow: 5px 6px 0 rgba(0, 0, 0, 0.16);
+}
+.modecard:active {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.14);
+}
+.modecard--secondary {
+  opacity: 0.92;
+}
+.modecard__icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+.modecard__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.modecard__desc {
+  font-size: 0.98rem;
+  opacity: 0.8;
+  font-family: var(--font-body, inherit);
+}
+.start__back {
+  position: absolute;
+  left: 1.2rem;
+  top: 1.2rem;
+}

@@ -184,14 +184,23 @@ function toggleBounded<T>(list: T[], value: T, max: number): T[] {
   return list; // at capacity for a multi-select — ignore extra clicks
 }
 
-export function usePlayInteraction(state: GameState, onAction: (a: Action) => void): PlayController {
+export function usePlayInteraction(
+  state: GameState,
+  onAction: (a: Action) => void,
+  localSeat: string,
+): PlayController {
   const [mode, setMode] = useState<PlayMode>('manual');
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [flow, setFlow] = useState<Flow | null>(null);
   const [dragCard, setDragCard] = useState<number | null>(null);
 
-  const me = state.activePlayer;
-  const canAct = state.phase === 'awaitingPlay';
+  // `me` is the seat THIS client controls — not necessarily the active seat. In
+  // Goldfish the caller passes `localSeat = state.activePlayer` (one driver plays
+  // whoever's turn it is), reproducing the old behaviour. In a networked game each
+  // client passes its own fixed seat, so a player can only ever act as themselves,
+  // and only on their own turn.
+  const me = localSeat;
+  const canAct = state.phase === 'awaitingPlay' && state.activePlayer === localSeat;
 
   // Any dispatched action produces a fresh state object — reset transient
   // interaction so a resolved play doesn't leave stale selections behind.

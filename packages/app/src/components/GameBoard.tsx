@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
-import type { Action, Color, GameState, Mood, PlayerState } from '@mood-swings/engine';
-import { ROUNDS_TO_WIN, SELF_TARGET, type ChoiceSlot } from '@mood-swings/engine';
+import type { Action, Color, GameState, Mood, PlayerId, PlayerState } from '@mood-swings/engine';
+import { ROUNDS_TO_WIN, SELF_TARGET, isHidden, type ChoiceSlot } from '@mood-swings/engine';
 import { db } from '../game/db.js';
 import { handWouldBe, moodComputed } from '../game/value.js';
 import { assignAvatars } from '../game/avatars.js';
@@ -20,6 +20,10 @@ interface GameBoardProps {
   state: GameState;
   onAction: (action: Action) => void;
   onNewGame: () => void;
+  /** The seat this client controls (Goldfish passes the active seat each render). */
+  localSeat: PlayerId;
+  /** The seat pinned to the bottom of the table for this client (orientation). */
+  viewerSeat: PlayerId;
 }
 
 /** Fixed seat position on the table (F2 — never swaps by turn). */
@@ -212,6 +216,19 @@ function HandRow({ player, state, ctx, pos }: { player: PlayerState; state: Game
     if (idx === draggingFrom) {
       handChildren.push(
         <div key={`ph-${idx}`} className="hand__slot hand__placeholder" data-hand-index={idx} style={fanVars(idx, order.length, isActive, pos)} aria-hidden />,
+      );
+      return;
+    }
+    // A redacted opponent hand (networked play) arrives as HIDDEN sentinels — render
+    // a plain face-down card back, with no pointer handlers, so the identity can't
+    // leak and it can't be interacted with.
+    if (isHidden(card)) {
+      handChildren.push(
+        <div key={`hidden-${idx}`} className="hand__slot" data-hand-index={idx} style={fanVars(idx, order.length, isActive, pos)}>
+          <div className="hand__hidden">
+            <CardBack />
+          </div>
+        </div>,
       );
       return;
     }
@@ -755,8 +772,8 @@ function DragGhost({ handDrag }: { handDrag: HandDragApi }) {
   );
 }
 
-export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
-  const pc = usePlayInteraction(state, onAction);
+export function GameBoard({ state, onAction, onNewGame, localSeat, viewerSeat }: GameBoardProps) {
+  const pc = usePlayInteraction(state, onAction, localSeat);
   const { orderedHand, reorder } = useHandOrder(state);
   const handDrag = useHandDrag(pc, (from, to) => reorder(pc.me, from, to));
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
@@ -795,9 +812,11 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
 
   const avatars = useMemo(() => assignAvatars(state.players), [state.players]);
 
-  // Fixed seats (F2): Player 1 permanently bottom, Player 2 permanently top.
-  const bottom = state.players[0]!;
-  const top = state.players[1] ?? bottom;
+  // Seats: the viewer's own seat is pinned to the bottom, the opponent to the top.
+  // Goldfish/Host pass viewerSeat = players[0] (Player 1 bottom, as before); the
+  // joiner passes its own seat so it too sits at the bottom of its screen.
+  const bottom = state.players.find((p) => p.id === viewerSeat) ?? state.players[0]!;
+  const top = state.players.find((p) => p.id !== bottom.id) ?? bottom;
 
   // When a targeting flow opens, drop any stale hover-preview (and its pending
   // timer) so the pane starts on the card being played rather than whatever was
