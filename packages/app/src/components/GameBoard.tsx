@@ -354,6 +354,8 @@ function PlayerEdge({ player, state, ctx, pos }: { player: PlayerState; state: G
 function PileColumn({ state, ctx }: { state: GameState; ctx: PanelCtx }) {
   const { openDiscard } = ctx;
   const top = state.discard[state.discard.length - 1];
+  // A pending discard-play (Grief/Melancholy/…) lights the pile up as playable.
+  const canPlayFromDiscard = ctx.pc.legalDiscardCards.length > 0;
   return (
     <div className="bf__pile">
       <div className="pile pile--deck">
@@ -369,10 +371,10 @@ function PileColumn({ state, ctx }: { state: GameState; ctx: PanelCtx }) {
 
       <button
         type="button"
-        className="pile pile--discard"
+        className={`pile pile--discard${canPlayFromDiscard ? ' pile--playable' : ''}`}
+        title={canPlayFromDiscard ? 'Play a mood from the discard pile' : 'Inspect the discard pile'}
         onClick={openDiscard}
         disabled={state.discard.length === 0}
-        title="Inspect the discard pile"
         onPointerEnter={(e) => { if (top != null) ctx.hoverPreview({ card: db.get(top), readOnly: true })(e); }}
         onPointerLeave={ctx.endHover}
       >
@@ -673,7 +675,7 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
 }
 
 /** Click-to-inspect discard viewer: the pile as a horizontal, scrollable fan (F3). */
-function DiscardInspector({ state, onClose, setPreview }: { state: GameState; onClose: () => void; setPreview: (t: PreviewTarget | null) => void }) {
+function DiscardInspector({ state, pc, onClose, setPreview }: { state: GameState; pc: PlayController; onClose: () => void; setPreview: (t: PreviewTarget | null) => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -681,6 +683,15 @@ function DiscardInspector({ state, onClose, setPreview }: { state: GameState; on
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // When the player has a discard-play available (Grief/Melancholy/…), the legal
+  // cards become playable straight from the pile — click one to play it from the
+  // discard (closing the inspector so any targeting flow is visible).
+  const canPlay = pc.legalDiscardCards.length > 0;
+  const playCard = (n: number) => {
+    pc.beginDiscardPlay(n);
+    onClose();
+  };
 
   return (
     <div className="inspector" role="dialog" aria-modal="true" aria-label="Discard pile">
@@ -692,20 +703,26 @@ function DiscardInspector({ state, onClose, setPreview }: { state: GameState; on
             Close
           </button>
         </header>
+        {canPlay && <p className="inspector__hint">You may play a highlighted mood from the discard pile — click one to play it.</p>}
         {state.discard.length === 0 ? (
           <p className="muted">The discard pile is empty.</p>
         ) : (
           <div className="inspector__fan">
-            {state.discard.map((n, i) => (
-              <div key={`${n}-${i}`} className="inspector__item">
-                <Card
-                  card={db.get(n)}
-                  tile
-                  onPointerEnter={() => setPreview({ card: db.get(n) })}
-                  onFocus={() => setPreview({ card: db.get(n) })}
-                />
-              </div>
-            ))}
+            {state.discard.map((n, i) => {
+              const playable = pc.legalDiscardCards.includes(n);
+              return (
+                <div key={`${n}-${i}`} className="inspector__item">
+                  <Card
+                    card={db.get(n)}
+                    tile
+                    highlighted={playable}
+                    onClick={playable ? () => playCard(n) : undefined}
+                    onPointerEnter={() => setPreview({ card: db.get(n) })}
+                    onFocus={() => setPreview({ card: db.get(n) })}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -838,7 +855,7 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
       </div>
 
       <TargetOverlay pc={pc} state={state} ctx={ctx} />
-      {discardOpen && <DiscardInspector state={state} onClose={() => setDiscardOpen(false)} setPreview={setPreview} />}
+      {discardOpen && <DiscardInspector state={state} pc={pc} onClose={() => setDiscardOpen(false)} setPreview={setPreview} />}
       {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
       <DragGhost handDrag={handDrag} />
     </div>

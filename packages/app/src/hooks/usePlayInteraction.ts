@@ -20,6 +20,7 @@ import {
   isSingleTarget,
   firstBoardSlot,
   playedMoodQualifies,
+  queries,
   SELF_TARGET,
   type ChoiceSlot,
   type ChoiceSpec,
@@ -71,6 +72,8 @@ interface Flow {
   spec: ChoiceSpec;
   slotIndex: number;
   sel: Selections;
+  /** Zone the card is played from — the discard pile for a Grief/Melancholy-style play. */
+  from?: 'hand' | 'discard';
 }
 
 /** Where a drag can currently be dropped (for highlight/dim affordances). */
@@ -127,6 +130,10 @@ export interface PlayController {
   beginDrag: (card: number) => void;
   /** Clear the drag with no play (snap back). */
   endDrag: () => void;
+  /** Discard-pile cards the player may play right now (Grief/Melancholy/etc.). */
+  legalDiscardCards: number[];
+  /** Start a play sourced from the discard pile (immediate, or open the flow). */
+  beginDiscardPlay: (card: number) => void;
   /** Play with no specific target: immediate, or open the flow at slot 0. */
   playToField: (card: number) => void;
   /** Play onto a specific mood (single-target immediate, else flow pre-selected). */
@@ -225,9 +232,9 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
 
   // --- Begin a play (either immediately or by opening the targeting flow) ---
   const beginPlay = useCallback(
-    (card: number, preselect?: { key: ChoiceSlot['key']; value: string }) => {
+    (card: number, preselect?: { key: ChoiceSlot['key']; value: string }, from: 'hand' | 'discard' = 'hand') => {
       if (playsImmediately(card)) {
-        onAction({ type: 'play', player: me, card });
+        onAction({ type: 'play', player: me, card, ...(from === 'discard' ? { from } : {}) });
         return;
       }
       const spec = specFor(card)!;
@@ -240,7 +247,7 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
           sel.copy = copyCardOf(state, preselect.value);
         }
       }
-      setFlow({ card, spec, slotIndex: 0, sel });
+      setFlow({ card, spec, slotIndex: 0, sel, from });
       setSelectedCard(null);
     },
     [me, onAction, state],
@@ -250,6 +257,22 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
     if (selectedCard == null) return;
     beginPlay(selectedCard);
   }, [selectedCard, beginPlay]);
+
+  // Which discard-pile cards can be played from the discard right now (Grief/Angst/
+  // Harmony grants, Melancholy permission, Grace colour-grant) — the source of truth
+  // for the discard inspector's play affordance. The engine still validates on dispatch.
+  const legalDiscardCards = useMemo(
+    () => (canAct && !flow ? queries.legalDiscardPlays(state, me, db) : []),
+    [canAct, flow, state, me],
+  );
+  const beginDiscardPlay = useCallback(
+    (card: number) => {
+      if (!canAct || flow) return;
+      if (!legalDiscardCards.includes(card)) return;
+      beginPlay(card, undefined, 'discard');
+    },
+    [canAct, flow, legalDiscardCards, beginPlay],
+  );
 
   const onPass = useCallback(() => {
     onAction({ type: 'pass', player: me });
@@ -267,7 +290,13 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
       }
       const isLast = f.slotIndex >= spec.slots.length - 1;
       if (isLast) {
-        onAction({ type: 'play', player: me, card: f.card, choices: assembleChoices(f.sel) });
+        onAction({
+          type: 'play',
+          player: me,
+          card: f.card,
+          choices: assembleChoices(f.sel),
+          ...(f.from === 'discard' ? { from: f.from } : {}),
+        });
         setFlow(null);
       } else {
         setFlow({ ...f, spec, slotIndex: f.slotIndex + 1 });
@@ -508,6 +537,8 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
     dragCard,
     beginDrag,
     endDrag,
+    legalDiscardCards,
+    beginDiscardPlay,
     playToField,
     playToMood,
     playToPlayer,

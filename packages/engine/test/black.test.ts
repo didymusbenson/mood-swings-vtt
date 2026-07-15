@@ -5,6 +5,7 @@ import { Engine } from '../src/engine.js';
 import { loadCardDB, type RawCard } from '../src/data.js';
 import type { CardDB } from '../src/cards/registry.js';
 import type { GameState } from '../src/types.js';
+import { legalDiscardPlays } from '../src/queries.js';
 import '../src/cards/black.js';
 
 const path = fileURLToPath(new URL('../../../data/cards.json', import.meta.url));
@@ -30,6 +31,34 @@ function findMood(g: GameState, player: 'p1' | 'p2', card: number) {
 }
 
 describe('black cards', () => {
+  it('#65 Grief lets you play moods from the discard pile (from: "discard")', () => {
+    // p1 holds Grief (#65). Seed the discard with a vanilla mood to recover.
+    const { e, s } = game(rig([65], [55]));
+    s.discard.push(COMP); // Complacency (#5) sits in the discard
+    let g = e.apply(s, { type: 'play', player: 'p1', card: 65 });
+    expect(g.activePlayer).toBe('p1'); // Grief granted discard-plays → turn continues
+    expect(g.discardPlaysRemaining).toBe(2);
+    // The UI's source of truth offers the discarded mood as playable.
+    expect(legalDiscardPlays(g, 'p1', db)).toContain(COMP);
+    // Play it FROM THE DISCARD.
+    g = e.apply(g, { type: 'play', player: 'p1', card: COMP, from: 'discard' });
+    expect(g.discard).not.toContain(COMP); // left the discard pile
+    expect(findMood(g, 'p1', COMP)).toBeTruthy(); // ...now a mood in play
+    expect(g.discardPlaysRemaining).toBe(1); // consumed one of the two grants
+  });
+
+  it('legalDiscardPlays offers nothing without a discard-play grant, and excludes banned colours', () => {
+    const { e, s } = game(rig([55], [55]));
+    s.discard.push(COMP);
+    // No grant yet → nothing offered.
+    expect(legalDiscardPlays(s, 'p1', db)).toEqual([]);
+    // With a grant, the discarded mood is offered — unless its colour is banned (Doubt).
+    s.discardPlaysRemaining = 1;
+    expect(legalDiscardPlays(s, 'p1', db)).toContain(COMP);
+    s.bannedColors = ['white']; // Complacency is white
+    expect(legalDiscardPlays(s, 'p1', db)).not.toContain(COMP);
+  });
+
   it('#63 Disgust is [6] alone and [3] with two green/white moods', () => {
     // [6] branch: Disgust alone.
     {

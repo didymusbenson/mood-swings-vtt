@@ -1,10 +1,49 @@
 // Board queries shared by value computation and effect resolution.
 
 import type { Color, GameState, Mood, PlayerId } from './types.js';
-import type { CardDB } from './cards/registry.js';
+import { type CardDB, effectsFor } from './cards/registry.js';
 
 export function allMoods(state: GameState): Mood[] {
   return state.players.flatMap((p) => state.moods[p.id] ?? []);
+}
+
+/**
+ * Which discard-pile cards the player can currently start a `from: 'discard'` play
+ * with — the UI's source of truth for offering discard plays. Mirrors the engine's
+ * `consumeDiscardPlay` legality:
+ *   - a dedicated discard-play grant (`discardPlaysRemaining` — Grief/Angst/Harmony);
+ *   - a Melancholy #69 permission (any mood exposing `permitsPlayFromDiscard`) plus a
+ *     normal play to spend; or
+ *   - a discard-sourced colour-matched grant (Grace #121).
+ * Banned colours (Doubt #36) are excluded either way. The engine still validates on
+ * dispatch — this only decides what to OFFER.
+ */
+export function legalDiscardPlays(state: GameState, player: PlayerId, db: CardDB): number[] {
+  const hasDiscardGrant = state.discardPlaysRemaining > 0;
+  const permitsMelancholy = (state.moods[player] ?? []).some(
+    (m) => effectsFor(resolveCardNumber(m)).permitsPlayFromDiscard != null,
+  );
+  const hasNormalPlay =
+    state.playsRemaining > 0 ||
+    state.conditionalGrants.some((g) => (g.from ?? 'hand') === 'hand');
+  const discardColorGrants = state.conditionalGrants.filter(
+    (g) => g.from === 'discard' && g.constraint.kind === 'colorSharedWithControllerMoods',
+  );
+  const sharesControllerColor = (color: Color) =>
+    (state.moods[player] ?? []).some((m) => colorOf(m, db) === color);
+
+  return state.discard.filter((n) => {
+    const data = db.get(n);
+    if (state.bannedColors.includes(data.color)) return false; // Doubt #36
+    if (hasDiscardGrant) return true;
+    if (permitsMelancholy && hasNormalPlay) return true;
+    return discardColorGrants.length > 0 && sharesControllerColor(data.color); // Grace #121
+  });
+}
+
+/** True if the player can start any discard-sourced play right now. */
+export function canPlayFromDiscard(state: GameState, player: PlayerId, db: CardDB): boolean {
+  return legalDiscardPlays(state, player, db).length > 0;
 }
 
 export function resolveCardNumber(mood: Mood): number {
