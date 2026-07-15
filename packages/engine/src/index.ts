@@ -25,6 +25,7 @@ export {
   hasRequiredTargets,
   isSingleTarget,
   firstBoardSlot,
+  playedMoodQualifies,
   SELF_TARGET,
   type ChoiceSpec,
   type ChoiceSlot,

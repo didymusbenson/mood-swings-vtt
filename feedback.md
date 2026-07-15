@@ -306,8 +306,12 @@ uid yet and can't be listed — even though the engine plays the mood into play 
   isn't in play during a cost) are correctly left non-self-targetable.
 - +2 engine tests; verified live end-to-end (Conviction chooses itself → bottom-decked,
   Player 1 draws, per the activity log).
-**Note:** the multi-player "each chosen player loses one of their moods" cards (#7 Courage,
-#28 Anxiety, #76 Spite, #101 Shock) can *technically* include the acting player's own
-just-played mood too, but that's an edge case tangled with per-player value filters; left
-as-is for now (they already work for the normal opponent-targeting case). Flag if you want
-those made self-inclusive as well.
+**Follow-up (also shipped):** the multi-player "each chosen player loses one of their
+moods" cards — **#7 Courage, #28 Anxiety, #76 Spite, #101 Shock** — are now self-inclusive
+too. The played mood is offered when the acting player is one of the chosen players and the
+mood passes the slot's value filter (checked via `playedMoodQualifies` on its would-be
+value): **Shock** ([2] ≤ [3]) can discard itself outright; Courage/Anxiety/Spite qualify
+only when their value is buffed to [5]+/odd/even. **Courage** also gained a mood slot so you
+can choose *which* [5]+ mood each player loses (its effect already read `choices.moods`,
+auto-picking otherwise). Verified live: playing Shock, choosing yourself, and picking "This
+mood" discards Shock into the pile. +5 engine tests.

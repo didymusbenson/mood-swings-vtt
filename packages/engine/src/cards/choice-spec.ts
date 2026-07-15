@@ -69,9 +69,12 @@ export interface ChoiceSlot {
   /**
    * kind === 'mood': this is an `afterPlaying` slot whose "choose a mood" may pick the
    * mood being played (it is already in play by then). The flow offers the played mood
-   * as an extra candidate (SELF_TARGET). Only set on slots whose filter the played mood
-   * always satisfies (e.g. `from: 'any'` with no value/colour constraint) — never on a
-   * cost slot (the mood is not yet in play during a cost) or an "another mood" effect.
+   * as an extra candidate (SELF_TARGET) whenever it passes the slot's filter — checked
+   * via `playedMoodQualifies` on the mood's would-be value (so Shock #101, worth [3]-,
+   * can discard itself, while a value-buffed play can qualify for an odd/even/[5]+ slot).
+   * For "each chosen player" cards the UI also requires the acting player to be chosen.
+   * Set only on `afterPlaying` slots — never a cost slot (the mood isn't in play during a
+   * cost) nor an "another mood" effect (those exclude the self by wording).
    */
   selfTargetable?: boolean;
 }
@@ -125,6 +128,32 @@ export function isSingleTarget(spec: ChoiceSpec): boolean {
 /** Look up static card data — the UI passes its CardDB-backed accessor. */
 export type CardLookup = (cardNumber: number) => CardData;
 
+/** Value-based part of a mood filter (min / max / parity) — shared by the in-play
+ *  enumeration and the played-mood self-target check so they can't drift. */
+function moodValuePasses(f: MoodFilter, value: number): boolean {
+  if (f.minValue != null && value < f.minValue) return false;
+  if (f.maxValue != null && value > f.maxValue) return false;
+  if (f.valueParity === 'odd' && value % 2 !== 1) return false;
+  if (f.valueParity === 'even' && value % 2 !== 0) return false;
+  return true;
+}
+
+/**
+ * Would the mood being played be a legal target for its own `selfTargetable` slot?
+ * The played mood is always the acting player's own, so `from: 'opponent'` excludes
+ * it; otherwise it must pass the same value / colour / secondary filter as any other
+ * candidate. `value` is the mood's would-be (in-play) value. Colour uses the printed
+ * colour (an Imagination override only exists once the mood is actually in play).
+ */
+export function playedMoodQualifies(slot: ChoiceSlot, data: CardData, value: number): boolean {
+  const f = slot.mood ?? {};
+  if (f.from === 'opponent') return false;
+  if (!moodValuePasses(f, value)) return false;
+  if (f.colorIn && !f.colorIn.includes(data.color)) return false;
+  if (f.hasSecondary && !data.secondaryValue) return false;
+  return true;
+}
+
 /**
  * Selections already gathered earlier in the current flow. Only the fields a
  * later slot can depend on are needed (e.g. a `handFrom: 'chosen'` card slot
@@ -155,10 +184,7 @@ export function legalTargets(
             ? state.players.filter((p) => p.id !== actingPlayer).flatMap((p) => state.moods[p.id] ?? [])
             : allMoods(state);
       const ok = scope.filter((m) => {
-        if (f.minValue != null && m.currentValue < f.minValue) return false;
-        if (f.maxValue != null && m.currentValue > f.maxValue) return false;
-        if (f.valueParity === 'odd' && m.currentValue % 2 !== 1) return false;
-        if (f.valueParity === 'even' && m.currentValue % 2 !== 0) return false;
+        if (!moodValuePasses(f, m.currentValue)) return false;
         const data = card(resolveCardNumber(m));
         // Honour an active colour override (Imagination) for in-play colour filters.
         if (f.colorIn && !f.colorIn.includes(m.colorOverride ?? data.color)) return false;

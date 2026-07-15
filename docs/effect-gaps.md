@@ -153,13 +153,20 @@ silently ignored or the ability no-op'd. All fixed (tests in `test/specs.test.ts
   (Anger #80: total value [5] or less). The flow blocks a pick that would exceed the
   cap so an over-limit selection can't be built; the effect still re-checks defensively.
 - **`ChoiceSlot.selfTargetable` + `SELF_TARGET`** — a mood is in play the instant it is
-  played, so an `afterPlaying — choose a mood` effect may target the mood itself
-  (Conviction #6, Faith #12, Scorn #24, Hate #66). The flow offers the played mood as an
-  extra candidate; because it has no uid until it enters play, the choice records the
-  `SELF_TARGET` sentinel, which the engine swaps for the real uid in `playMood` just
-  before `afterPlaying` runs. Only set on afterPlaying slots whose filter the played
-  mood always satisfies — never a cost slot (the mood isn't in play during a cost) or an
-  "another mood" / opponent-only effect (those exclude the self by text/filter already).
+  played, so an `afterPlaying — choose a mood` effect may target the mood itself. The
+  flow offers the played mood as an extra candidate; because it has no uid until it
+  enters play, the choice records the `SELF_TARGET` sentinel, which the engine swaps for
+  the real uid in `playMood` just before `afterPlaying` runs. Two groups are marked:
+  - **Single-target "choose a/any mood"** — Conviction #6, Faith #12, Scorn #24, Hate #66
+    (`from: 'any'`, always self-eligible).
+  - **"Each chosen player loses one of their moods"** — Courage #7, Anxiety #28, Spite
+    #76, Shock #101. Here the self is offered only when the acting player is one of the
+    chosen players AND the played mood passes the slot's value filter (`playedMoodQualifies`
+    on its would-be value) — so Shock ([2] ≤ [3]) can discard itself, and the others
+    qualify only if their value is buffed to odd/even/[5]+. (Courage gained a mood slot so
+    you can also pick *which* [5]+ mood each player loses; the effect already read it.)
+  Never set on a cost slot (the mood isn't in play during a cost) or an "another mood" /
+  opponent-only effect (those exclude the self by wording/filter already).
 
 ## Known residual
 

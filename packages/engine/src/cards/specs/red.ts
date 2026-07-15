@@ -87,7 +87,7 @@ registerSpec(100, {
 registerSpec(101, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 2, players: 'all', label: 'Choose up to two players', optional: true },
-    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any', maxValue: 3 }, label: 'Choose which [3]-or-less mood each discards', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any', maxValue: 3 }, selfTargetable: true, label: 'Choose which [3]-or-less mood each discards', optional: true },
   ],
 });
 

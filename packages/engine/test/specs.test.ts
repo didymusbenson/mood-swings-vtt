@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { loadCardDB, type RawCard } from '../src/data.js';
-import { specFor, legalTargets, type ChoiceSlot } from '../src/cards/choice-spec.js';
+import { specFor, legalTargets, playedMoodQualifies, type ChoiceSlot } from '../src/cards/choice-spec.js';
 import type { GameState, Mood } from '../src/types.js';
 import '../src/cards/index.js'; // registers all effects + specs
 
@@ -180,11 +180,37 @@ describe('card target specs', () => {
     expect(specFor(80)!.slots[0]!.mood?.maxTotalValue).toBe(5);
   });
 
-  it('afterPlaying "choose a mood" cards are marked selfTargetable (#6/#12/#24/#66)', () => {
-    // The mood being played is in play by afterPlaying, so these may target themselves.
+  it('afterPlaying mood slots that may target the played mood are selfTargetable', () => {
+    // Single-target "choose a/any mood" (#6/#12/#24/#66) and the "each chosen player
+    // loses a mood" family (#7/#28/#76/#101) — all afterPlaying, all in play by then.
     const moodSlot = (n: number) => specFor(n)!.slots.find((sl) => sl.kind === 'mood')!;
-    for (const n of [6, 12, 24, 66]) expect(moodSlot(n).selfTargetable, `#${n}`).toBe(true);
+    for (const n of [6, 12, 24, 66, 7, 28, 76, 101]) expect(moodSlot(n).selfTargetable, `#${n}`).toBe(true);
     // "another mood" / cost / opponent-only slots must NOT be self-targetable.
     for (const n of [84, 34, 40]) expect(moodSlot(n).selfTargetable ?? false, `#${n}`).toBe(false);
+  });
+
+  describe('playedMoodQualifies — the played mood is offered only when it passes the filter', () => {
+    const shock = specFor(101)!.slots.find((s) => s.kind === 'mood')!; // maxValue 3
+    const spite = specFor(76)!.slots.find((s) => s.kind === 'mood')!; // even
+    const courage = specFor(7)!.slots.find((s) => s.kind === 'mood')!; // minValue 5
+    const arrog = specFor(82)!.slots[0]!; // from: 'opponent'
+    const d = (color = 'red' as const, secondaryValue: unknown = null) =>
+      ({ color, secondaryValue } as unknown as Parameters<typeof playedMoodQualifies>[1]);
+
+    it('Shock #101 (≤[3]) accepts a [2] self, rejects a [4] self', () => {
+      expect(playedMoodQualifies(shock, d(), 2)).toBe(true);
+      expect(playedMoodQualifies(shock, d(), 4)).toBe(false);
+    });
+    it('Spite #76 (even) accepts an even self, rejects an odd self', () => {
+      expect(playedMoodQualifies(spite, d(), 2)).toBe(true);
+      expect(playedMoodQualifies(spite, d(), 1)).toBe(false);
+    });
+    it('Courage #7 ([5]+) accepts a buffed [5] self, rejects the printed [1]', () => {
+      expect(playedMoodQualifies(courage, d(), 5)).toBe(true);
+      expect(playedMoodQualifies(courage, d(), 1)).toBe(false);
+    });
+    it('an opponent-only slot never accepts the (own) played mood', () => {
+      expect(playedMoodQualifies(arrog, d('white'), 2)).toBe(false);
+    });
   });
 });

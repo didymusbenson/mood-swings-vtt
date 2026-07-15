@@ -9,7 +9,7 @@ import { registerSpec } from '../choice-spec.js';
 registerSpec(28, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 2, players: 'all', label: 'Choose up to two players', optional: true },
-    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any', valueParity: 'odd' }, label: 'Choose which odd-value mood each returns', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any', valueParity: 'odd' }, selfTargetable: true, label: 'Choose which odd-value mood each returns', optional: true },
   ],
 });
 

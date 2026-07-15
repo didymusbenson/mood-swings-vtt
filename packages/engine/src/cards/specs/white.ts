@@ -7,9 +7,15 @@ import { registerSpec } from '../choice-spec.js';
 // in play when this resolves, so it may choose itself (selfTargetable).
 registerSpec(6, { slots: [{ key: 'moods', kind: 'mood', min: 1, max: 1, mood: { from: 'any' }, selfTargetable: true, label: 'Choose a mood' }] });
 
-// #7 Courage — up to two players each lose a [5]+ mood.
+// #7 Courage — up to two players each lose a [5]+ mood. The mood slot lets you pick
+// which qualifying mood each chosen player loses (the effect already reads it, falling
+// back to their first [5]+ mood); selfTargetable so a chosen self can lose a buffed
+// just-played Courage. Skipping the slot keeps the auto-pick behaviour.
 registerSpec(7, {
-  slots: [{ key: 'players', kind: 'player', min: 0, max: 2, players: 'all', label: 'Choose up to two players', optional: true }],
+  slots: [
+    { key: 'players', kind: 'player', min: 0, max: 2, players: 'all', label: 'Choose up to two players', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any', minValue: 5 }, selfTargetable: true, label: 'Choose which [5]-or-more mood each loses', optional: true },
+  ],
 });
 
 // #8 Dignity — may discard a hand card printed [0]/[1]/[2]/[3] to become [5].

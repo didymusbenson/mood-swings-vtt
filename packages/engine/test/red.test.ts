@@ -5,6 +5,7 @@ import { Engine } from '../src/engine.js';
 import { loadCardDB, type RawCard } from '../src/data.js';
 import type { CardDB } from '../src/cards/registry.js';
 import type { GameState, Mood, PlayerId } from '../src/types.js';
+import { SELF_TARGET } from '../src/cards/choice-spec.js';
 import '../src/cards/red.js';
 
 const path = fileURLToPath(new URL('../../../data/cards.json', import.meta.url));
@@ -30,6 +31,15 @@ function mkMood(card: number, owner: PlayerId): Mood {
 }
 
 describe('red cards', () => {
+  it('#101 Shock can discard ITSELF — it is [2] (≤[3]) and in play when it resolves', () => {
+    // p1 plays Shock, choosing themselves as a target player and the just-played Shock
+    // (SELF_TARGET) as the mood to discard. Rules-legal: the mood is in play by now.
+    const { e, s } = game(rig([101], [5]));
+    const g = e.apply(s, { type: 'play', player: 'p1', card: 101, choices: { players: ['p1'], moods: [SELF_TARGET] } });
+    expect(g.moods.p1 ?? []).toEqual([]); // Shock removed itself from play
+    expect(g.discard).toContain(101); // ...into the discard pile
+  });
+
   it('#92 Glee is [6] the round it is played, [0] afterwards', () => {
     const { e, s } = game(rig([92], [5]));
     let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 92 });

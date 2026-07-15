@@ -19,11 +19,13 @@ import {
   playsImmediately,
   isSingleTarget,
   firstBoardSlot,
+  playedMoodQualifies,
   SELF_TARGET,
   type ChoiceSlot,
   type ChoiceSpec,
 } from '@mood-swings/engine';
 import { db } from '../game/db.js';
+import { handWouldBe } from '../game/value.js';
 
 export type PlayMode = 'manual' | 'drag';
 
@@ -205,10 +207,18 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
       return { ...legal, cards: legal.cards.filter((c) => c !== flow.card) };
     }
     // A `selfTargetable` mood slot may pick the mood being played (it's in play by the
-    // time the afterPlaying effect resolves). Offer it as an extra candidate up front;
-    // the SELF_TARGET sentinel resolves to the real uid engine-side.
+    // time the afterPlaying effect resolves). Offer it up front when the played mood
+    // would pass the slot's filter, and — for "each chosen player" cards (a preceding
+    // players slot) — only when the acting player is one of the chosen. The SELF_TARGET
+    // sentinel resolves to the real uid engine-side.
     if (currentSlot.kind === 'mood' && currentSlot.selfTargetable) {
-      return { ...legal, moods: [SELF_TARGET, ...(legal.moods ?? [])] };
+      const hasPlayerSlot = flow.spec.slots.some((sl) => sl.kind === 'player');
+      const iAmChosen = !hasPlayerSlot || flow.sel.players.includes(me);
+      const wb = handWouldBe(state, me, flow.card);
+      const value = wb.value ?? wb.printed;
+      if (iAmChosen && playedMoodQualifies(currentSlot, cardLookup(flow.card), value)) {
+        return { ...legal, moods: [SELF_TARGET, ...(legal.moods ?? [])] };
+      }
     }
     return legal;
   }, [flow, currentSlot, state, me]);
