@@ -32,6 +32,10 @@ export interface CardData {
   rulesText: string | null;
   image: string;
   set: string;
+  /** Illustrator credit (may be absent for some entries). */
+  artist: string | null;
+  /** Mark Rosewater's clarifications, joined at load from data/card-notes.json. */
+  notes?: string[];
 }
 
 export type PlayerId = string;

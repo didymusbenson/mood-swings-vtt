@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
-import type { CardData, Color } from '@mood-swings/engine';
 import { randomBoxDeck, validateCustomDeck, minDeckSize } from '@mood-swings/engine';
 import { db } from '../game/db.js';
-import { Card } from './Card.js';
+import type { DeckCounts } from '../game/deckModel.js';
+import { flatten, fromFlat, totalCards } from '../game/deckModel.js';
+import { saveDeck } from '../game/deckStorage.js';
 import { Starburst } from './Starburst.js';
 import { HowToPlay } from './HowToPlay.js';
+import { Deckbuilder } from './deckbuilder/Deckbuilder.js';
 
 export interface StartConfig {
   players: { id: string; name: string }[];
@@ -16,18 +18,17 @@ interface StartScreenProps {
   onStart: (config: StartConfig) => void;
 }
 
-const COLOR_ORDER: Color[] = ['white', 'blue', 'black', 'red', 'green'];
 const MIN = minDeckSize(2);
-
-// Playable pool: every card except the headliner foil (#134) and the
-// multiplayer-only helper Hurt Feelings (#135).
-const POOL: CardData[] = db
-  .all()
-  .filter((c) => c.rarity !== 'headliner' && c.rarity !== 'helper')
-  .sort((a, b) => a.number - b.number);
 
 function randomSeed(): number {
   return Math.floor(Math.random() * 1_000_000);
+}
+
+/** Value-equality for two deck count maps (same cards, same copies). */
+function countsEqual(a: DeckCounts, b: DeckCounts): boolean {
+  if (a.size !== b.size) return false;
+  for (const [k, v] of a) if (b.get(k) !== v) return false;
+  return true;
 }
 
 export function StartScreen({ onStart }: StartScreenProps) {
@@ -39,30 +40,61 @@ export function StartScreen({ onStart }: StartScreenProps) {
   const [seed, setSeed] = useState<number>(() => randomSeed());
   const [randomDeck, setRandomDeck] = useState<number[]>(() => randomBoxDeck(db, seed).deck);
 
-  const [picked, setPicked] = useState<number[]>([]);
+  // Custom builder deck (a count map) + the last clean baseline for dirty tracking.
+  const [builderCounts, setBuilderCounts] = useState<DeckCounts>(() => new Map());
+  const [builderBaseline, setBuilderBaseline] = useState<DeckCounts>(() => new Map());
+  const [builderName, setBuilderName] = useState('Untitled deck');
+  const [guardOpen, setGuardOpen] = useState(false);
 
-  const deck = tab === 'random' ? randomDeck : picked;
+  const dirty = !countsEqual(builderCounts, builderBaseline);
+
+  const deck = tab === 'random' ? randomDeck : flatten(builderCounts);
   const validation = useMemo(() => validateCustomDeck(deck, 2), [deck]);
-
-  const byColor = useMemo(() => {
-    const groups = new Map<Color, CardData[]>();
-    for (const color of COLOR_ORDER) groups.set(color, []);
-    for (const card of POOL) groups.get(card.color)?.push(card);
-    return groups;
-  }, []);
-
-  const toggle = (n: number) =>
-    setPicked((prev) => (prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n]));
 
   const rerollRandom = () => {
     const s = randomSeed();
     setSeed(s);
     setRandomDeck(randomBoxDeck(db, s).deck);
   };
-
   const applySeed = (s: number) => {
     setSeed(s);
     setRandomDeck(randomBoxDeck(db, s).deck);
+  };
+
+  const markClean = (counts: DeckCounts, name: string) => {
+    setBuilderBaseline(new Map(counts));
+    setBuilderName(name);
+  };
+
+  const viewInBuilder = () => {
+    const counts = fromFlat(randomDeck);
+    setBuilderCounts(counts);
+    setBuilderBaseline(new Map(counts));
+    setBuilderName('From random deck');
+    setTab('custom');
+  };
+
+  /** Guarded tab switch: leaving an unsaved, dirty custom build prompts first. */
+  const switchTab = (next: 'random' | 'custom') => {
+    if (tab === 'custom' && next === 'random' && dirty) {
+      setGuardOpen(true);
+      return;
+    }
+    setTab(next);
+  };
+
+  const guardSave = () => {
+    const name = window.prompt('Save deck as:', builderName)?.trim();
+    if (!name) return; // stay in the guard
+    saveDeck(name, builderCounts);
+    markClean(builderCounts, name);
+    setGuardOpen(false);
+    setTab('random');
+  };
+  const guardDiscard = () => {
+    setBuilderCounts(new Map(builderBaseline)); // revert to last clean
+    setGuardOpen(false);
+    setTab('random');
   };
 
   const canStart = validation.ok && p1.trim().length > 0 && p2.trim().length > 0;
@@ -110,10 +142,10 @@ export function StartScreen({ onStart }: StartScreenProps) {
 
       <section className="panel">
         <div className="tabs">
-          <button className={tab === 'random' ? 'tab is-active' : 'tab'} onClick={() => setTab('random')}>
+          <button className={tab === 'random' ? 'tab is-active' : 'tab'} onClick={() => switchTab('random')}>
             Random deck
           </button>
-          <button className={tab === 'custom' ? 'tab is-active' : 'tab'} onClick={() => setTab('custom')}>
+          <button className={tab === 'custom' ? 'tab is-active' : 'tab'} onClick={() => switchTab('custom')}>
             Deckbuilder
           </button>
         </div>
@@ -124,40 +156,19 @@ export function StartScreen({ onStart }: StartScreenProps) {
             <div className="start__seedrow">
               <label>
                 Seed
-                <input
-                  type="number"
-                  value={seed}
-                  onChange={(e) => applySeed(Number(e.target.value) || 0)}
-                />
+                <input type="number" value={seed} onChange={(e) => applySeed(Number(e.target.value) || 0)} />
               </label>
               <button className="btn" onClick={rerollRandom}>
                 Reroll
+              </button>
+              <button className="btn" onClick={viewInBuilder}>
+                View in deckbuilder
               </button>
               <span className="muted">{randomDeck.length} cards</span>
             </div>
           </div>
         ) : (
-          <div className="start__builder">
-            <p className="muted">
-              Click cards to add or remove. Minimum {MIN} cards for 2 players.
-            </p>
-            {COLOR_ORDER.map((color) => (
-              <div key={color} className="builder__group">
-                <h3 className={`builder__color builder__color--${color}`}>{color}</h3>
-                <div className="builder__cards">
-                  {byColor.get(color)?.map((c) => (
-                    <Card
-                      key={c.number}
-                      card={c}
-                      compact
-                      selected={picked.includes(c.number)}
-                      onClick={() => toggle(c.number)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <Deckbuilder counts={builderCounts} db={db} onChange={setBuilderCounts} onClean={markClean} />
         )}
       </section>
 
@@ -169,11 +180,28 @@ export function StartScreen({ onStart }: StartScreenProps) {
           ) : (
             <span className="bad">{validation.errors.join(' ')}</span>
           )}
+          {tab === 'custom' && <span className="muted"> · min {MIN}</span>}
         </div>
         <button className="btn btn--primary" disabled={!canStart} onClick={start}>
           Start game
         </button>
       </footer>
+
+      {guardOpen && (
+        <div className="dbx-modal__backdrop" onClick={() => setGuardOpen(false)} role="presentation">
+          <div className="dbx-modal dbx-guard" role="dialog" aria-modal="true" aria-label="Unsaved changes" onClick={(e) => e.stopPropagation()}>
+            <header className="dbx-modal__head">
+              <h3 className="dbx-modal__title">Unsaved changes</h3>
+            </header>
+            <p>You have unsaved changes to this deck ({totalCards(builderCounts)} cards). Save them before leaving?</p>
+            <div className="dbx-import__actions">
+              <button type="button" className="btn btn--primary" onClick={guardSave}>Save deck</button>
+              <button type="button" className="btn" onClick={guardDiscard}>Discard</button>
+              <button type="button" className="btn" onClick={() => setGuardOpen(false)}>Keep editing</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

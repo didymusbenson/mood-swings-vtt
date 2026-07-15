@@ -7,7 +7,18 @@ import '@mood-swings/engine/cards';
 
 import { loadCardDB, type RawCard } from '@mood-swings/engine';
 import rawCards from '../../../../data/cards.json';
+import cardNotes from '../../../../data/card-notes.json';
 
 // The JSON is the faithful scraper output (RawCard[]); loadCardDB normalises it.
 export const RAW_CARDS = rawCards as unknown as RawCard[];
 export const db = loadCardDB(RAW_CARDS);
+
+// Join Mark Rosewater's clarifications (data/card-notes.json, keyed by collector
+// number) onto each card's optional `notes`. Kept in a separate file so the
+// scraper output (data/cards.json) stays pristine. Cards without notes are left
+// untouched.
+const NOTES = cardNotes as Record<string, string[]>;
+for (const card of db.all()) {
+  const notes = NOTES[String(card.number)];
+  if (notes) card.notes = notes;
+}

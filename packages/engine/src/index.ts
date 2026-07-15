@@ -9,8 +9,10 @@ export {
   randomBoxDeck,
   validateCustomDeck,
   minDeckSize,
+  standardDeckNotice,
   BOX_COLLATION,
   CUSTOM_MIN_FOR_TWO_PLAYERS,
+  STANDARD_DECK_SIZE,
   type DeckValidation,
 } from './deck.js';
 export * as queries from './queries.js';
