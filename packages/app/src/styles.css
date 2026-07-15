@@ -779,7 +779,9 @@ input:focus-visible {
   color: var(--muted);
   font-family: var(--font-hand);
   font-size: 0.95rem;
-  min-height: 1.6rem;
+  /* Collapses to nothing when idle (no reminder text) so the mood halves get the
+     space; the drag / game-over message expands it only when shown. */
+  min-height: 0;
 }
 .battlefield.is-armed .bf__drop-msg {
   color: var(--ink);

@@ -441,9 +441,11 @@ function Battlefield({
         <MoodTableau player={top} state={state} ctx={ctx} pos="top" />
       </div>
       <div className="bf__center">
-        <span className="bf__drop-msg">
-          {dragging ? 'Release to play' : gameOver ? 'Game over' : 'Drop a card anywhere here to play'}
-        </span>
+        {/* Only meaningful feedback — the drop cue while dragging, or the game-over
+            status. No idle reminder (it just took up centre space). */}
+        {(dragging || gameOver) && (
+          <span className="bf__drop-msg">{dragging ? 'Release to play' : 'Game over'}</span>
+        )}
       </div>
       <div className={`bf__half bf__half--bottom ${botTurn ? 'is-turn' : ''}`}>
         <MoodTableau player={bottom} state={state} ctx={ctx} pos="bottom" />
