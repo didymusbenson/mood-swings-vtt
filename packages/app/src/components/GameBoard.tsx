@@ -337,23 +337,15 @@ function PlayerEdge({ player, state, ctx, pos }: { player: PlayerState; state: G
   const actions = isActive ? <ActionSlot pc={pc} state={state} /> : <div className="actionslot actionslot--empty" aria-hidden />;
   const hand = <HandRow player={player} state={state} ctx={ctx} pos={pos} />;
 
-  // Top edge: info at the very top, hand nearest the battlefield. Bottom edge:
-  // hand nearest the battlefield, info at the very bottom; action slot above the hand.
+  // Both edges stack header → action slot → hand outward from the battlefield, so the
+  // hand is always the band nearest the player's screen edge. For the bottom seat that
+  // means your oversized hand reads large and its bottom bleeds off the screen edge
+  // (MTG-Arena / Slay-the-Spire style) rather than over your own info bar.
   return (
     <div className={classes}>
-      {pos === 'top' ? (
-        <>
-          {header}
-          {actions}
-          {hand}
-        </>
-      ) : (
-        <>
-          {actions}
-          {hand}
-          {header}
-        </>
-      )}
+      {header}
+      {actions}
+      {hand}
     </div>
   );
 }

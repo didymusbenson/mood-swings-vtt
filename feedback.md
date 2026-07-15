@@ -36,6 +36,7 @@ and implement. Status legend: 🆕 new · 📋 planned · 🔧 in progress · �
 | F8 | ✅ | targeting UX | "Choose a player; **that player** gives/discards a card from **their** hand" cards showed the **acting player's own hand** by mistake (e.g. Compulsion as P1 → chose P2 → was shown P1's hand). | `handCard` slots gained a source field (`cardsFrom`); `'chosen'` makes `legalTargets` enumerate the hand(s) of the player(s) picked in an earlier `players` slot (union), so the chooser shows the correct hand. Marked #86 Compulsion, #67 Intimidation, #78 Suspicion; the UI passes the flow's chosen players into `legalTargets`. +5 engine regression tests; verified live (Compulsion→P2 now shows P2's hand). |
 | F10 | ✅ | rules fidelity | "After playing this mood — choose a mood" cards (like **Conviction**) couldn't choose **themselves**, but by the rules the mood is *in play* when its effect resolves, so it should be a legal self-target. The chooser omitted it (it showed "No valid moods" when nothing else was out). | The mood is played into play *before* `afterPlaying` runs, so a self-target is valid engine-side. Added a `SELF_TARGET` sentinel + `ChoiceSlot.selfTargetable`; the flow offers the played mood as a candidate and the engine resolves the sentinel to its real uid before the effect runs. Marked #6 Conviction, #12 Faith, #24 Scorn, #66 Hate (single-target "choose a/any mood", `from:'any'`). "Another mood"/opponent-only/cost slots are correctly excluded. +2 engine tests; verified live (Conviction → chooses itself → bottom-decked + draw). |
 | F9 | ✅ | engine/targeting | Sweep of remaining known targeting gaps so the engine isn't left incomplete. Discard-recovery cards (#60 Corruption, #62 Cynicism, #128 Nostalgia) showed the acting **hand** instead of the **discard pile** → those abilities silently did nothing. Parity cards (#28 Anxiety odd, #76 Spite even) and the total-cap card (#80 Anger ≤[5]) over-offered moods → the player's pick was silently overridden or no-op'd. | Generalised the source field to `cardsFrom: 'acting' \| 'chosen' \| 'discard'` and marked the three discard cards. Added `MoodFilter.valueParity` (odd/even → #28/#76 offer only legal moods) and `MoodFilter.maxTotalValue` (#80: the flow blocks a pick that would push the running total past [5]). Fixed stale comments (Doubt #36 "not enforceable" — it *is*, via `bannedColors`; Anger "[3]"→"[5]"). +6 engine regression tests; `effect-gaps.md` updated. Remaining residual: Grace #121's recurring discard-play colour gate (grant-accounting, not targeting). |
+| F11 | ✅ | layout | Your (Player 1) hand was small and hard to read. Make it bigger and pull it to the bottom so name + value + art read clearly; its bottom (rules text) **may clip off the screen edge** — the Preview covers the text. Moods in play must **not** shrink or clip. | Your bottom hand cards are enlarged (134×188) and pinned to the very bottom, showing only their top slice — the rest bleeds off the table edge (MTG-Arena / Slay-the-Spire). Per the follow-up, your **info bar + action slot were pulled OUT of the vertical stack into the foreground** (bottom-left / bottom-right corners) — that fourth stacked row was the crowding. The battlefield reclaimed their ~67px (282→424px), so **full-size mood tiles now clip 0px** (previously the old layout already clipped moods ~36px on your turn). Opponent (hotseat) focal hand stays moderate + fully visible. No page scroll at 1366×768 / 1440×900. |
 
 ---
 
@@ -315,3 +316,31 @@ only when their value is buffed to [5]+/odd/even. **Courage** also gained a mood
 can choose *which* [5]+ mood each player loses (its effect already read `choices.moods`,
 auto-picking otherwise). Verified live: playing Shock, choosing yourself, and picking "This
 mood" discards Shock into the pile. +5 engine tests.
+
+### F11 — Bigger, bottom-anchored hand; foreground info bar  (✅ shipped)
+**What:** Your hand was small and hard to read. Enlarge it and pull it to the very bottom so
+name + value + art carry each card; the card's bottom (rules text) may run off the screen
+edge — the Preview shows the full text. Moods in play must NOT shrink or clip.
+**Design (from the reference images — MTG Arena / Slay the Spire):** big hand cards anchored
+to the bottom, their lower portion clipped by the screen edge; the player's info + controls
+float in the foreground at the bottom corners rather than stacking as rows.
+**Root cause of the crowding (the user's own diagnosis):** the bottom edge stacked *four*
+things vertically — info bar, action slot, hand — each stealing height from the battlefield,
+which forced the moods to clip. First attempt (shrinking the mood tiles to fit) was wrong —
+moods must keep their size.
+**Shipped:**
+- Your bottom hand cards are enlarged to 134×188 but only their top `--tile-hand-visible`
+  (116px) sits in the layout; the taller card renders full-height and overflows below the
+  table edge (viewport-clipped), so name + value + art read big.
+- The bottom seat's **info bar (`.seat__head`) and action slot (`.actionslot`) are floated
+  in the foreground** — absolute, bottom-left / bottom-right corners — instead of stacking.
+  Removing those ~67px from the vertical stack grew the battlefield **282 → 424px**, so
+  full-size mood tiles (184px) now clip **0px** (the old layout already clipped them ~36px on
+  your turn — this is strictly better).
+- The opponent's focal (hotseat) hand stays moderate and fully visible; only your bottom
+  hand gets the oversized bottom-clipped treatment. Table bottom padding removed so the clip
+  lands at the screen edge.
+- Verified live at 1366×768 and 1440×900 (no page scroll), with an empty board, a populated
+  board (mood not clipped), and the opponent's turn.
+**Note:** at the bottom corners the floated info bar / Pass button lightly overlap the hand's
+outermost cards (Slay-the-Spire-style); the info bar has a paper backing so it stays legible.

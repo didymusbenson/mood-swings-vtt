@@ -77,9 +77,15 @@
 
   /* Compact board-tile dimensions (fixed full-screen layout). Tuned so a full
      hand, both tableaus, the shared row and both rails fit 1366x768 / 1440x900
-     with no page scroll. */
-  --tile-hand-w: 82px;
-  --tile-hand-h: 112px;
+     with no page scroll. Played-mood tiles keep their full size; your hand reads
+     large (name + value + art — rules live in the Preview) and its bottom bleeds
+     off the bottom of the screen rather than squeezing the battlefield. */
+  --tile-hand-w: 134px;
+  --tile-hand-h: 188px;
+  /* Visible slice of your hand card (top: name + value + art). The rest overflows
+     below the screen edge. Keeps the hand's layout footprint small so the moods
+     don't lose room. */
+  --tile-hand-visible: 116px;
   --tile-you-w: 136px;
   --tile-you-h: 184px;
   --tile-opp-w: 124px;
@@ -700,7 +706,8 @@ input:focus-visible {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0.5rem;
-  padding: 0.5rem 0.6rem;
+  /* No bottom padding: your hand's oversized cards clip cleanly at the screen edge. */
+  padding: 0.5rem 0.6rem 0;
   overflow: hidden;
 }
 
@@ -960,6 +967,33 @@ input:focus-visible {
   background: linear-gradient(to top, rgba(47, 111, 176, 0.1), rgba(47, 111, 176, 0));
 }
 
+/* Your info bar + action slot float in the foreground at the bottom corners
+   (Slay-the-Spire style) instead of stacking as their own rows. That hands their
+   ~67px back to the battlefield so full-size moods no longer clip, while your hand
+   stays the big strip along the very bottom. */
+.edge--bottom {
+  position: relative;
+}
+.edge--bottom > .seat__head {
+  position: absolute;
+  left: 0.4rem;
+  bottom: 0.35rem;
+  z-index: 46;
+  width: auto;
+  max-width: 45%;
+  background: linear-gradient(90deg, var(--paper) 70%, rgba(246, 242, 231, 0));
+  border-radius: 10px;
+  padding: 0.1rem 0.5rem 0.1rem 0.2rem;
+}
+.edge--bottom > .actionslot {
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.5rem;
+  z-index: 46;
+  width: auto;
+  max-width: 45%;
+}
+
 /* During a targeting flow the modal overlay owns the confirm controls and dims the
    rest, so the acting edge no longer needs to escape above the scrim. */
 
@@ -1128,6 +1162,17 @@ input:focus-visible {
   --card-w: var(--tile-hand-w);
   --card-h: var(--tile-hand-h);
 }
+/* The opponent's focal (hotseat) hand stays fully visible and moderate — only YOUR
+   bottom hand gets the oversized, bottom-clipped treatment. */
+.hand--focal.hand--top {
+  --card-w: 104px;
+  --card-h: 140px;
+}
+/* Your hand reads big: larger name, so name + value + art carry the card (full
+   rules live in the Preview). */
+.hand--focal .card--tile .card__name {
+  font-size: 0.92rem;
+}
 .hand--idle {
   --card-w: var(--tile-opphand-w);
   --card-h: var(--tile-opphand-h);
@@ -1149,15 +1194,22 @@ input:focus-visible {
   padding: 0.2rem 0.5rem;
 }
 .hand--focal .hand__cards {
-  min-height: calc(var(--card-h) + 16px);
+  min-height: calc(var(--card-h) + 10px);
 }
+/* Your hand: cap the box to the visible top slice; the taller card renders at full
+   height and overflows below, clipped by the table edge (viewport). The battlefield
+   keeps its room — only the card's off-screen bottom (rules text) is lost. */
 .hand--focal.hand--bottom .hand__cards {
-  align-items: flex-end;
-  padding-top: 14px;
+  align-items: flex-start;
+  height: var(--tile-hand-visible);
+  min-height: var(--tile-hand-visible);
+  overflow: visible;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 .hand--focal.hand--top .hand__cards {
   align-items: flex-start;
-  padding-bottom: 14px;
+  padding-bottom: 8px;
 }
 .hand--idle .hand__cards {
   padding: 0.15rem 0.4rem;
@@ -1173,7 +1225,7 @@ input:focus-visible {
   flex: none;
 }
 .hand--focal .hand__slot + .hand__slot {
-  margin-left: -46px;
+  margin-left: -58px;
 }
 .hand--idle .hand__slot + .hand__slot {
   margin-left: -28px;
@@ -1184,6 +1236,11 @@ input:focus-visible {
 }
 .hand--bottom .hand__slot .card {
   transform-origin: bottom center;
+}
+/* The clipped bottom hand pivots at its visible top so fan rotation and the hover
+   lift keep the name/value/art in view. */
+.hand--focal.hand--bottom .hand__slot .card {
+  transform-origin: top center;
 }
 .hand--top .hand__slot .card {
   transform-origin: top center;
