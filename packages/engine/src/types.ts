@@ -176,11 +176,12 @@ export interface GameState {
   hands: Record<PlayerId, CardNumber[]>;
   moods: Record<PlayerId, Mood[]>;
   /**
-   * Card numbers currently revealed from each player's hand (Curiosity #33 /
-   * Paranoia #71). A revealed card is public: while it remains in the holder's hand,
-   * redaction shows it face-up to opponents instead of a card back. Reconciled against
-   * the live hand at redaction (a revealed card that's since been played simply drops
-   * out) and cleared at the start of each round to bound staleness.
+   * Card numbers currently revealed from each player's hand and thus public knowledge:
+   * Curiosity #33 / Paranoia #71 reveals, plus any mood that returns from play to a hand
+   * (everyone saw which card went back). While a revealed card remains in the holder's
+   * hand, redaction shows it face-up to opponents instead of a card back. It persists —
+   * across rounds — until the card leaves the hand (played, discarded, given, passed):
+   * the engine prunes it (see reconcileRevealed) the moment the hand no longer holds it.
    */
   revealed: Record<PlayerId, CardNumber[]>;
 

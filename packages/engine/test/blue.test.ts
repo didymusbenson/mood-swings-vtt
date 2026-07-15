@@ -60,6 +60,21 @@ describe('blue cards', () => {
     expect(g.revealed.p2).toContain(44);
   });
 
+  it('a revealed card persists while in hand and is pruned once it leaves', () => {
+    const { e, s } = game(rig([5, 44], [44], 44)); // p1 hand: 5, then four 44s
+    s.revealed = { p1: [5, 44] };
+    // Playing a DIFFERENT card leaves both revealed cards in hand → both stay revealed.
+    let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 44 });
+    expect(g.revealed.p1).toContain(5); // 5 still in hand → still revealed
+    expect(g.revealed.p1).toContain(44); // a 44 still in hand → still revealed
+    // Now play the revealed 5 → it leaves the hand → its reveal is pruned.
+    const { e: e2, s: s2 } = game(rig([5, 44], [44], 44));
+    s2.revealed = { p1: [5] };
+    g = e2.apply(s2, { type: 'play', player: 'p1', card: 5 });
+    expect(g.hands.p1).not.toContain(5);
+    expect(g.revealed.p1 ?? []).not.toContain(5); // gone once it left the hand
+  });
+
   it('#27 Ambivalence is [6] alone, [3] with two red/green moods', () => {
     // p1 plays Ambivalence; p2 brings two red (Boredom) moods into play.
     const { e, s } = game(rig([27], [83, 83], 83));

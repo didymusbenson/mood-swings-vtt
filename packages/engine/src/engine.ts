@@ -277,9 +277,13 @@ export class Engine {
         this.fireLeavePlay(state, mood);
         const m = removeMood(mood);
         if (m) {
-          (state.hands[to ?? m.owner] ??= []).push(m.card);
+          const dest = to ?? m.owner;
+          (state.hands[dest] ??= []).push(m.card);
+          // A mood returning from play to a hand is public knowledge — everyone saw
+          // which card went back — so it stays revealed in that hand until it leaves.
+          (state.revealed[dest] ??= []).push(m.card);
           clearSuppressionsBy(state, m.uid);
-          push(`${label} returns to ${pname(to ?? m.owner)}'s hand`, 'return');
+          push(`${label} returns to ${pname(dest)}'s hand`, 'return');
         }
       },
       discardFromHand: (player, card) => {
@@ -409,7 +413,36 @@ export class Engine {
         state.discardPlaysRemaining > 0;
       if (!canContinue) this.completeTurn(state, action.player);
     }
+    this.reconcileRevealed(state);
     return state;
+  }
+
+  /**
+   * Keep `revealed` honest after an action: a revealed card stays revealed only while a
+   * matching card is still in that hand. Any departure (played, discarded, given, passed,
+   * bottom-decked) drops the reveal — the hand's count of that card falls, so the excess
+   * revealed entry is pruned. Reveals otherwise persist indefinitely (across rounds) until
+   * the card leaves. Count-based, so with duplicate copies it errs toward keeping a reveal
+   * while any matching copy remains.
+   */
+  private reconcileRevealed(state: GameState): void {
+    for (const pid of Object.keys(state.revealed) as PlayerId[]) {
+      const rev = state.revealed[pid];
+      if (!rev || rev.length === 0) continue;
+      const handCount = new Map<number, number>();
+      for (const c of state.hands[pid] ?? []) handCount.set(c, (handCount.get(c) ?? 0) + 1);
+      const used = new Map<number, number>();
+      const kept: number[] = [];
+      for (const c of rev) {
+        const cap = handCount.get(c) ?? 0;
+        const u = used.get(c) ?? 0;
+        if (u < cap) {
+          kept.push(c);
+          used.set(c, u + 1);
+        }
+      }
+      state.revealed[pid] = kept;
+    }
   }
 
   private completeTurn(state: GameState, player: PlayerId): void {
@@ -732,7 +765,6 @@ export class Engine {
     state.actedThisRound = [];
     state.roundScores = {};
     state.discardedThisRound = 0;
-    state.revealed = {}; // revealed-hand knowledge is a per-round fog-of-war window
     // Doubt #36: the colours staged this round become unplayable for exactly this next round.
     state.bannedColors = state.pendingBannedColors;
     state.pendingBannedColors = [];
