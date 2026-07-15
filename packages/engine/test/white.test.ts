@@ -5,6 +5,7 @@ import { Engine } from '../src/engine.js';
 import { loadCardDB, type RawCard } from '../src/data.js';
 import type { CardDB } from '../src/cards/registry.js';
 import type { GameState } from '../src/types.js';
+import { SELF_TARGET } from '../src/cards/choice-spec.js';
 import '../src/cards/index.js';
 
 const path = fileURLToPath(new URL('../../../data/cards.json', import.meta.url));
@@ -79,6 +80,17 @@ describe('white cards', () => {
     expect(g.moods.p1!.map((m) => m.card)).toEqual([6]); // Complacency left play
     expect(g.deck[g.deck.length - 1]).toBe(5); // bottom-decked
     expect(g.hands.p1!.length).toBe(handBefore); // played Conviction (-1) then drew (+1)
+  });
+
+  it('#6 Conviction can choose ITSELF — it is in play when its effect resolves', () => {
+    // Conviction with no other mood in play, targeting the mood being played
+    // (SELF_TARGET). It's in play by afterPlaying, so it bottom-decks itself and draws.
+    const { e, s } = game(rig([6], [5]));
+    const handBefore = s.hands.p1!.length;
+    const g = e.apply(s, { type: 'play', player: 'p1', card: 6, choices: { moods: [SELF_TARGET] } });
+    expect(g.moods.p1!).toEqual([]); // Conviction removed itself from play
+    expect(g.deck[g.deck.length - 1]).toBe(6); // Conviction is on the bottom of the deck
+    expect(g.hands.p1!.length).toBe(handBefore); // -1 play, +1 draw
   });
 
   it('#19 Meekness suppresses all moods worth [5]+ while it stays in play', () => {

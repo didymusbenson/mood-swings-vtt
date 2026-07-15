@@ -179,4 +179,12 @@ describe('card target specs', () => {
   it('Anger #80 carries a maxTotalValue cap of 5 (running total enforced in the flow)', () => {
     expect(specFor(80)!.slots[0]!.mood?.maxTotalValue).toBe(5);
   });
+
+  it('afterPlaying "choose a mood" cards are marked selfTargetable (#6/#12/#24/#66)', () => {
+    // The mood being played is in play by afterPlaying, so these may target themselves.
+    const moodSlot = (n: number) => specFor(n)!.slots.find((sl) => sl.kind === 'mood')!;
+    for (const n of [6, 12, 24, 66]) expect(moodSlot(n).selfTargetable, `#${n}`).toBe(true);
+    // "another mood" / cost / opponent-only slots must NOT be self-targetable.
+    for (const n of [84, 34, 40]) expect(moodSlot(n).selfTargetable ?? false, `#${n}`).toBe(false);
+  });
 });

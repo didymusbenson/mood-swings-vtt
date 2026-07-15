@@ -25,6 +25,7 @@ export {
   hasRequiredTargets,
   isSingleTarget,
   firstBoardSlot,
+  SELF_TARGET,
   type ChoiceSpec,
   type ChoiceSlot,
   type MoodFilter,

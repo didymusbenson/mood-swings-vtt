@@ -66,7 +66,24 @@ export interface ChoiceSlot {
   players?: 'opponents' | 'all'; // kind === 'player'
   numberRange?: [number, number]; // kind === 'number'
   options?: string[]; // kind === 'choice' → sets `option`
+  /**
+   * kind === 'mood': this is an `afterPlaying` slot whose "choose a mood" may pick the
+   * mood being played (it is already in play by then). The flow offers the played mood
+   * as an extra candidate (SELF_TARGET). Only set on slots whose filter the played mood
+   * always satisfies (e.g. `from: 'any'` with no value/colour constraint) — never on a
+   * cost slot (the mood is not yet in play during a cost) or an "another mood" effect.
+   */
+  selfTargetable?: boolean;
 }
+
+/**
+ * Sentinel `moods` value meaning "the mood being played". A mood is in play the
+ * instant it is played, so its own `afterPlaying — choose a mood` effect may target
+ * it (Conviction #6, Scorn #24, Hate #66, Faith #12). The player picks it before the
+ * mood has a real uid, so the flow records this sentinel; the engine swaps it for the
+ * played mood's uid once it enters play (before afterPlaying runs).
+ */
+export const SELF_TARGET = '@self';
 
 export interface ChoiceSpec {
   slots: ChoiceSlot[];

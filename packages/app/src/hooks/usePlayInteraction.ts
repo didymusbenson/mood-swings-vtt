@@ -19,6 +19,7 @@ import {
   playsImmediately,
   isSingleTarget,
   firstBoardSlot,
+  SELF_TARGET,
   type ChoiceSlot,
   type ChoiceSpec,
 } from '@mood-swings/engine';
@@ -202,6 +203,12 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
     // hand-cost discard/reveal (matters when copying a discard-cost card via Creativity).
     if (currentSlot.kind === 'handCard' && legal.cards) {
       return { ...legal, cards: legal.cards.filter((c) => c !== flow.card) };
+    }
+    // A `selfTargetable` mood slot may pick the mood being played (it's in play by the
+    // time the afterPlaying effect resolves). Offer it as an extra candidate up front;
+    // the SELF_TARGET sentinel resolves to the real uid engine-side.
+    if (currentSlot.kind === 'mood' && currentSlot.selfTargetable) {
+      return { ...legal, moods: [SELF_TARGET, ...(legal.moods ?? [])] };
     }
     return legal;
   }, [flow, currentSlot, state, me]);

@@ -3,8 +3,9 @@
 // and play immediately. Slots must match what the effect reads from ctx.choices.
 import { registerSpec } from '../choice-spec.js';
 
-// #6 Conviction — choose any mood; its owner bottom-decks it and draws.
-registerSpec(6, { slots: [{ key: 'moods', kind: 'mood', min: 1, max: 1, mood: { from: 'any' }, label: 'Choose a mood' }] });
+// #6 Conviction — choose any mood; its owner bottom-decks it and draws. Conviction is
+// in play when this resolves, so it may choose itself (selfTargetable).
+registerSpec(6, { slots: [{ key: 'moods', kind: 'mood', min: 1, max: 1, mood: { from: 'any' }, selfTargetable: true, label: 'Choose a mood' }] });
 
 // #7 Courage — up to two players each lose a [5]+ mood.
 registerSpec(7, {
@@ -28,7 +29,7 @@ registerSpec(11, {
 registerSpec(12, {
   slots: [
     { key: 'cards', kind: 'handCard', min: 0, max: 1, hand: { colorIn: ['green', 'blue'] }, label: 'Discard a green/blue card (optional)', optional: true },
-    { key: 'moods', kind: 'mood', min: 0, max: 1, mood: { from: 'any' }, label: 'Suppress a mood' },
+    { key: 'moods', kind: 'mood', min: 0, max: 1, mood: { from: 'any' }, selfTargetable: true, label: 'Suppress a mood' },
   ],
 });
 
@@ -52,8 +53,8 @@ registerSpec(22, { slots: [{ key: 'players', kind: 'player', min: 0, max: 1, pla
 // #23 Repentance — choose a value; suppress all other moods with it.
 registerSpec(23, { slots: [{ key: 'option', kind: 'number', min: 0, max: 1, numberRange: [0, 12], label: 'Choose a value', optional: true }] });
 
-// #24 Scorn — suppress any mood.
-registerSpec(24, { slots: [{ key: 'moods', kind: 'mood', min: 0, max: 1, mood: { from: 'any' }, label: 'Suppress a mood', optional: true }] });
+// #24 Scorn — suppress any mood (may be Scorn itself; it is in play by now).
+registerSpec(24, { slots: [{ key: 'moods', kind: 'mood', min: 0, max: 1, mood: { from: 'any' }, selfTargetable: true, label: 'Suppress a mood', optional: true }] });
 
 // #25 Shame — discard a card; suppress other moods sharing its colour.
 registerSpec(25, { slots: [{ key: 'cards', kind: 'handCard', min: 0, max: 1, label: 'Discard a card (optional)', optional: true }] });

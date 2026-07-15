@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import type { Action, Color, GameState, Mood, PlayerState } from '@mood-swings/engine';
-import { ROUNDS_TO_WIN, type ChoiceSlot } from '@mood-swings/engine';
+import { ROUNDS_TO_WIN, SELF_TARGET, type ChoiceSlot } from '@mood-swings/engine';
 import { db } from '../game/db.js';
 import { handWouldBe, moodComputed } from '../game/value.js';
 import { assignAvatars } from '../game/avatars.js';
@@ -566,6 +566,24 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
             <div className="target-fan">
               {(legal?.moods ?? []).length === 0 && <p className="muted">No valid moods.</p>}
               {(legal?.moods ?? []).map((uid) => {
+                // The mood being played, offered to its own afterPlaying effect (Conviction).
+                if (uid === SELF_TARGET) {
+                  const selfCard = db.get(pc.flow!.card);
+                  return (
+                    <div key={uid} className="target-fan__item">
+                      <span className="target-fan__owner">This mood</span>
+                      <Card
+                        card={selfCard}
+                        value={showValue ? wb.value! : undefined}
+                        computed={showValue && wb.computed}
+                        tile
+                        targetSelected={pc.moodSelected(uid)}
+                        onClick={() => pc.onMoodClick(uid)}
+                        onPointerEnter={() => ctx.setPreview({ card: selfCard, handOwner: pc.me })}
+                      />
+                    </div>
+                  );
+                }
                 const found = findMood(state, uid);
                 if (!found) return null;
                 const owner = state.players.find((p) => p.id === found.owner);

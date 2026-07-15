@@ -33,6 +33,7 @@ import {
   printedValue,
   resolveCardNumber,
 } from './queries.js';
+import { SELF_TARGET } from './cards/choice-spec.js';
 
 const MAX_STABILISE_ITERATIONS = 64;
 
@@ -469,8 +470,12 @@ export class Engine {
     // 3. while-in-play stabilises
     this.stabilise(state);
 
-    // 4. after-playing
-    eff.afterPlaying?.(this.playContext(state, mood, me, choices));
+    // 4. after-playing. The mood is now in play, so a `selfTargetable` slot's
+    // SELF_TARGET sentinel resolves to this mood's uid (Conviction #6 targeting itself).
+    const afterChoices: Choices = choices.moods?.includes(SELF_TARGET)
+      ? { ...choices, moods: choices.moods.map((u) => (u === SELF_TARGET ? mood.uid : u)) }
+      : choices;
+    eff.afterPlaying?.(this.playContext(state, mood, me, afterChoices));
     this.stabilise(state);
 
     // 5. "each time you play another mood" triggers on the player's other moods

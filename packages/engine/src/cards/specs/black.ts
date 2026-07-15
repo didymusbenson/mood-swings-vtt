@@ -70,9 +70,9 @@ registerSpec(64, {
   slots: [{ key: 'moods', kind: 'mood', min: 1, max: 1, mood: { from: 'own' }, label: 'Discard one of your moods' }],
 });
 
-// #66 Hate — may bottom-deck any mood and draw.
+// #66 Hate — may bottom-deck any mood and draw (may be Hate itself; it is in play now).
 registerSpec(66, {
-  slots: [{ key: 'moods', kind: 'mood', min: 0, max: 1, mood: { from: 'any' }, label: 'Bottom-deck a mood (optional)', optional: true }],
+  slots: [{ key: 'moods', kind: 'mood', min: 0, max: 1, mood: { from: 'any' }, selfTargetable: true, label: 'Bottom-deck a mood (optional)', optional: true }],
 });
 
 // #67 Intimidation — may take a revealed card from another player and play it.
