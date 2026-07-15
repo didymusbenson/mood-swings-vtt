@@ -228,7 +228,19 @@ function HandRow({ player, state, ctx, pos }: { player: PlayerState; state: Game
           highlighted={!!targetLegal}
           targetSelected={flowHandSlot && pc.handCardSelected(card)}
           pointerDraggable={canDragHand}
-          onPointerDown={canDragHand ? (e) => handDrag.onCardPointerDown(e, card, idx) : undefined}
+          // Tap / click / drag all begin with pointer-down, so forcing the preview
+          // here makes every one of them an immediate preview trigger (hover is the
+          // fourth, delayed path). Disabled cards (opponent hands) emit no pointer
+          // events, so hidden cards never leak through this.
+          onPointerDown={
+            interactive
+              ? (e) => {
+                  ctx.endHover();
+                  setPreview(preview);
+                  if (canDragHand) handDrag.onCardPointerDown(e, card, idx);
+                }
+              : undefined
+          }
           onPointerEnter={ctx.hoverPreview(preview)}
           onPointerLeave={ctx.endHover}
           onFocus={() => setPreview(preview)}
@@ -743,11 +755,21 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
   const bottom = state.players[0]!;
   const top = state.players[1] ?? bottom;
 
-  // The preview shows the dragged card, or (during targeting) the card being
-  // played (F4 — held in the Preview space), else whatever is hovered/focused.
+  // When a targeting flow opens, drop any stale hover-preview (and its pending
+  // timer) so the pane starts on the card being played rather than whatever was
+  // last hovered. Hovering a modal target then updates it live (below).
+  const flowCard = pc.flow?.card ?? null;
+  useEffect(() => {
+    endHover();
+    setPreview(null);
+  }, [flowCard, endHover]);
+
+  // The preview shows the dragged card; during targeting it holds the card being
+  // played (F4 — in the Preview space) but switches to whatever modal target is
+  // hovered so it stays a big, legible read; else whatever is hovered/focused.
   const previewTarget = useMemo<PreviewTarget | null>(() => {
     if (handDrag.drag?.active) return { card: db.get(handDrag.drag.card) };
-    if (pc.flow) return { card: db.get(pc.flow.card) };
+    if (pc.flow) return preview ?? { card: db.get(pc.flow.card) };
     return preview;
   }, [handDrag.drag, pc.flow, preview]);
 
@@ -798,7 +820,7 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
       </header>
 
       <div className="board">
-        <PreviewPane target={previewTarget} state={state} />
+        <PreviewPane target={previewTarget} state={state} floating={!!pc.flow || discardOpen} />
         {/* Center column, three stacked bands (F5): opponent edge / battlefield / your edge. */}
         <div className="playfield">
           <PlayerEdge player={top} state={state} ctx={ctx} pos="top" />

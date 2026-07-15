@@ -48,9 +48,18 @@ function RulesText({ text, clause }: { text: string; clause?: string }) {
  *            rarity) and printed rules text, with the self-modifying clause
  *            highlighted when the mood's own text drives its value.
  */
-export function PreviewPane({ target, state }: { target: PreviewTarget | null; state: GameState }) {
+export function PreviewPane({
+  target,
+  state,
+  floating,
+}: {
+  target: PreviewTarget | null;
+  state: GameState;
+  /** Lift the pane above an open modal's scrim so it stays visible while reading. */
+  floating?: boolean;
+}) {
   return (
-    <aside className="preview" tabIndex={0} aria-label="Card preview">
+    <aside className={`preview${floating ? ' preview--floating' : ''}`} tabIndex={0} aria-label="Card preview">
       <span className="preview__tape preview__tape--l" aria-hidden />
       <span className="preview__tape preview__tape--r" aria-hidden />
       <h3 className="preview__label">Preview</h3>

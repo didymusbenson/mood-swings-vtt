@@ -40,6 +40,14 @@
   --ok: #3f9d5a;
   --bad: #c0392b;
 
+  /* Selection — the unmistakable "this is chosen" highlight used in choice
+     modals (card targets, chips, avatars). A hot amber-gold ring + glow that
+     pops on paper and against every card colour. */
+  --select: #ff9500;
+  --select-strong: #e07a00;
+  --select-glow: rgba(255, 149, 0, 0.55);
+  --select-soft: rgba(255, 149, 0, 0.18);
+
   /* Value Transparency — computed-value indicator (glow on a modified value). */
   --computed: #c77d16;
   --computed-glow: rgba(199, 125, 22, 0.7);
@@ -462,8 +470,32 @@ input:focus-visible {
   box-shadow: 0 0 0 3px rgba(63, 157, 90, 0.3), 0 0 12px rgba(63, 157, 90, 0.4);
 }
 .card--target-selected {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 12px rgba(47, 111, 176, 0.4);
+  border-color: var(--select) !important;
+  border-width: 4px;
+  box-shadow: 0 0 0 4px var(--select), 0 0 0 7px var(--select-soft), 0 0 20px 2px var(--select-glow);
+  transform: translateY(-3px);
+  z-index: 1;
+}
+/* An unmistakable "chosen" tick in the corner of a selected target card. */
+.card--target-selected::after {
+  content: '✓';
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: var(--select);
+  color: #fff;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  z-index: 2;
+  pointer-events: none;
 }
 .card--dimmed {
   opacity: 0.35;
@@ -1331,11 +1363,21 @@ input:focus-visible {
   text-transform: capitalize;
 }
 .chip.is-on {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  /* Number / choice chips (no inline colour) take the amber selection border;
+     colour chips keep their inline colour border but gain the same amber glow,
+     so a selected chip pops either way. */
+  border-color: var(--select);
+  border-width: 3px;
+  background: var(--select-soft);
+  color: var(--select-strong);
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--select-soft), 0 0 12px var(--select-glow);
 }
 .chip--color {
   border-width: 3px;
+}
+.chip--color.is-on {
+  border-width: 4px;
 }
 
 /* ============================================================================
@@ -1460,9 +1502,11 @@ input:focus-visible {
   box-shadow: 3px 3px 0 rgba(44, 42, 37, 0.5);
 }
 .avatar-pick.is-on {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  box-shadow: 0 0 0 3px var(--accent-soft), 2px 2px 0 rgba(44, 42, 37, 0.45);
+  border-color: var(--select);
+  border-width: 4px;
+  background: var(--select-soft);
+  transform: translate(-1px, -1px);
+  box-shadow: 0 0 0 4px var(--select-soft), 0 0 18px 2px var(--select-glow), 2px 2px 0 rgba(44, 42, 37, 0.45);
 }
 .avatar-pick__face {
   font-size: 2.6rem;
@@ -1484,7 +1528,9 @@ input:focus-visible {
   flex-wrap: nowrap;
   gap: 0.6rem;
   overflow-x: auto;
-  padding: 0.3rem 0.2rem 0.5rem;
+  /* Generous vertical padding so a selected card's lift, glow ring and corner
+     tick (which overflow the card box) stay inside the scrollport, not clipped. */
+  padding: 1.4rem 0.9rem 1.1rem;
   max-width: min(88vw, 660px);
   --card-w: 96px;
   --card-h: 134px;
@@ -1542,6 +1588,14 @@ input:focus-visible {
   border-radius: 6px;
   padding: 1rem 0.9rem;
   box-shadow: var(--shadow);
+}
+/* While a choice modal / inspector is open the preview lifts above the scrim so
+   the card being read stays fully visible and updates live as targets are
+   hovered — a big, legible companion to the (necessarily compact) modal cards. */
+.preview--floating {
+  z-index: 60;
+  border-color: var(--select);
+  box-shadow: 0 0 0 2px var(--select-soft), 0 10px 30px rgba(30, 22, 10, 0.45);
 }
 .preview::after {
   /* faint index-card ruling */

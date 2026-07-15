@@ -31,6 +31,8 @@ and implement. Status legend: 🆕 new · 📋 planned · 🔧 in progress · �
 | F4 | ✅ | targeting UX | Target selection must be an in-your-face **modal overlay** (dims background), not the current subtle inline flow | Dimming overlay, bold "Choose {target(s)}" header + count, played card held in Preview, per-kind pickers (avatars/moods/hand-fan/chips) brought forward. The modal owns its Submit/Skip/Cancel (part of the overlay); the non-modal manual "Play" uses the action slot above the hand. |
 | F4a | ✅ | asset | **Player avatars** — **emoji placeholders** for now (real art TBD), auto-assigned per player | `assignAvatars` gives each seat a distinct emoji (🦊 P1 / 🐙 P2); shown in seat headers, topbar, and the F4 player picker. |
 | F5 | ✅ | layout | Hands were still **inside** each player's battlefield box. Restructure into three stacked bands — TOP: opponent info + hand · MIDDLE: one battlefield (halves split by owner, no per-player boxes) · BOTTOM: your hand + info | Center column is now a `.playfield` 3-row grid: `PlayerEdge` (info + action slot + hand) top & bottom, a single `.battlefield` between them holding only the played moods split into `.bf__half--top`/`--bottom` (dashed centre split, no boxes), deck+discard column at the left edge. Active player's half + edge get a soft tint (no boxy ring). No page scroll at 1366×768 / 1440×900; targeting overlay + both play modes preserved. |
+| F6 | ✅ | targeting UX | The **"selected" highlight in choice modals is too subtle** — hard to tell what's chosen (soft blue/green ring). Make it thicker and pop with a glowing red/yellow. | New `--select` amber-gold token drives one bold selection treatment across the modal: selected card targets get a 4px amber border + double glow ring + lift + a white **✓ corner badge**; selected chips get an amber border/glow (colour chips keep their colour border, add the glow); the selected avatar gets an amber border + glow + fill. `.target-fan` vertical padding widened so the lift/glow/badge aren't clipped by its scroll container. |
+| F7 | ✅ | targeting UX | In a choice modal the **played-card preview is forced tiny and unreadable**; and **only hover** opened a hand preview. 1) make the preview readable during modals, and 2) let **tap/click/drag** (not just hover) force a preview. | The left **Preview** rail now lifts above the modal scrim (`.preview--floating`, amber border) so it stays fully visible and **updates live** as modal targets are hovered — a big, legible companion to the compact modal cards (opening a flow clears any stale hover-preview so it starts on the played card). Hand cards force the preview on **pointer-down**, so tap / click / drag are all instant preview triggers (hover stays the delayed 4th path); disabled opponent cards emit no pointer events, so no hidden card leaks. |
 
 ---
 
@@ -193,3 +195,39 @@ than the CSS homage. **Shipped:** `CardBack` hotlinks the official back from mtg
 homage if the image can't load (offline / blocked CDN). The real image is verifiable in
 a normal browser; the in-sandbox proxy blocks image CDNs, so previews there show the
 fallback.
+
+### F6 — Choice-modal selection highlight must pop  (✅ shipped)
+**What:** The "selected" affordance in choice modals was too subtle — a soft blue/green
+ring left players unsure whether a card/chip/avatar was actually chosen. Make it thicker
+and unmistakable; a glowing red or yellow.
+**Shipped:** one shared amber-gold selection token (`--select` / `--select-glow` /
+`--select-soft`) drives every selected state in the modal so "chosen" reads the same way
+everywhere:
+- **Card targets** (`.card--target-selected`): 4px amber border, a double glow ring
+  (`0 0 0 4px` solid + soft halo + 20px outer glow), a small upward lift, and a white
+  **✓ badge** pinned to the top-right corner.
+- **Chips** (`.chip.is-on`): amber border + soft fill + glow + bold amber label; **colour
+  chips keep their colour border** (identity) and add the same glow, so they pop too.
+- **Avatar picker** (`.avatar-pick.is-on`): amber border + soft fill + glow + nudge.
+- `.target-fan` gained generous vertical padding so a selected card's lift, glow and
+  corner tick sit inside the scrollport instead of being clipped by `overflow-x: auto`.
+
+### F7 — Readable preview during modals; tap/click/drag to preview  (✅ shipped)
+**What:** Two related previewer gaps.
+1. In a choice modal the played-card preview was crammed into the modal rail and became
+   too small to read. Either enlarge it or float the Preview rail on top of the overlay
+   so it stays visible and live.
+2. The requirement that a hand card can be **tapped/clicked/dragged** to force a preview
+   was unmet — only hover opened one.
+**Shipped:**
+- The left **Preview** rail now lifts above the modal scrim while a targeting flow (or the
+  discard inspector) is open (`.preview--floating`: `z-index` above the scrim, amber
+  border + drop shadow). It shows the card being played at full, legible size and
+  **updates live** as modal targets are hovered — a big companion to the necessarily
+  compact modal cards. Opening a flow clears any stale hover-preview so the pane starts on
+  the played card, then follows hovered targets.
+- Hand cards force the preview on **pointer-down**, which begins every tap, click and
+  drag — so all three are now instant preview triggers, with hover remaining the delayed
+  4th path. Disabled opponent-hand cards emit no pointer events, so no hidden card leaks
+  through the new trigger. (Drag already surfaced the dragged card via `previewTarget`;
+  this makes tap/click match.)
