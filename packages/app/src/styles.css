@@ -2322,6 +2322,223 @@ input:focus-visible {
 }
 
 /* ============================================================================
+   Animations — round-boundary cinematics, mood landing + value reveal, and
+   drag-to-play pre-commit feedback. Cues are derived from the engine log
+   (game/animations.ts); everything here is presentation only.
+   ========================================================================== */
+
+/* --- Full-screen cinematics (round start / round end / victory) --- */
+.cinematic {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  text-align: center;
+  color: var(--paper);
+}
+.cinematic__scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(24, 22, 18, 0.82), rgba(24, 22, 18, 0.94));
+  animation: cine-scrim 0.28s ease-out both;
+}
+@keyframes cine-scrim {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.cinematic__stage {
+  position: relative;
+  padding: 2rem 2.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  animation: cine-rise 0.5s cubic-bezier(0.16, 0.84, 0.3, 1) both;
+}
+@keyframes cine-rise {
+  from { opacity: 0; transform: translateY(26px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.cinematic__eyebrow {
+  font-family: var(--font-hand);
+  font-size: 1.15rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--select);
+  opacity: 0.92;
+}
+.cinematic__round {
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 16vw, 9rem);
+  line-height: 0.9;
+  margin: 0.1rem 0;
+  text-shadow: 0 6px 26px rgba(0, 0, 0, 0.5);
+}
+.cinematic__lead {
+  font-family: var(--font-hand);
+  font-size: clamp(1.3rem, 4vw, 2rem);
+}
+.cinematic__lead strong,
+.cinematic__winner strong {
+  color: var(--select);
+}
+/* Round-end score tally: each line flies in staggered, winner banner last. */
+.cinematic__tally {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.6rem 0 0.2rem;
+  min-width: min(80vw, 22rem);
+}
+.cinematic__scoreline {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2rem;
+  padding: 0.35rem 1rem;
+  border-bottom: 1.5px dashed rgba(246, 242, 231, 0.28);
+  animation: cine-line 0.44s ease-out both;
+  animation-delay: calc(0.18s + var(--d) * 0.18s);
+}
+@keyframes cine-line {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.cinematic__scorename {
+  font-family: var(--font-hand);
+  font-size: 1.5rem;
+}
+.cinematic__scorenum {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  line-height: 1;
+}
+.cinematic__winner {
+  font-family: var(--font-hand);
+  font-size: clamp(1.3rem, 4vw, 2rem);
+  margin-top: 0.5rem;
+  animation: cine-rise 0.5s ease-out both;
+  animation-delay: 0.72s;
+}
+.cinematic__champion {
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 10vw, 5.5rem);
+  line-height: 1;
+  color: var(--select);
+  text-shadow: 0 4px 30px var(--select-glow);
+  animation: cine-pop 0.6s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+@keyframes cine-pop {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cinematic__hint {
+  margin-top: 1.4rem;
+  font-family: var(--font-hand);
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  opacity: 0.55;
+  animation: cine-hint 0.6s ease-out both;
+  animation-delay: 1s;
+}
+@keyframes cine-hint {
+  from { opacity: 0; }
+  to { opacity: 0.55; }
+}
+
+/* --- Pass flash (non-blocking beat when a player passes) --- */
+.pass-flash {
+  position: fixed;
+  top: 34%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 120;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  background: rgba(24, 22, 18, 0.86);
+  color: var(--paper);
+  font-family: var(--font-hand);
+  font-size: 1.25rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: pass-flash 1.3s ease-out both;
+}
+.pass-flash__mark {
+  font-size: 1.4rem;
+  opacity: 0.85;
+}
+@keyframes pass-flash {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(0.9); }
+  16% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -64%) scale(0.98); }
+}
+
+/* --- Mood played: the tile "lands" as it enters play, then its value reveals --- */
+.card--entering {
+  animation: mood-land 0.42s cubic-bezier(0.18, 0.9, 0.32, 1.1) both;
+  z-index: 2;
+}
+@keyframes mood-land {
+  0% { opacity: 0; transform: translateY(-26px) scale(1.16) rotate(-3deg); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+}
+/* Point-value reveal: the SHARED DiceValue element (board tile or art overlay)
+   fades/pops in AFTER the card has landed — so the number looks identical whether
+   it is animating in or sitting static, per Value Transparency. */
+.card--entering .card__die {
+  animation: value-reveal 0.4s ease-out both;
+  animation-delay: 0.34s;
+}
+@keyframes value-reveal {
+  0% { opacity: 0; transform: scale(0.55); }
+  70% { transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* --- Drag-to-play pre-commit feedback --- */
+/* When the held card is over the field, the drop zone reads unmistakably "release
+   here to play" BEFORE the player commits: a breathing green wash + lifted label. */
+.battlefield.is-over {
+  animation: field-arm 1.1s ease-in-out infinite;
+}
+@keyframes field-arm {
+  0%, 100% { box-shadow: inset 0 0 0 3px rgba(63, 157, 90, 0.3); }
+  50% { box-shadow: inset 0 0 0 4px rgba(63, 157, 90, 0.55); }
+}
+.battlefield.is-over .bf__drop-msg {
+  color: var(--ok);
+  font-weight: 800;
+  transform: scale(1.08);
+  transition: transform 0.14s ease, color 0.14s ease;
+}
+.bf__drop-msg {
+  display: inline-block;
+  transition: transform 0.14s ease, color 0.14s ease;
+}
+/* The armed drag-ghost gets a clear "will play" ring so a stray drag is obvious. */
+.drag-ghost--armed::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ok);
+  opacity: 0.8;
+  animation: ghost-ring 1s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes ghost-ring {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.04); }
+}
+
+/* ============================================================================
    Reduced motion
    ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
@@ -2334,6 +2551,17 @@ input:focus-visible {
   }
   .starburst svg {
     animation: none;
+  }
+  /* Keep everything legible with motion removed: no held-back reveals, no loops. */
+  .card--entering .card__die,
+  .cinematic__scoreline,
+  .cinematic__winner,
+  .cinematic__hint {
+    animation-delay: 0ms !important;
+  }
+  .battlefield.is-over,
+  .drag-ghost--armed::after {
+    animation: none !important;
   }
 }
 

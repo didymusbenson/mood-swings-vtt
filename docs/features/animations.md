@@ -1,6 +1,53 @@
 # Feature: Animations
 
-> **Status:** Stub — brief captured, not yet refined.
+> **Status:** Iteration 1 shipped — round-boundary cinematics, mood-played
+> landing + point-value reveal, and drag-to-play pre-commit feedback are live and
+> runtime-verified. Remaining brief items are deferred (see below).
+
+## Implemented (iteration 1)
+
+Driven off the engine's append-only `log` plus the structured view fields
+(`round`/`phase`/`winner`) — **not** off diffing arbitrary React state. This is
+deliberate and load-bearing for V2: a networked client receives exactly these
+same (redacted) values, so the cinematics port unchanged.
+
+- **The event-stream spine.** `game/animations.ts` (`deriveCinematics`, pure +
+  unit-tested) turns each state transition's new log entries into an ordered cue
+  list; `hooks/useGameEvents.ts` queues them; `components/Cinematic.tsx` renders
+  them. This hook is the seam V2 reuses ("new state from dispatch" → "redacted
+  view from server").
+- **Round-start callout** — full-screen `ROUND N` + `[player] plays first`,
+  fly-in over a dark scrim.
+- **Round-end / scoring** — full-screen staggered score tally, then the round
+  winner.
+- **Victory** — distinct match-end champion callout (lingers until dismissed).
+- **Mood played** — the tile "lands" as it enters play (`card--entering`, keyed
+  on a newly-seen mood uid).
+- **Point-value reveal** — the value pops in *after* the landing, animating the
+  **shared** `DiceValue` element (Value Transparency), so it looks identical
+  animating in vs. sitting static.
+- **Drag-to-play pre-commit feedback** — the battlefield reads an unmistakable
+  "release here to play" (breathing green wash + lifted label) and the held ghost
+  gets a pulsing ring, all *before* the player commits.
+- **Pass indicator** — a brief, non-blocking flash when a player passes.
+- **Skippable + reduced-motion** — every cinematic is click/Esc-to-continue with
+  an auto-advance ceiling; `prefers-reduced-motion` collapses motion while
+  keeping everything legible.
+
+## Deferred (next iterations)
+
+- **Effect-driven zone-change flights** (cards animating deck↔discard↔hand↔play).
+  Needs richer per-card events than the log carries today; the opponent-redacted
+  slice of this genuinely belongs to V2.
+- **Value recomputation mid-round** — in-play moods animating a value change on a
+  fixpoint recompute.
+- **Card draw** animated deck→hand; **per-move score-tick** on the board.
+- **Sequencing of chained effects** (queue/overlap/log-order) and a global
+  animation-speed control (see `settings.md`).
+
+---
+
+> **Original brief (captured).** Retained below for reference.
 
 ## Summary
 

@@ -10,6 +10,8 @@ import { PreviewPane, type PreviewTarget } from './PreviewPane.js';
 import { ActivityLog } from './ActivityLog.js';
 import { Starburst } from './Starburst.js';
 import { RulesModal } from './RulesModal.js';
+import { Cinematic, PassIndicator } from './Cinematic.js';
+import { useGameEvents } from '../hooks/useGameEvents.js';
 import { usePlayInteraction, type PlayController } from '../hooks/usePlayInteraction.js';
 import { useHandOrder } from '../hooks/useHandOrder.js';
 import { useHandDrag, type HandDragApi } from '../hooks/useHandDrag.js';
@@ -142,6 +144,15 @@ function MoodTableau({ player, state, ctx, pos }: { player: PlayerState; state: 
   const moods: Mood[] = state.moods[pid] ?? [];
   const dragging = pc.dragCard != null;
 
+  // "Mood played" landing: a mood whose uid we haven't rendered before is entering
+  // play this frame → it gets the landing + value-reveal animation exactly once.
+  // uids are unique per instance, so a card that leaves and returns re-animates.
+  const seen = useRef<Set<string>>(new Set());
+  const isEntering = (uid: string) => !seen.current.has(uid);
+  useEffect(() => {
+    seen.current = new Set(moods.map((m) => m.uid));
+  });
+
   return (
     <div className={`tableau tableau--${pos}`}>
       <div className="tableau__cards">
@@ -159,6 +170,7 @@ function MoodTableau({ player, state, ctx, pos }: { player: PlayerState; state: 
                 value={m.currentValue}
                 computed={moodComputed(m)}
                 tile
+                entering={isEntering(m.uid)}
                 highlighted={legal}
                 targetSelected={pc.moodSelected(m.uid)}
                 dimmed={dragging && !legal}
@@ -732,6 +744,12 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
   const [discardOpen, setDiscardOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
 
+  // Animation event stream: round-boundary + victory cinematics and the pass
+  // flash, all derived from the engine log (see hooks/useGameEvents).
+  const { cue, dismiss: dismissCue, passFlash } = useGameEvents(state);
+  const [passHiddenSeq, setPassHiddenSeq] = useState(-1);
+  const showPass = passFlash && passFlash.seq !== passHiddenSeq;
+
   // Preview opens instantly on hover / touch / pen — no delay (the wait felt
   // unintuitive). `hoverPreview` returns the pointer handler; `endHover` remains as a
   // stable no-op hook for pointer-leave and flow-start callers (and cancels a pending
@@ -841,6 +859,8 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
       {discardOpen && <DiscardInspector state={state} onClose={() => setDiscardOpen(false)} setPreview={setPreview} />}
       {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
       <DragGhost handDrag={handDrag} />
+      {showPass && <PassIndicator flash={passFlash} onDone={() => setPassHiddenSeq(passFlash.seq)} />}
+      {cue && <Cinematic cue={cue} onDismiss={dismissCue} />}
     </div>
   );
 }

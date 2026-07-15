@@ -50,6 +50,12 @@ interface CardProps {
   tile?: boolean;
   /** Render the sketch card back instead of the face (hidden hands, deck). */
   faceDown?: boolean;
+  /**
+   * The card is entering play this render → play the "landing" animation, and
+   * reveal its (possibly computed) value once landed. Drives the Animations
+   * mood-played + point-value reveal on the shared DiceValue element.
+   */
+  entering?: boolean;
 }
 
 type DieColor = 'white' | 'black';
@@ -274,6 +280,7 @@ export function Card({
   large,
   tile,
   faceDown,
+  entering,
 }: CardProps) {
   const { src, onError } = useCardImage(card);
   const headline = value ?? card.value;
@@ -296,6 +303,7 @@ export function Card({
     targetSelected ? 'card--target-selected' : '',
     dimmed ? 'card--dimmed' : '',
     pointerDraggable ? 'card--draggable' : '',
+    entering ? 'card--entering' : '',
   ]
     .filter(Boolean)
     .join(' ');
