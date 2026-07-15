@@ -2,6 +2,7 @@
 
 export * from './types.js';
 export * from './effects.js';
+export { redactFor, isHidden, HIDDEN, PUBLIC_MOOD_DATA_KEYS } from './redact.js';
 export { Engine, type Action, type SetupOptions } from './engine.js';
 export { CardDB, registerEffects, effectsFor } from './cards/registry.js';
 export { loadCardDB, normaliseCard, type RawCard } from './data.js';
