@@ -39,6 +39,14 @@ export interface MoodFilter {
   /** Only moods whose current value is odd (Anxiety #28) / even (Spite #76). */
   valueParity?: 'odd' | 'even';
   /**
+   * Only each owner's highest-current-value mood(s) — the moods tied for that
+   * player's maximum (Fury #91: "each player discards one of their highest-value
+   * moods"). Enforced per owner within the slot's scope, so a lower mood is never
+   * offered (its pick would be silently ignored by the effect, which only ever
+   * discards a top mood). Ties are all offered, so the player picks which top mood.
+   */
+  highestPerOwner?: boolean;
+  /**
    * Cap on the SUM of the current values of the moods selected together in this
    * slot (Anger #80: "total value [5] or less"). Not a per-candidate filter — it
    * constrains the combination, so the flow enforces it as moods are toggled.
@@ -231,7 +239,15 @@ export function legalTargets(
         if (f.hasSecondary && !data.secondaryValue) return false;
         return true;
       });
-      return { moods: ok.map((m) => m.uid) };
+      // Fury #91: keep only each owner's top-value mood(s), so a non-highest pick
+      // (which the effect would ignore) is never offered. Ties are all kept.
+      const kept = f.highestPerOwner
+        ? ok.filter((m) => {
+            const max = Math.max(...ok.filter((o) => o.owner === m.owner).map((o) => o.currentValue));
+            return m.currentValue === max;
+          })
+        : ok;
+      return { moods: kept.map((m) => m.uid) };
     }
     case 'player': {
       const ids = state.players.map((p) => p.id);

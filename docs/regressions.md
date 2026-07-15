@@ -17,6 +17,38 @@ never honour (or skipped one it needs).
 
 ---
 
+## R-003 — Fury #91 offered non-highest moods (found by audit, not reported)
+
+**Found:** proactively, while auditing every remaining `from: 'any'` mood slot for
+the same over-offer class as R-002. Not user-reported — surfaced by cross-checking
+each spec against its effect.
+
+**Affected card:** #91 Fury — "each player discards one of their highest-value moods."
+
+**Root cause:** the mood slot used `mood: { from: 'any' }`, offering *every* mood in
+play. But the effect
+([`packages/engine/src/cards/red.ts`](../packages/engine/src/cards/red.ts), `registerEffects(91)`)
+computes each player's max value and only accepts a pick among the tied-top moods
+(`top.find(chosen) ?? top[0]`). Selecting a non-highest mood was silently ignored
+and the effect fell back to an arbitrary top mood — the same "UI offers targets the
+effect rejects" pattern as the parity cards fixed in feedback F9. It only bites when
+a player holds two or more moods tied at their maximum (otherwise the single top mood
+is forced anyway), which is why it went unreported.
+
+**Fix:** added a `highestPerOwner` flag to `MoodFilter`
+([`choice-spec.ts`](../packages/engine/src/cards/choice-spec.ts)); `legalTargets`
+now keeps only each owner's top-current-value mood(s) within the slot's scope (ties
+all offered, so the player still chooses *which* top mood). Tagged Fury #91's slot in
+[`specs/red.ts`](../packages/engine/src/cards/specs/red.ts) with
+`{ from: 'any', highestPerOwner: true }`.
+
+**Tests:** [`packages/engine/test/specs.test.ts`](../packages/engine/test/specs.test.ts)
+— `describe('highestPerOwner offers only each owner top-value mood(s) (Fury #91)')`:
+a board where p1 has two moods tied at [6] plus a [1], and p2 has [4] over [3];
+asserts both of p1's top moods and p2's [4] are offered, and neither lower mood is.
+
+---
+
 ## R-002 — "Choose their moods" cards offered every seat's moods
 
 **Reported:** Playing **Panic #48** as Player 1, choosing only Player 2, the mood

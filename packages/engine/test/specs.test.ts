@@ -231,6 +231,36 @@ describe('card target specs', () => {
     });
   });
 
+  // Regression: "each player discards one of their HIGHEST moods" (Fury #91) offered
+  // from:'any' — every mood in play. Picking a non-highest was silently ignored by the
+  // effect (it only discards a top mood), so the slot now filters to each owner's max.
+  describe('highestPerOwner offers only each owner top-value mood(s) (Fury #91)', () => {
+    // p1: [1, 6, 6] (two tied at the top); p2: [3, 4]; p3: []
+    const board = {
+      players: [
+        { id: 'p1', name: 'P1', roundsWon: 0 },
+        { id: 'p2', name: 'P2', roundsWon: 0 },
+        { id: 'p3', name: 'P3', roundsWon: 0 },
+      ],
+      hands: { p1: [], p2: [], p3: [] },
+      moods: {
+        p1: [mk(5, 'p1-lo', 'p1', 1), mk(5, 'p1-hiA', 'p1', 6), mk(5, 'p1-hiB', 'p1', 6)],
+        p2: [mk(44, 'p2-lo', 'p2', 3), mk(44, 'p2-hi', 'p2', 4)],
+        p3: [],
+      },
+    } as unknown as GameState;
+
+    it('offers both of a player tied-top moods but neither lower mood', () => {
+      const slot = specFor(91)!.slots[0]!;
+      expect(slot).toMatchObject({ kind: 'mood', mood: { highestPerOwner: true } });
+      const legal = legalTargets(slot, board, 'p1', look).moods;
+      expect(legal).toEqual(expect.arrayContaining(['p1-hiA', 'p1-hiB', 'p2-hi']));
+      expect(legal).not.toContain('p1-lo'); // below p1's max — never offered
+      expect(legal).not.toContain('p2-lo'); // below p2's max — never offered
+      expect(legal).toHaveLength(3);
+    });
+  });
+
   // Regression: parity-restricted mood pickers must offer only legal moods, so the
   // player's pick isn't silently overridden by the effect (which filters by parity).
   describe('valueParity mood filter (Anxiety #28 odd / Spite #76 even)', () => {
