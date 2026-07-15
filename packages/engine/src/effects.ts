@@ -105,6 +105,12 @@ export interface MutationApi {
   /** Deterministic random integer in [0, maxExclusive) (advances the game seed). */
   random(maxExclusive: number): number;
   log(message: string): void;
+  /**
+   * Publicly reveal a card from `holder`'s hand (Curiosity #33 / Paranoia #71): logs
+   * it for everyone and marks it revealed so redaction shows it face-up to opponents
+   * while it remains in that hand.
+   */
+  reveal(holder: PlayerId, card: number): void;
 }
 
 export type PlayContext = ReadContext & MutationApi;

@@ -32,11 +32,12 @@ export function isHidden(card: CardNumber): boolean {
 export function redactFor(state: GameState, viewer: PlayerId): GameState {
   const s = structuredClone(state);
 
-  // Hands: keep the viewer's own hand verbatim; blank every other seat to a
-  // same-length array of HIDDEN so the opponent's hand SIZE is still visible but
-  // the card identities and order are not.
+  // Hands: keep the viewer's own hand verbatim; for every other seat, blank cards to
+  // HIDDEN — EXCEPT cards that have been publicly revealed (Curiosity #33), which stay
+  // face-up while they remain in that hand. Hand SIZE is always preserved.
   for (const pid of Object.keys(s.hands) as PlayerId[]) {
-    if (pid !== viewer) s.hands[pid] = (s.hands[pid] ?? []).map(() => HIDDEN);
+    if (pid === viewer) continue;
+    s.hands[pid] = redactHand(state.hands[pid] ?? [], state.revealed?.[pid] ?? []);
   }
 
   // Draw pile: order is secret from everyone. Keep only the length.
@@ -59,6 +60,26 @@ export function redactFor(state: GameState, viewer: PlayerId): GameState {
   // discardedThisRound, firstPlayer, winner, uidCounter — is public board / flow
   // state and passes through untouched.
   return s;
+}
+
+/**
+ * Blank a hand to HIDDEN for a viewer who doesn't hold it, keeping up to the revealed
+ * multiplicity of each card number face-up (reconciled against the live hand, so a
+ * revealed card that has since been played simply isn't there to show). Positions are
+ * preserved; only identities are concealed.
+ */
+function redactHand(hand: CardNumber[], revealed: CardNumber[]): CardNumber[] {
+  if (revealed.length === 0) return hand.map(() => HIDDEN);
+  const budget = new Map<CardNumber, number>();
+  for (const c of revealed) budget.set(c, (budget.get(c) ?? 0) + 1);
+  return hand.map((card) => {
+    const left = budget.get(card) ?? 0;
+    if (left > 0) {
+      budget.set(card, left - 1);
+      return card; // still revealed → face-up
+    }
+    return HIDDEN;
+  });
 }
 
 /**

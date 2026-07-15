@@ -251,7 +251,9 @@ registerEffects(71, {
     if (!to) return;
     const hand = ctx.state.hands[to];
     if (!hand || hand.length === 0) return;
-    const card = hand.splice(ctx.random(hand.length), 1)[0]!;
+    const card = hand[ctx.random(hand.length)]!;
+    ctx.reveal(to, card); // public: log which card was revealed before it leaves the hand
+    hand.splice(hand.indexOf(card), 1);
     ctx.state.deck.push(card);
     ctx.draw(ctx.me, 1);
   },

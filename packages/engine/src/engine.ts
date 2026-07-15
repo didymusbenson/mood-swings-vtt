@@ -102,6 +102,7 @@ export class Engine {
       discard: [],
       hands,
       moods,
+      revealed: {},
       phase: 'awaitingPlay',
       round: 1,
       activePlayer: firstPlayer,
@@ -365,6 +366,12 @@ export class Engine {
       },
       restabilize: () => this.stabilise(state),
       log: (message) => state.log.push({ round: state.round, message, kind: 'info', actor: me }),
+      reveal: (holder, card) => {
+        // A reveal is public: everyone sees which card it was. Log it, and record it so
+        // redaction can keep it face-up in the holder's hand while it stays there.
+        push(`${pname(holder)} reveals ${db.get(card).name}`, 'info');
+        (state.revealed[holder] ??= []).push(card);
+      },
     };
   }
 
@@ -725,6 +732,7 @@ export class Engine {
     state.actedThisRound = [];
     state.roundScores = {};
     state.discardedThisRound = 0;
+    state.revealed = {}; // revealed-hand knowledge is a per-round fog-of-war window
     // Doubt #36: the colours staged this round become unplayable for exactly this next round.
     state.bannedColors = state.pendingBannedColors;
     state.pendingBannedColors = [];

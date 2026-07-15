@@ -51,6 +51,15 @@ describe('blue cards', () => {
     expect(g.hands.p2).not.toContain(83);
   });
 
+  it('#33 Curiosity publicly reveals a card from the chosen hand', () => {
+    const { e, s } = game(rig([33], [44], 44)); // p2's hand is all #44, so the reveal is deterministic
+    const g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 33, choices: { players: ['p2'] } });
+    // A public (non-private) log line records what was revealed…
+    expect(g.log.some((l) => /reveals/.test(l.message) && !l.private)).toBe(true);
+    // …and it's marked revealed so redaction keeps it face-up while it stays in hand.
+    expect(g.revealed.p2).toContain(44);
+  });
+
   it('#27 Ambivalence is [6] alone, [3] with two red/green moods', () => {
     // p1 plays Ambivalence; p2 brings two red (Boredom) moods into play.
     const { e, s } = game(rig([27], [83, 83], 83));

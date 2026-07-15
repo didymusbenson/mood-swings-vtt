@@ -31,9 +31,7 @@ export function ModeChooser({ onPick }: ModeChooserProps) {
             🎲
           </span>
           <span className="modecard__title">Host Game</span>
-          <span className="modecard__desc">
-            Start a two-player game and share a room code with a friend. Hands stay hidden.
-          </span>
+          <span className="modecard__desc">Start a two-player game and share a room code with a friend.</span>
         </button>
 
         <button className="modecard" onClick={() => onPick('join')}>

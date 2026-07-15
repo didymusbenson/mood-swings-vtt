@@ -156,6 +156,7 @@ registerEffects(33, {
     const hand = ctx.state.hands[pid] ?? [];
     if (hand.length === 0) return;
     const revealed = hand[ctx.random(hand.length)]!;
+    ctx.reveal(pid, revealed); // public: log it + keep it face-up in that hand
     // The revealed card is in hand → printed colour (Imagination doesn't touch hands).
     // The moods in play use their in-play colour (colorOf) so Imagination is honoured.
     const col = ctx.cardData(revealed).color;

@@ -41,6 +41,23 @@ describe('redactFor', () => {
     expect(p2View.hands.p1.every(isHidden)).toBe(true);
   });
 
+  it('keeps a publicly revealed opponent card face-up, reconciled against the hand', () => {
+    const { state } = game(riggedDeck([A, B, A], [B, A, B], A)); // p2 hand holds two B's
+    state.revealed = { p2: [B] }; // one B was revealed (Curiosity)
+
+    const p1View = redactFor(state, 'p1');
+    expect(p1View.hands.p2.filter((c) => c === B)).toHaveLength(1); // the revealed B shows
+    expect(p1View.hands.p2.filter(isHidden)).toHaveLength(state.hands.p2.length - 1); // rest hidden
+    expect(p1View.hands.p2).toHaveLength(state.hands.p2.length); // size preserved
+
+    // Reconciled to the live hand: if p2 no longer holds B, nothing is shown.
+    const played = { ...state, hands: { ...state.hands, p2: [A, A] } } as GameState;
+    expect(redactFor(played, 'p1').hands.p2.every(isHidden)).toBe(true);
+
+    // The viewer always sees their own hand in full regardless of reveals.
+    expect(redactFor(state, 'p2').hands.p2).toEqual(state.hands.p2);
+  });
+
   it('strips deck order but preserves deck size', () => {
     const { state } = game(riggedDeck([A], [B], A));
     const view = redactFor(state, 'p1');

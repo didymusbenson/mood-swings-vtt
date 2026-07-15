@@ -198,6 +198,10 @@ function HandRow({ player, state, ctx, pos }: { player: PlayerState; state: Game
   const { pc, handDrag, orderedHand, setPreview } = ctx;
   const pid = player.id;
   const isActive = isActiveSeat(state, pid);
+  // Only the viewer's OWN hand is ever interactive. In Goldfish `me` is the active
+  // seat, so this matches the old behaviour; in networked play it stops a player from
+  // acting on the opponent's hand (which matters once revealed cards render face-up).
+  const isOwn = pid === pc.me;
   const order = orderedHand(pid);
 
   // Active drag pop-out state (only for the active player's own hand; active === me).
@@ -208,7 +212,7 @@ function HandRow({ player, state, ctx, pos }: { player: PlayerState; state: Game
 
   // Both play modes are always available: outside a targeting flow, a card can be
   // tapped to select (manual) or dragged to play/reorder.
-  const canDragHand = isActive && pc.flow == null;
+  const canDragHand = isOwn && isActive && pc.flow == null;
 
   const handChildren: React.ReactNode[] = [];
   order.forEach((card, idx) => {
@@ -236,26 +240,39 @@ function HandRow({ player, state, ctx, pos }: { player: PlayerState; state: Game
     }
     const flowHandSlot = pc.flow != null && pc.currentSlot?.kind === 'handCard';
     const targetLegal = flowHandSlot && pc.handCardHighlighted(card);
-    const interactive = isActive && (pc.flow == null ? true : flowHandSlot && targetLegal);
+    const interactive = isOwn && isActive && (pc.flow == null ? true : flowHandSlot && targetLegal);
+    // A face-up card in an opponent's hand is one they publicly revealed (Curiosity).
+    const revealedByOpponent = !isOwn;
     // During a targeting flow, hand-card targets are surfaced in the overlay, so
     // here we only need tap-to-select (drag hook handles it) outside a flow.
     const clickable = interactive && pc.flow != null;
     // A playable hand card (the active player's, outside a flow) is actionable →
     // show its objective would-be value with the computed glow. Cards being read
     // (the idle opponent hand) keep their printed die.
-    const playable = isActive && pc.flow == null;
+    const playable = isOwn && isActive && pc.flow == null;
     const wb = playable ? handWouldBe(state, pid, card) : null;
     const showWb = !!(wb && wb.objective && wb.value != null);
     const preview: PreviewTarget = { card: db.get(card), handOwner: playable ? pid : undefined };
     handChildren.push(
-      <div key={`${card}-${idx}`} className="hand__slot" data-hand-index={idx} style={fanVars(idx, order.length, isActive, pos)}>
+      <div
+        key={`${card}-${idx}`}
+        className={`hand__slot${revealedByOpponent ? ' hand__slot--revealed' : ''}`}
+        data-hand-index={idx}
+        style={fanVars(idx, order.length, isActive, pos)}
+        title={revealedByOpponent ? 'Revealed card' : undefined}
+      >
+        {revealedByOpponent && (
+          <span className="hand__revealed-badge" aria-label="Revealed card" title="Revealed card">
+            👁
+          </span>
+        )}
         <Card
           card={db.get(card)}
           tile
           value={showWb ? wb!.value! : undefined}
           computed={showWb && wb!.computed}
           disabled={!interactive}
-          selected={isActive && pc.isSelected(card)}
+          selected={isOwn && isActive && pc.isSelected(card)}
           highlighted={!!targetLegal}
           targetSelected={flowHandSlot && pc.handCardSelected(card)}
           pointerDraggable={canDragHand}
