@@ -3,12 +3,11 @@
 // cards (#55, #57, #63, #65, #69, #70, #72, #74, #77, #79) play immediately.
 // Slots mirror exactly the choices fields each effect in ../black.ts consumes.
 //
-// NOTE on card sources: a 'handCard' slot enumerates the ACTING player's hand by
-// default, or the CHOSEN player(s)' hand(s) when marked `handFrom: 'chosen'` — used
-// by #67 (an opponent's hand) and #78 (each targeted player's own hand), which pick
-// the player in a preceding 'players' slot. Still unhandled: #60/#62 read
-// choices.cards from the DISCARD pile, which legalTargets cannot yet enumerate (their
-// slots carry the field so the UI collects a number, but show the acting hand — see report).
+// NOTE on card sources: a 'handCard' slot's `cardsFrom` picks the pile it enumerates —
+// 'acting' (default, the acting player's hand), 'chosen' (the hand(s) of player(s)
+// picked in a preceding 'players' slot: #67 an opponent's hand, #78 each targeted
+// player's own hand), or 'discard' (the shared discard pile: #60 Corruption recovers,
+// #62 Cynicism moves a discard card into an opponent's hand).
 import { registerSpec } from '../choice-spec.js';
 
 // #53 Ambition — may discard a hand card to play an additional mood.
@@ -49,7 +48,7 @@ registerSpec(59, {
 registerSpec(60, {
   slots: [
     { key: 'option', kind: 'choice', min: 1, max: 1, options: ['cards', 'wins'], label: 'Recover cards or double the win' },
-    { key: 'cards', kind: 'handCard', min: 0, max: 2, label: 'Choose up to two discard cards (if "cards")', optional: true },
+    { key: 'cards', kind: 'handCard', min: 0, max: 2, cardsFrom: 'discard', label: 'Choose up to two discard cards (if "cards")', optional: true },
   ],
 });
 
@@ -61,7 +60,7 @@ registerSpec(61, {
 // #62 Cynicism — may move a discard card into an opponent's hand to become [6].
 registerSpec(62, {
   slots: [
-    { key: 'cards', kind: 'handCard', min: 0, max: 1, label: 'Choose a discard card (optional)', optional: true },
+    { key: 'cards', kind: 'handCard', min: 0, max: 1, cardsFrom: 'discard', label: 'Choose a discard card (optional)', optional: true },
     { key: 'players', kind: 'player', min: 0, max: 1, players: 'opponents', label: 'Choose an opponent', optional: true },
   ],
 });
@@ -80,7 +79,7 @@ registerSpec(66, {
 registerSpec(67, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 1, players: 'opponents', label: 'Choose an opponent (optional)', optional: true },
-    { key: 'cards', kind: 'handCard', min: 0, max: 1, handFrom: 'chosen', label: 'Choose a card from their hand', optional: true },
+    { key: 'cards', kind: 'handCard', min: 0, max: 1, cardsFrom: 'chosen', label: 'Choose a card from their hand', optional: true },
   ],
 });
 
@@ -108,11 +107,10 @@ registerSpec(75, {
 });
 
 // #76 Spite — up to two players each discard an even-value mood.
-// (The "even value" restriction is not expressible as a MoodFilter — see report.)
 registerSpec(76, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 2, players: 'all', label: 'Choose up to two players', optional: true },
-    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any' }, label: 'Choose which mood each discards', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any', valueParity: 'even' }, label: 'Choose which even-value mood each discards', optional: true },
   ],
 });
 
@@ -120,6 +118,6 @@ registerSpec(76, {
 registerSpec(78, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 8, players: 'all', label: 'Choose players (optional)', optional: true },
-    { key: 'cards', kind: 'handCard', min: 0, max: 8, handFrom: 'chosen', label: 'Choose which card each discards', optional: true },
+    { key: 'cards', kind: 'handCard', min: 0, max: 8, cardsFrom: 'chosen', label: 'Choose which card each discards', optional: true },
   ],
 });

@@ -83,17 +83,18 @@ describe('card target specs', () => {
   // Regression: "choose a player; THAT player gives/discards a card from THEIR hand"
   // cards must enumerate the chosen player's hand, not the acting player's. This was
   // the Compulsion bug — playing it as p1 and choosing p2 showed p1's OWN hand.
-  describe('handFrom:chosen enumerates the chosen player(s) hand, not the acting hand', () => {
+  describe('cardsFrom:chosen enumerates the chosen player(s) hand, not the acting hand', () => {
     // p1 (acting) holds 5; the opponent p2 holds 55 + 44.
     const twoHands = {
       players: [{ id: 'p1', name: 'P1', roundsWon: 0 }, { id: 'p2', name: 'P2', roundsWon: 0 }],
       hands: { p1: [5], p2: [55, 44] },
       moods: { p1: [], p2: [] },
+      discard: [],
     } as unknown as GameState;
 
     it('Compulsion #86 shows the CHOSEN player p2 hand, never the acting p1 hand', () => {
       const cardsSlot = specFor(86)!.slots[1]!;
-      expect(cardsSlot).toMatchObject({ key: 'cards', kind: 'handCard', handFrom: 'chosen' });
+      expect(cardsSlot).toMatchObject({ key: 'cards', kind: 'handCard', cardsFrom: 'chosen' });
       const legal = legalTargets(cardsSlot, twoHands, 'p1', look, { players: ['p2'] }).cards;
       expect(legal).toEqual([55, 44]); // p2's hand
       expect(legal).not.toContain(5); // NOT p1's own card — the reported bug
@@ -101,13 +102,13 @@ describe('card target specs', () => {
 
     it('Intimidation #67 shows the chosen opponent hand', () => {
       const cardsSlot = specFor(67)!.slots[1]!;
-      expect(cardsSlot).toMatchObject({ kind: 'handCard', handFrom: 'chosen' });
+      expect(cardsSlot).toMatchObject({ kind: 'handCard', cardsFrom: 'chosen' });
       expect(legalTargets(cardsSlot, twoHands, 'p1', look, { players: ['p2'] }).cards).toEqual([55, 44]);
     });
 
     it('Suspicion #78 unions every chosen player hand', () => {
       const cardsSlot = specFor(78)!.slots[1]!;
-      expect(cardsSlot).toMatchObject({ kind: 'handCard', handFrom: 'chosen' });
+      expect(cardsSlot).toMatchObject({ kind: 'handCard', cardsFrom: 'chosen' });
       expect(legalTargets(cardsSlot, twoHands, 'p1', look, { players: ['p1', 'p2'] }).cards).toEqual([5, 55, 44]);
     });
 
@@ -121,5 +122,61 @@ describe('card target specs', () => {
       const acting: ChoiceSlot = { key: 'cards', kind: 'handCard', min: 0, max: 1, label: 'own hand' };
       expect(legalTargets(acting, twoHands, 'p1', look, { players: ['p2'] }).cards).toEqual([5]);
     });
+  });
+
+  // Regression: discard-recovery cards must enumerate the DISCARD pile, not a hand.
+  // Previously they showed the acting hand, so picking never matched and the ability
+  // silently no-op'd (Corruption/Cynicism/Nostalgia were effectively unusable).
+  describe('cardsFrom:discard enumerates the shared discard pile', () => {
+    const withDiscard = {
+      players: [{ id: 'p1', name: 'P1', roundsWon: 0 }, { id: 'p2', name: 'P2', roundsWon: 0 }],
+      hands: { p1: [5], p2: [44] },
+      moods: { p1: [], p2: [] },
+      discard: [17, 33, 111],
+    } as unknown as GameState;
+
+    it.each([[60, 1], [128, 0]] as const)('card #%i shows the discard pile', (num, slotIdx) => {
+      const slot = specFor(num)!.slots[slotIdx]!;
+      expect(slot).toMatchObject({ kind: 'handCard', cardsFrom: 'discard' });
+      const legal = legalTargets(slot, withDiscard, 'p1', look).cards;
+      expect(legal).toEqual([17, 33, 111]); // the discard pile
+      expect(legal).not.toContain(5); // NOT the acting hand
+    });
+
+    it('Cynicism #62 discard slot comes first, then the opponent slot', () => {
+      const slot = specFor(62)!.slots[0]!;
+      expect(slot).toMatchObject({ kind: 'handCard', cardsFrom: 'discard' });
+      expect(legalTargets(slot, withDiscard, 'p1', look).cards).toEqual([17, 33, 111]);
+    });
+  });
+
+  // Regression: parity-restricted mood pickers must offer only legal moods, so the
+  // player's pick isn't silently overridden by the effect (which filters by parity).
+  describe('valueParity mood filter (Anxiety #28 odd / Spite #76 even)', () => {
+    // values: m1=1(odd) m2=2(even) m3=3(odd) m4=6(even)
+    const parityState = {
+      players: [{ id: 'p1', name: 'P1', roundsWon: 0 }, { id: 'p2', name: 'P2', roundsWon: 0 }],
+      hands: { p1: [], p2: [] },
+      moods: {
+        p1: [mk(5, 'm1', 'p1', 1), mk(5, 'm2', 'p1', 2)],
+        p2: [mk(44, 'm3', 'p2', 3), mk(44, 'm4', 'p2', 6)],
+      },
+    } as unknown as GameState;
+
+    it('Anxiety #28 offers only odd-value moods', () => {
+      const slot = specFor(28)!.slots[1]!;
+      expect(slot.mood?.valueParity).toBe('odd');
+      expect(legalTargets(slot, parityState, 'p1', look).moods).toEqual(['m1', 'm3']);
+    });
+
+    it('Spite #76 offers only even-value moods', () => {
+      const slot = specFor(76)!.slots[1]!;
+      expect(slot.mood?.valueParity).toBe('even');
+      expect(legalTargets(slot, parityState, 'p1', look).moods).toEqual(['m2', 'm4']);
+    });
+  });
+
+  it('Anger #80 carries a maxTotalValue cap of 5 (running total enforced in the flow)', () => {
+    expect(specFor(80)!.slots[0]!.mood?.maxTotalValue).toBe(5);
   });
 });

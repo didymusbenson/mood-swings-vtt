@@ -45,6 +45,15 @@ const emptySelections = (): Selections => ({
   moods: [], players: [], cards: [], colors: [], option: null, copy: null, copyUid: null,
 });
 
+/** Current (stabilised) value of an in-play mood by uid — 0 if not found. */
+function moodValue(state: GameState, uid: string): number {
+  for (const p of state.players) {
+    const m = (state.moods[p.id] ?? []).find((x) => x.uid === uid);
+    if (m) return m.currentValue;
+  }
+  return 0;
+}
+
 /** The card number a mood in play currently represents (copies resolve to their source). */
 function copyCardOf(state: GameState, uid: string): number | null {
   for (const p of state.players) {
@@ -186,7 +195,7 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
 
   const legalNow = useMemo(() => {
     if (!flow || !currentSlot) return null;
-    // Pass the players already chosen this flow so a `handFrom: 'chosen'` card slot
+    // Pass the players already chosen this flow so a `cardsFrom: 'chosen'` card slot
     // enumerates the CHOSEN player's hand (Compulsion #86 etc.), not the acting one.
     const legal = legalTargets(currentSlot, state, me, cardLookup, { players: flow.sel.players });
     // The card being played is a mood-to-be, not a hand card — never offer it as a
@@ -314,6 +323,13 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
         return;
       }
       if (currentSlot.kind !== 'mood') return;
+      // Running-total cap (Anger #80): block a pick that would push the selected moods'
+      // combined value over the limit (deselecting is always allowed).
+      const cap = currentSlot.mood?.maxTotalValue;
+      if (cap != null && !flow.sel.moods.includes(uid)) {
+        const total = flow.sel.moods.reduce((s, u) => s + moodValue(state, u), 0);
+        if (total + moodValue(state, uid) > cap) return;
+      }
       setFlow((f) => (f ? { ...f, sel: { ...f.sel, moods: toggleBounded(f.sel.moods, uid, currentSlot.max) } } : f));
     },
     [flow, currentSlot, legalNow, state],

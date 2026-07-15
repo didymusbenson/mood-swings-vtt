@@ -33,7 +33,8 @@ and implement. Status legend: 🆕 new · 📋 planned · 🔧 in progress · �
 | F5 | ✅ | layout | Hands were still **inside** each player's battlefield box. Restructure into three stacked bands — TOP: opponent info + hand · MIDDLE: one battlefield (halves split by owner, no per-player boxes) · BOTTOM: your hand + info | Center column is now a `.playfield` 3-row grid: `PlayerEdge` (info + action slot + hand) top & bottom, a single `.battlefield` between them holding only the played moods split into `.bf__half--top`/`--bottom` (dashed centre split, no boxes), deck+discard column at the left edge. Active player's half + edge get a soft tint (no boxy ring). No page scroll at 1366×768 / 1440×900; targeting overlay + both play modes preserved. |
 | F6 | ✅ | targeting UX | The **"selected" highlight in choice modals is too subtle** — hard to tell what's chosen (soft blue/green ring). Make it thicker and pop with a glowing red/yellow. | New `--select` amber-gold token drives one bold selection treatment across the modal: selected card targets get a 4px amber border + double glow ring + lift + a white **✓ corner badge**; selected chips get an amber border/glow (colour chips keep their colour border, add the glow); the selected avatar gets an amber border + glow + fill. `.target-fan` vertical padding widened so the lift/glow/badge aren't clipped by its scroll container. |
 | F7 | ✅ | targeting UX | In a choice modal the **played-card preview is forced tiny and unreadable**; and **only hover** opened a hand preview. 1) make the preview readable during modals, and 2) let **tap/click/drag** (not just hover) force a preview. | The left **Preview** rail now lifts above the modal scrim (`.preview--floating`, amber border) so it stays fully visible and **updates live** as modal targets are hovered — a big, legible companion to the compact modal cards (opening a flow clears any stale hover-preview so it starts on the played card). Hand cards force the preview on **pointer-down**, so tap / click / drag are all instant preview triggers (hover stays the delayed 4th path); disabled opponent cards emit no pointer events, so no hidden card leaks. |
-| F8 | ✅ | targeting UX | "Choose a player; **that player** gives/discards a card from **their** hand" cards showed the **acting player's own hand** by mistake (e.g. Compulsion as P1 → chose P2 → was shown P1's hand). | `handCard` slots gained a `handFrom` field; `'chosen'` makes `legalTargets` enumerate the hand(s) of the player(s) picked in an earlier `players` slot (union), so the chooser shows the correct hand. Marked #86 Compulsion, #67 Intimidation, #78 Suspicion; the UI passes the flow's chosen players into `legalTargets`. +5 engine regression tests; verified live (Compulsion→P2 now shows P2's hand). Still open: #60/#62 read from the **discard pile**, a different source `legalTargets` can't enumerate yet. In v2 the *targeted* player will make this choice on their own screen. |
+| F8 | ✅ | targeting UX | "Choose a player; **that player** gives/discards a card from **their** hand" cards showed the **acting player's own hand** by mistake (e.g. Compulsion as P1 → chose P2 → was shown P1's hand). | `handCard` slots gained a source field (`cardsFrom`); `'chosen'` makes `legalTargets` enumerate the hand(s) of the player(s) picked in an earlier `players` slot (union), so the chooser shows the correct hand. Marked #86 Compulsion, #67 Intimidation, #78 Suspicion; the UI passes the flow's chosen players into `legalTargets`. +5 engine regression tests; verified live (Compulsion→P2 now shows P2's hand). |
+| F9 | ✅ | engine/targeting | Sweep of remaining known targeting gaps so the engine isn't left incomplete. Discard-recovery cards (#60 Corruption, #62 Cynicism, #128 Nostalgia) showed the acting **hand** instead of the **discard pile** → those abilities silently did nothing. Parity cards (#28 Anxiety odd, #76 Spite even) and the total-cap card (#80 Anger ≤[5]) over-offered moods → the player's pick was silently overridden or no-op'd. | Generalised the source field to `cardsFrom: 'acting' \| 'chosen' \| 'discard'` and marked the three discard cards. Added `MoodFilter.valueParity` (odd/even → #28/#76 offer only legal moods) and `MoodFilter.maxTotalValue` (#80: the flow blocks a pick that would push the running total past [5]). Fixed stale comments (Doubt #36 "not enforceable" — it *is*, via `bannedColors`; Anger "[3]"→"[5]"). +6 engine regression tests; `effect-gaps.md` updated. Remaining residual: Grace #121's recurring discard-play colour gate (grant-accounting, not targeting). |
 
 ---
 
@@ -249,7 +250,36 @@ via a new `SlotContext`. Marked `handFrom: 'chosen'` on **#86 Compulsion**, **#6
 Intimidation** (an opponent's hand) and **#78 Suspicion** (each targeted player's own
 hand). +5 engine regression tests in `specs.test.ts`; verified end-to-end in the app
 (Compulsion → Player 2 now shows Player 2's five-card hand).
-**Still open (documented):** #60 Corruption / #62 Cynicism read `choices.cards` from the
-**discard pile** — a source `legalTargets` can't enumerate yet, so those still show the
-acting hand. And per the reporter, in **v2** the *targeted* player will make this choice
-on their own screen, which will reshape this whole interaction.
+**Follow-up:** the discard-pile source these called out is now handled — see F9. And per
+the reporter, in **v2** the *targeted* player will make this choice on their own screen,
+which will reshape this whole interaction.
+
+### F9 — Sweep the remaining known targeting gaps  (✅ shipped)
+**What:** After F8, close out the rest of the "wrong pile / over-offered targets" family
+so the engine isn't left incomplete.
+**Broken abilities (showed the acting hand instead of the discard pile → silently did
+nothing):**
+- **#60 Corruption** ("recover up to two discard cards"), **#62 Cynicism** ("move a
+  discard card into an opponent's hand"), **#128 Nostalgia** ("take a discard card").
+  Their effects read `choices.cards` from `state.discard`; the UI offered the acting
+  hand, so a pick never matched and the ability no-op'd.
+**Over-offered mood pickers (player's pick silently overridden by the effect):**
+- **#28 Anxiety** (odd-value moods only) and **#76 Spite** (even-value only) offered
+  every mood; the effect re-filtered by parity and moved a *different* mood.
+- **#80 Anger** ("total value [5] or less") let you build a selection exceeding the cap,
+  which the effect then rejected wholesale — a confusing silent no-op.
+**Shipped:**
+- Generalised the source field to **`cardsFrom: 'acting' | 'chosen' | 'discard'`**;
+  `'discard'` enumerates the shared discard pile. Marked #60/#62/#128.
+- Added **`MoodFilter.valueParity`** (`'odd'`/`'even'`) so #28/#76 offer only legal moods.
+- Added **`MoodFilter.maxTotalValue`**; the flow blocks a mood pick that would push the
+  running total past the cap (#80), so an illegal selection can't be assembled. The
+  effect keeps its defensive re-check.
+- Cleaned stale comments: Doubt #36 was labelled "not enforceable" but *is* enforced via
+  `pendingBannedColors`/`bannedColors`; Anger's "[3]" corrected to "[5]".
+- +6 engine regression tests (`specs.test.ts`); `docs/effect-gaps.md` updated with the
+  targeting-source model.
+**Residual (documented):** Grace #121's *recurring* discard-play colour-match is
+best-effort — the shared `discardPlaysRemaining` counter can't tell a Grace-sourced
+(colour-gated) discard play from Harmony's unconstrained one. That's grant-accounting,
+not targeting.

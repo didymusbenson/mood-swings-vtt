@@ -126,12 +126,40 @@ Wonder (#133 +[2]). Printed `value`/`secondaryValue` were already correct.
 
 ## Missing engine primitives
 
-None. All 130 playable cards are faithfully modelled with no approximations. (#135
-Hurt Feelings remains the 3+-player, non-scoring helper — see below.)
+None. All 130 playable cards are faithfully modelled. (#135 Hurt Feelings remains the
+3+-player, non-scoring helper — see below.)
 
 Hand-to-hand card passing (#31 Confusion, #49 Rationalization, #85 Chaos,
 #86 Compulsion, #106 Zeal) is done via direct `ctx.state` mutation (sanctioned by
 the authoring guide) and works.
+
+## Targeting-source model (UI `legalTargets`) — now complete
+
+The card *effects* were always authoritative, but the UI's target enumeration
+(`legalTargets`) once over-/mis-offered on a few cards, so the player's pick was
+silently ignored or the ability no-op'd. All fixed (tests in `test/specs.test.ts`):
+
+- **`ChoiceSlot.cardsFrom`** selects which pile a `handCard` slot enumerates:
+  `'acting'` (default, the acting player's hand), `'chosen'` (the union of the hands
+  of the player(s) picked in a preceding `players` slot — Compulsion #86, Intimidation
+  #67, Suspicion #78), or `'discard'` (the shared discard pile — Corruption #60,
+  Cynicism #62, Nostalgia #128). Previously all three groups showed the acting hand:
+  the "chosen" cards showed your own hand, and the "discard" cards were effectively
+  unusable (a hand pick never matched the discard the effect reads).
+- **`MoodFilter.valueParity`** (`'odd'`/`'even'`) offers only odd- (Anxiety #28) or
+  even-value (Spite #76) moods, matching the parity the effect enforces — so the
+  chosen mood is the one that actually moves.
+- **`MoodFilter.maxTotalValue`** caps the running sum of a multi-select mood slot
+  (Anger #80: total value [5] or less). The flow blocks a pick that would exceed the
+  cap so an over-limit selection can't be built; the effect still re-checks defensively.
+
+## Known residual
+
+- **Grace #121 recurring discard-play colour-match** — the shared
+  `discardPlaysRemaining` counter can't distinguish a Grace-sourced (colour-gated)
+  discard play from Harmony's unconstrained one, so the "shares a colour with one of
+  your moods" gate on the recurring grant is best-effort. Grant-accounting limitation,
+  not a targeting one.
 
 ## Out of scope
 

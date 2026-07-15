@@ -11,10 +11,11 @@
 // total <=5 for Anger), not docs/card-notes.md.
 import { registerSpec } from '../choice-spec.js';
 
-// #80 Anger — may discard any number of moods whose total value is [5] or less.
-// (The running-total cap is not expressible; maxValue:5 keeps each candidate legal.)
+// #80 Anger — may discard any number of moods whose TOTAL value is [5] or less.
+// `maxTotalValue: 5` caps the running sum as moods are toggled (a per-candidate
+// maxValue can't express the combination cap); the flow blocks a pick that would exceed it.
 registerSpec(80, {
-  slots: [{ key: 'moods', kind: 'mood', min: 0, max: 8, mood: { from: 'any', maxValue: 5 }, label: 'Choose low-value moods to discard (optional)', optional: true }],
+  slots: [{ key: 'moods', kind: 'mood', min: 0, max: 8, mood: { from: 'any', maxValue: 5, maxTotalValue: 5 }, label: 'Choose moods to discard — total value [5] or less (optional)', optional: true }],
 });
 
 // #82 Arrogance — may take an opponent's white/blue mood.
@@ -31,7 +32,7 @@ registerSpec(84, {
 registerSpec(86, {
   slots: [
     { key: 'players', kind: 'player', min: 1, max: 1, players: 'opponents', label: 'Choose another player' },
-    { key: 'cards', kind: 'handCard', min: 0, max: 1, handFrom: 'chosen', label: 'They choose a card to give', optional: true },
+    { key: 'cards', kind: 'handCard', min: 0, max: 1, cardsFrom: 'chosen', label: 'They choose a card to give', optional: true },
   ],
 });
 

@@ -191,8 +191,8 @@ registerEffects(35, {
 });
 
 // #36 Doubt — [2]; may reveal any number of hand cards, bottom-deck them, draw that many.
-// LIMITATION: the "next round can't play those colours" restriction is not enforceable
-// (no play-gate primitive); we record the colours + log it. See report.
+// The revealed colours are banned for everyone next round via pendingBannedColors →
+// bannedColors (folded in at round start; playMood rejects a banned-colour play).
 registerEffects(36, {
   afterPlaying: (ctx) => {
     const hand = ctx.state.hands[ctx.me]!;

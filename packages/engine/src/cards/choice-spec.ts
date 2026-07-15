@@ -23,6 +23,15 @@ export interface MoodFilter {
   maxValue?: number;
   colorIn?: Color[];
   hasSecondary?: boolean;
+  /** Only moods whose current value is odd (Anxiety #28) / even (Spite #76). */
+  valueParity?: 'odd' | 'even';
+  /**
+   * Cap on the SUM of the current values of the moods selected together in this
+   * slot (Anger #80: "total value [5] or less"). Not a per-candidate filter — it
+   * constrains the combination, so the flow enforces it as moods are toggled.
+   * legalTargets ignores it (every single mood is still individually offered).
+   */
+  maxTotalValue?: number;
 }
 
 /** Filter over the acting player's hand (serializable). */
@@ -44,13 +53,16 @@ export interface ChoiceSlot {
   mood?: MoodFilter; // kind === 'mood'
   hand?: HandFilter; // kind === 'handCard'
   /**
-   * Whose hand a `handCard` slot draws from (default `'acting'` — the player
-   * playing the card). `'chosen'` draws from the union of the players already
-   * picked in an EARLIER `players` slot of the same flow — for "choose a player;
-   * that player gives/discards a card from THEIR hand" cards (Compulsion #86,
-   * Intimidation #67, Suspicion #78). Requires the `players` slot to come first.
+   * Which pile a `handCard` slot enumerates (default `'acting'` — the hand of the
+   * player playing the card):
+   *   - `'chosen'`   — the union of the hands of the player(s) picked in an EARLIER
+   *                    `players` slot of this flow, for "choose a player; that player
+   *                    gives/discards a card from THEIR hand" cards (Compulsion #86,
+   *                    Intimidation #67, Suspicion #78). Needs the `players` slot first.
+   *   - `'discard'`  — the shared discard pile, for cards that recover/move a card
+   *                    from the discard (Corruption #60, Cynicism #62, Nostalgia #128).
    */
-  handFrom?: 'acting' | 'chosen';
+  cardsFrom?: 'acting' | 'chosen' | 'discard';
   players?: 'opponents' | 'all'; // kind === 'player'
   numberRange?: [number, number]; // kind === 'number'
   options?: string[]; // kind === 'choice' → sets `option`
@@ -128,6 +140,8 @@ export function legalTargets(
       const ok = scope.filter((m) => {
         if (f.minValue != null && m.currentValue < f.minValue) return false;
         if (f.maxValue != null && m.currentValue > f.maxValue) return false;
+        if (f.valueParity === 'odd' && m.currentValue % 2 !== 1) return false;
+        if (f.valueParity === 'even' && m.currentValue % 2 !== 0) return false;
         const data = card(resolveCardNumber(m));
         // Honour an active colour override (Imagination) for in-play colour filters.
         if (f.colorIn && !f.colorIn.includes(m.colorOverride ?? data.color)) return false;
@@ -142,13 +156,18 @@ export function legalTargets(
     }
     case 'handCard': {
       const f = slot.hand ?? {};
-      // 'chosen' → the hand(s) of the player(s) picked in an earlier slot; else the
-      // acting player's own hand. Union covers multi-target cards (Suspicion #78);
-      // single-target cards (Compulsion #86, Intimidation #67) resolve to one hand.
-      const owners: PlayerId[] =
-        slot.handFrom === 'chosen' ? ctx?.players ?? [] : [actingPlayer];
-      const hand = owners.flatMap((owner) => state.hands[owner] ?? []);
-      const ok = hand.filter((n) => {
+      // Resolve the source pile:
+      //   'discard' → the shared discard pile (Corruption #60, Cynicism #62, Nostalgia #128);
+      //   'chosen'  → the union of the hands of the player(s) picked in an earlier slot
+      //               (Suspicion #78 union; Compulsion #86 / Intimidation #67 single);
+      //   'acting'  → the acting player's own hand (default).
+      const pool: number[] =
+        slot.cardsFrom === 'discard'
+          ? state.discard ?? []
+          : (slot.cardsFrom === 'chosen' ? ctx?.players ?? [] : [actingPlayer]).flatMap(
+              (owner) => state.hands[owner] ?? [],
+            );
+      const ok = pool.filter((n) => {
         const data = card(n);
         if (f.valueIn && !f.valueIn.includes(data.value)) return false;
         if (f.colorIn && !f.colorIn.includes(data.color)) return false;

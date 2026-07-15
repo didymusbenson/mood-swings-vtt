@@ -4,11 +4,11 @@
 // #117, #119, #122, #124, #125, #126, #127, #129, #130, #131, #132, #134) — need no
 // spec and play immediately. Slots mirror the choices each effect in ../green.ts reads.
 //
-// NOTE: #121 Grace, #123 Harmony, and #128 Nostalgia read choices.cards from the
-// DISCARD pile, and #118 Fascination gives a card to another player; slot kind
-// 'handCard' carries the 'cards' field but legalTargets enumerates the acting
-// player's hand, not the discard pile (see report). Hand-card value filters follow
-// the effect CODE in ../green.ts (which matches the data/cards.json rules text).
+// NOTE: #128 Nostalgia recovers a card from the DISCARD pile — its 'cards' slot is
+// marked `cardsFrom: 'discard'` so legalTargets enumerates the discard pile. #118
+// Fascination gives away one of the ACTING player's own cards (default source is
+// correct). #121 Grace / #123 Harmony grant a discard-play with no play-time chooser.
+// Hand-card value filters follow the effect CODE in ../green.ts (matches cards.json).
 import { registerSpec } from '../choice-spec.js';
 
 // #107 Awe — you choose which player goes first next round.
@@ -50,7 +50,7 @@ registerSpec(120, {
 
 // #128 Nostalgia — may put a discard card into your hand, then play an additional mood.
 registerSpec(128, {
-  slots: [{ key: 'cards', kind: 'handCard', min: 0, max: 1, label: 'Take a discard card (optional)', optional: true }],
+  slots: [{ key: 'cards', kind: 'handCard', min: 0, max: 1, cardsFrom: 'discard', label: 'Take a discard card (optional)', optional: true }],
 });
 
 // #133 Wonder — choose a colour; +[2] per mood/discard card of that colour.

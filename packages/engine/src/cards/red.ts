@@ -16,9 +16,11 @@ import { registerEffects } from './registry.js';
 const byUid = (ctx: ReadContext, uid: string | undefined): Mood | undefined =>
   uid == null ? undefined : ctx.allMoods().find((m) => m.uid === uid);
 
-// #80 Anger — [0]. You may put any number of moods with total value [3] or less
+// #80 Anger — [0]. You may put any number of moods with total value [5] or less
 // into the discard pile. All chosen at once; the total of their current values
-// must not exceed the threshold (a suppressed mood counts as [0]).
+// must not exceed the threshold (a suppressed mood counts as [0]). The flow caps the
+// running total (maxTotalValue) so an over-limit selection can't be built; the effect
+// re-checks defensively.
 registerEffects(80, {
   afterPlaying: (ctx) => {
     const chosen = (ctx.choices.moods ?? [])

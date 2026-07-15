@@ -6,11 +6,10 @@
 import { registerSpec } from '../choice-spec.js';
 
 // #28 Anxiety — up to two players each return one of their odd-value moods.
-// (The "odd value" restriction is not expressible as a MoodFilter — see report.)
 registerSpec(28, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 2, players: 'all', label: 'Choose up to two players', optional: true },
-    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any' }, label: 'Choose which mood each returns', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any', valueParity: 'odd' }, label: 'Choose which odd-value mood each returns', optional: true },
   ],
 });
 
