@@ -18,7 +18,20 @@ export type TargetKind = 'mood' | 'player' | 'handCard' | 'color' | 'number' | '
 
 /** Filter over moods in play (serializable). Values use current (stabilised) value. */
 export interface MoodFilter {
-  from?: 'own' | 'opponent' | 'any'; // relative to the acting player (default 'any')
+  /**
+   * Which players' moods this slot enumerates, relative to the acting player
+   * (default `'any'`):
+   *   - `'own'`      — the acting player's moods.
+   *   - `'opponent'` — every other player's moods.
+   *   - `'chosen'`   — the moods of the player(s) picked in an EARLIER `players`
+   *                    slot of this flow, for "choose player(s); one of THEIR moods
+   *                    each" cards (Panic #48, Malice #68, and the per-player
+   *                    return/discard cards #7/#28/#76/#101). Needs the `players`
+   *                    slot first; offers nothing until a player is chosen, mirroring
+   *                    `cardsFrom: 'chosen'` for hand slots.
+   *   - `'any'`      — every mood in play.
+   */
+  from?: 'own' | 'opponent' | 'chosen' | 'any';
   minValue?: number;
   maxValue?: number;
   colorIn?: Color[];
@@ -205,7 +218,11 @@ export function legalTargets(
           ? state.moods[actingPlayer] ?? []
           : f.from === 'opponent'
             ? state.players.filter((p) => p.id !== actingPlayer).flatMap((p) => state.moods[p.id] ?? [])
-            : allMoods(state);
+            : f.from === 'chosen'
+              // Only the moods of the player(s) picked in the earlier `players` slot;
+              // empty until one is chosen (Panic #48 must not offer other seats' moods).
+              ? (ctx?.players ?? []).flatMap((pid) => state.moods[pid] ?? [])
+              : allMoods(state);
       const ok = scope.filter((m) => {
         if (!moodValuePasses(f, m.currentValue)) return false;
         const data = card(resolveCardNumber(m));

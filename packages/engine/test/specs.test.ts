@@ -59,10 +59,11 @@ describe('card target specs', () => {
   } as unknown as GameState;
 
   it('legalTargets honours a maxValue mood filter (excludes a [6] mood)', () => {
-    // Shock (#101) second slot: moods with value <= 3.
+    // Shock (#101) second slot: the chosen players' moods with value <= 3.
     const slot = specFor(101)!.slots[1]!;
     expect(slot.mood?.maxValue).toBe(3);
-    const legal = legalTargets(slot, state, 'p1', look).moods;
+    // Both players chosen so the scope spans the board; the filter still drops the [6].
+    const legal = legalTargets(slot, state, 'p1', look, { players: ['p1', 'p2'] }).moods;
     expect(legal).toContain('m-lo'); // [3]
     expect(legal).toContain('m-opp'); // [2]
     expect(legal).not.toContain('m-hi'); // [6] excluded
@@ -150,6 +151,57 @@ describe('card target specs', () => {
     });
   });
 
+  // Regression: "choose player(s); one of THEIR moods each" cards must enumerate only
+  // the CHOSEN players' moods. Playing Panic #48 as p1 and choosing p2 still offered
+  // p1's moods, so a mood no chosen player owns could be selected. The mood slot is now
+  // `from: 'chosen'`, mirroring `cardsFrom: 'chosen'` for hand slots.
+  describe("from:chosen mood slots enumerate only the chosen players' moods", () => {
+    // p1 owns m1a/m1b; p2 owns m2a; p3 owns m3a.
+    const board = {
+      players: [
+        { id: 'p1', name: 'P1', roundsWon: 0 },
+        { id: 'p2', name: 'P2', roundsWon: 0 },
+        { id: 'p3', name: 'P3', roundsWon: 0 },
+      ],
+      hands: { p1: [], p2: [], p3: [] },
+      moods: {
+        p1: [mk(5, 'm1a', 'p1', 3), mk(5, 'm1b', 'p1', 6)],
+        p2: [mk(44, 'm2a', 'p2', 3)],
+        p3: [mk(55, 'm3a', 'p3', 3)],
+      },
+    } as unknown as GameState;
+
+    it('Panic #48 offers only the chosen player p2 moods, never other seats', () => {
+      const moodSlot = specFor(48)!.slots[1]!;
+      expect(moodSlot).toMatchObject({ key: 'moods', kind: 'mood', mood: { from: 'chosen' } });
+      const legal = legalTargets(moodSlot, board, 'p1', look, { players: ['p2'] }).moods;
+      expect(legal).toEqual(['m2a']); // only p2's mood
+      expect(legal).not.toContain('m1a'); // NOT the acting player p1 — the reported bug
+      expect(legal).not.toContain('m3a'); // NOT an unchosen third seat
+    });
+
+    it('spans the union of chosen players and still honours the value filter', () => {
+      // Shock #101 (maxValue 3): choose p1 + p2 → p1's [6] is filtered out, [3]s remain.
+      const moodSlot = specFor(101)!.slots[1]!;
+      const legal = legalTargets(moodSlot, board, 'p1', look, { players: ['p1', 'p2'] }).moods;
+      expect(legal).toEqual(['m1a', 'm2a']); // both [3]s
+      expect(legal).not.toContain('m1b'); // p1's [6] excluded by maxValue
+    });
+
+    it('offers nothing until a player is chosen (no fallback to every mood in play)', () => {
+      const moodSlot = specFor(48)!.slots[1]!;
+      expect(legalTargets(moodSlot, board, 'p1', look, { players: [] }).moods).toEqual([]);
+      expect(legalTargets(moodSlot, board, 'p1', look).moods).toEqual([]); // no ctx at all
+    });
+
+    it.each([[7], [28], [48], [68], [76], [101]] as const)(
+      'card #%i per-chosen-player mood slot is scoped to the chosen players',
+      (num) => {
+        expect(specFor(num)!.slots[1]!.mood?.from).toBe('chosen');
+      },
+    );
+  });
+
   // Regression: an option-gated follow-up slot must only be presented on its own
   // branch. Corruption #60's discard-recovery slot showed even when the double-win
   // ('wins') branch was chosen, prompting "choose cards" with nothing to recover.
@@ -192,16 +244,20 @@ describe('card target specs', () => {
       },
     } as unknown as GameState;
 
+    // Both players chosen so the from:'chosen' scope spans the board; the parity
+    // filter is what these assert.
+    const bothChosen = { players: ['p1', 'p2'] };
+
     it('Anxiety #28 offers only odd-value moods', () => {
       const slot = specFor(28)!.slots[1]!;
       expect(slot.mood?.valueParity).toBe('odd');
-      expect(legalTargets(slot, parityState, 'p1', look).moods).toEqual(['m1', 'm3']);
+      expect(legalTargets(slot, parityState, 'p1', look, bothChosen).moods).toEqual(['m1', 'm3']);
     });
 
     it('Spite #76 offers only even-value moods', () => {
       const slot = specFor(76)!.slots[1]!;
       expect(slot.mood?.valueParity).toBe('even');
-      expect(legalTargets(slot, parityState, 'p1', look).moods).toEqual(['m2', 'm4']);
+      expect(legalTargets(slot, parityState, 'p1', look, bothChosen).moods).toEqual(['m2', 'm4']);
     });
   });
 

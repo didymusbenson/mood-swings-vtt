@@ -87,7 +87,7 @@ registerSpec(67, {
 registerSpec(68, {
   slots: [
     { key: 'players', kind: 'player', min: 1, max: 1, players: 'all', label: 'Choose a player with 2+ moods' },
-    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any' }, label: 'That player chooses two of their moods', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'chosen' }, label: 'That player chooses two of their moods', optional: true },
   ],
 });
 
@@ -110,7 +110,7 @@ registerSpec(75, {
 registerSpec(76, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 2, players: 'all', label: 'Choose up to two players', optional: true },
-    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any', valueParity: 'even' }, selfTargetable: true, label: 'Choose which even-value mood each discards', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'chosen', valueParity: 'even' }, selfTargetable: true, label: 'Choose which even-value mood each discards', optional: true },
   ],
 });
 
