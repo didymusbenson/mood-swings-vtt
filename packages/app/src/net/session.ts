@@ -19,6 +19,7 @@ import {
 } from './peer.js';
 import {
   computeChoosers,
+  delegatePrompt,
   delegatedSlotIndex,
   isDelegated,
   mergeResponses,
@@ -314,7 +315,7 @@ export class HostSession extends BaseSession {
     const card = action.card;
     const prior = action.choices ?? {};
     const slotIndex = delegatedSlotIndex(card);
-    const label = specFor(card)?.slots[slotIndex]?.label ?? 'Make your choice';
+    const label = delegatePrompt(card);
     this.delegation = { action, awaiting: new Set(choosers), contributions: [] };
     for (const seat of choosers) {
       const req: ChoiceRequest = {

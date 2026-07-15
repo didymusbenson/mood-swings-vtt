@@ -19,13 +19,18 @@ import { specFor, type Choices, type GameState, type PlayerId } from '@mood-swin
  * either let the affected player pick from their own hidden hand, or have every
  * player choose simultaneously:
  *
- *   86 Compulsion — victim picks a card from their hand to give
- *   31 Confusion  — each player simultaneously picks a hand card to pass
- *   78 Suspicion  — each chosen player simultaneously picks a discard
- *   68 Malice     — chosen player picks which two of their moods
- *   29 Avoidance  — each player simultaneously picks one of their moods to pass
+ *   67 Intimidation — chosen player reveals a card from their hand to give
+ *   86 Compulsion   — victim picks a card from their hand to give
+ *   31 Confusion    — each player simultaneously picks a hand card to pass
+ *   78 Suspicion    — each chosen player simultaneously picks a discard
+ *   68 Malice       — chosen player picks which two of their moods
+ *   29 Avoidance    — each player simultaneously picks one of their moods to pass
+ *
+ * #67's ruling (docs/card-notes.md:724 "that player reveals a card from their hand"):
+ * the CHOSEN player picks which card to reveal/give — not the active player. This
+ * matches the card text and avoids ever exposing a hidden hand to the opponent.
  */
-export const DELEGATED_CARDS: ReadonlySet<number> = new Set([86, 31, 78, 68, 29]);
+export const DELEGATED_CARDS: ReadonlySet<number> = new Set([67, 86, 31, 78, 68, 29]);
 
 /**
  * Cards where every player chooses at the same time and no one may see another's
@@ -45,6 +50,30 @@ export function isDelegated(card: number): boolean {
  */
 export function maxPerChooser(card: number, slotMax: number): number {
   return card === 78 ? 1 : slotMax;
+}
+
+/**
+ * The prompt shown to a delegated chooser. The card's own slot label is worded from
+ * the ACTIVE player's point of view ("Choose a card from their hand"); the chooser is
+ * picking from their OWN hand/moods, so give them a first-person prompt instead.
+ */
+export function delegatePrompt(card: number): string {
+  switch (card) {
+    case 67:
+      return 'Reveal a card from your hand to give them';
+    case 86:
+      return 'Choose a card from your hand to give them';
+    case 78:
+      return 'Choose a card from your hand to discard';
+    case 31:
+      return 'Choose a card from your hand to pass';
+    case 68:
+      return 'Choose two of your moods';
+    case 29:
+      return 'Choose one of your moods to pass';
+    default:
+      return 'Make your choice';
+  }
 }
 
 /** Host → a seat: "fill this one slot of the card being played." */
@@ -104,8 +133,10 @@ export function computeChoosers(
   const allWithMoods = () => state.players.map((p) => p.id).filter((p) => moodsOf(state, p) > 0);
   const allWithCards = () => state.players.map((p) => p.id).filter((p) => handSize(state, p) > 0);
   switch (card) {
+    case 67:
     case 86: {
-      // Compulsion — the chosen victim picks a card from their own hand to give.
+      // Intimidation / Compulsion — the chosen opponent picks a card from their own
+      // hand to reveal+give. No choice needed if they hold none (engine no-ops).
       const v = prior.players?.[0];
       return v && v !== activeSeat && handSize(state, v) > 0 ? [v] : [];
     }

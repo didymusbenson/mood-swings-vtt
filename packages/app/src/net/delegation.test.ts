@@ -31,6 +31,7 @@ describe('delegation catalog', () => {
   });
   it('flags the delegated + simultaneous cards', () => {
     expect(isDelegated(86)).toBe(true);
+    expect(isDelegated(67)).toBe(true); // Intimidation — opponent reveals a card
     expect(isDelegated(92)).toBe(false); // Glee — no delegation
     expect([...SIMULTANEOUS_CARDS].sort()).toEqual([29, 31, 78]);
   });
@@ -42,11 +43,15 @@ describe('delegation catalog', () => {
 });
 
 describe('computeChoosers', () => {
-  it('#86 Compulsion → the chosen victim, only if they hold cards', () => {
+  it('#86 Compulsion / #67 Intimidation → the chosen opponent, only if they hold cards', () => {
     const s = st({ p1: [1], p2: [2, 3] }, { p1: 0, p2: 0 });
     expect(computeChoosers(86, s, 'p1', { players: ['p2'] })).toEqual(['p2']);
+    expect(computeChoosers(67, s, 'p1', { players: ['p2'] })).toEqual(['p2']);
     const empty = st({ p1: [1], p2: [] }, { p1: 0, p2: 0 });
     expect(computeChoosers(86, empty, 'p1', { players: ['p2'] })).toEqual([]); // engine no-ops
+    expect(computeChoosers(67, empty, 'p1', { players: ['p2'] })).toEqual([]);
+    // #67 with no target chosen (optional slot) → no delegation.
+    expect(computeChoosers(67, s, 'p1', {})).toEqual([]);
   });
 
   it('#68 Malice → the chosen player, only with 2+ moods', () => {

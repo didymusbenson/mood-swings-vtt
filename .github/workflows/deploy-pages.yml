@@ -2,18 +2,20 @@ name: Deploy app to GitHub Pages
 
 # Builds @mood-swings/app and publishes packages/app/dist to GitHub Pages.
 #
-# Runs on every push to the default branch and can be triggered by hand from the
-# Actions tab (workflow_dispatch). The app currently lives on the feature branch
-# `claude/mood-swings-tabletop-mvp-qgcbsy`; this workflow will start deploying
-# automatically once that branch is merged into `main`, or immediately via a
-# manual "Run workflow" dispatch from any branch that contains this file.
+# v2 deployment: the live site is published from the feature branch
+# `claude/v2-deployment-strategy-iorlce` (Goldfish + networked Host/Join multiplayer).
+# It deploys on every push to that branch, and can be run by hand from the Actions
+# tab (workflow_dispatch). `main` no longer auto-deploys — to make main authoritative
+# again later, add `main` back to the branches list (or merge this branch into main).
 #
-# One-time repo setup (human): Settings -> Pages -> Build and deployment ->
-# Source: "GitHub Actions". Site URL: https://didymusbenson.github.io/mood-swings-vtt/
+# One-time repo setup (human, if not already set): Settings -> Pages -> Build and
+# deployment -> Source: "GitHub Actions". Confirm the `github-pages` environment has
+# no protection rule restricting deploys to `main`. Site URL:
+# https://didymusbenson.github.io/mood-swings-vtt/
 
 on:
   push:
-    branches: [main]
+    branches: [claude/v2-deployment-strategy-iorlce]
   workflow_dispatch:
 
 # Least-privilege token plus the OIDC id-token the deploy-pages action needs.
