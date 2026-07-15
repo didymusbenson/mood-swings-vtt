@@ -3,12 +3,12 @@
 // cards (#55, #57, #63, #65, #69, #70, #72, #74, #77, #79) play immediately.
 // Slots mirror exactly the choices fields each effect in ../black.ts consumes.
 //
-// NOTE on card sources: slot kind 'handCard' enumerates the ACTING player's hand
-// (see legalTargets). A few black effects read choices.cards from a different
-// pile — #60/#62 from the discard pile, #67 from an opponent's hand, #78 from each
-// targeted player's own hand. Those slots still carry the correct 'cards' field so
-// the UI collects a card number, but legalTargets cannot enumerate their true
-// source (see report).
+// NOTE on card sources: a 'handCard' slot enumerates the ACTING player's hand by
+// default, or the CHOSEN player(s)' hand(s) when marked `handFrom: 'chosen'` — used
+// by #67 (an opponent's hand) and #78 (each targeted player's own hand), which pick
+// the player in a preceding 'players' slot. Still unhandled: #60/#62 read
+// choices.cards from the DISCARD pile, which legalTargets cannot yet enumerate (their
+// slots carry the field so the UI collects a number, but show the acting hand — see report).
 import { registerSpec } from '../choice-spec.js';
 
 // #53 Ambition — may discard a hand card to play an additional mood.
@@ -80,7 +80,7 @@ registerSpec(66, {
 registerSpec(67, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 1, players: 'opponents', label: 'Choose an opponent (optional)', optional: true },
-    { key: 'cards', kind: 'handCard', min: 0, max: 1, label: 'Choose a card from their hand', optional: true },
+    { key: 'cards', kind: 'handCard', min: 0, max: 1, handFrom: 'chosen', label: 'Choose a card from their hand', optional: true },
   ],
 });
 
@@ -120,6 +120,6 @@ registerSpec(76, {
 registerSpec(78, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 8, players: 'all', label: 'Choose players (optional)', optional: true },
-    { key: 'cards', kind: 'handCard', min: 0, max: 8, label: 'Choose which card each discards', optional: true },
+    { key: 'cards', kind: 'handCard', min: 0, max: 8, handFrom: 'chosen', label: 'Choose which card each discards', optional: true },
   ],
 });

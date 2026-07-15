@@ -79,4 +79,47 @@ describe('card target specs', () => {
     const legal = legalTargets(specFor(82)!.slots[0]!, state, 'p1', look).moods;
     expect(legal).toEqual(['m-opp']);
   });
+
+  // Regression: "choose a player; THAT player gives/discards a card from THEIR hand"
+  // cards must enumerate the chosen player's hand, not the acting player's. This was
+  // the Compulsion bug — playing it as p1 and choosing p2 showed p1's OWN hand.
+  describe('handFrom:chosen enumerates the chosen player(s) hand, not the acting hand', () => {
+    // p1 (acting) holds 5; the opponent p2 holds 55 + 44.
+    const twoHands = {
+      players: [{ id: 'p1', name: 'P1', roundsWon: 0 }, { id: 'p2', name: 'P2', roundsWon: 0 }],
+      hands: { p1: [5], p2: [55, 44] },
+      moods: { p1: [], p2: [] },
+    } as unknown as GameState;
+
+    it('Compulsion #86 shows the CHOSEN player p2 hand, never the acting p1 hand', () => {
+      const cardsSlot = specFor(86)!.slots[1]!;
+      expect(cardsSlot).toMatchObject({ key: 'cards', kind: 'handCard', handFrom: 'chosen' });
+      const legal = legalTargets(cardsSlot, twoHands, 'p1', look, { players: ['p2'] }).cards;
+      expect(legal).toEqual([55, 44]); // p2's hand
+      expect(legal).not.toContain(5); // NOT p1's own card — the reported bug
+    });
+
+    it('Intimidation #67 shows the chosen opponent hand', () => {
+      const cardsSlot = specFor(67)!.slots[1]!;
+      expect(cardsSlot).toMatchObject({ kind: 'handCard', handFrom: 'chosen' });
+      expect(legalTargets(cardsSlot, twoHands, 'p1', look, { players: ['p2'] }).cards).toEqual([55, 44]);
+    });
+
+    it('Suspicion #78 unions every chosen player hand', () => {
+      const cardsSlot = specFor(78)!.slots[1]!;
+      expect(cardsSlot).toMatchObject({ kind: 'handCard', handFrom: 'chosen' });
+      expect(legalTargets(cardsSlot, twoHands, 'p1', look, { players: ['p1', 'p2'] }).cards).toEqual([5, 55, 44]);
+    });
+
+    it('offers nothing until a player is chosen (no fallback to the acting hand)', () => {
+      const cardsSlot = specFor(86)!.slots[1]!;
+      expect(legalTargets(cardsSlot, twoHands, 'p1', look, { players: [] }).cards).toEqual([]);
+      expect(legalTargets(cardsSlot, twoHands, 'p1', look).cards).toEqual([]); // no ctx at all
+    });
+
+    it('a default (acting) handCard slot is unaffected — still the acting hand', () => {
+      const acting: ChoiceSlot = { key: 'cards', kind: 'handCard', min: 0, max: 1, label: 'own hand' };
+      expect(legalTargets(acting, twoHands, 'p1', look, { players: ['p2'] }).cards).toEqual([5]);
+    });
+  });
 });

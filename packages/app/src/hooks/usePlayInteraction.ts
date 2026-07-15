@@ -186,7 +186,9 @@ export function usePlayInteraction(state: GameState, onAction: (a: Action) => vo
 
   const legalNow = useMemo(() => {
     if (!flow || !currentSlot) return null;
-    const legal = legalTargets(currentSlot, state, me, cardLookup);
+    // Pass the players already chosen this flow so a `handFrom: 'chosen'` card slot
+    // enumerates the CHOSEN player's hand (Compulsion #86 etc.), not the acting one.
+    const legal = legalTargets(currentSlot, state, me, cardLookup, { players: flow.sel.players });
     // The card being played is a mood-to-be, not a hand card — never offer it as a
     // hand-cost discard/reveal (matters when copying a discard-cost card via Creativity).
     if (currentSlot.kind === 'handCard' && legal.cards) {

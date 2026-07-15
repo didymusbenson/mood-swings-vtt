@@ -4,8 +4,9 @@
 // Slots mirror exactly the choices fields each effect in ../red.ts consumes.
 //
 // NOTE: #86 Compulsion's card comes from the TARGET player's hand, not the acting
-// player's; the 'cards' slot still carries the field but legalTargets enumerates
-// the acting player's hand (see report). Value thresholds follow the effect CODE
+// player's — its 'cards' slot is marked `handFrom: 'chosen'`, so legalTargets
+// enumerates the hand of the player picked in the preceding 'players' slot. Value
+// thresholds follow the effect CODE
 // in ../red.ts (which uses the data/cards.json values, e.g. <=3 for Shock/Rage,
 // total <=5 for Anger), not docs/card-notes.md.
 import { registerSpec } from '../choice-spec.js';
@@ -30,7 +31,7 @@ registerSpec(84, {
 registerSpec(86, {
   slots: [
     { key: 'players', kind: 'player', min: 1, max: 1, players: 'opponents', label: 'Choose another player' },
-    { key: 'cards', kind: 'handCard', min: 0, max: 1, label: 'They choose a card to give', optional: true },
+    { key: 'cards', kind: 'handCard', min: 0, max: 1, handFrom: 'chosen', label: 'They choose a card to give', optional: true },
   ],
 });
 

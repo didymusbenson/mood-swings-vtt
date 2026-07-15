@@ -43,6 +43,14 @@ export interface ChoiceSlot {
   optional?: boolean;
   mood?: MoodFilter; // kind === 'mood'
   hand?: HandFilter; // kind === 'handCard'
+  /**
+   * Whose hand a `handCard` slot draws from (default `'acting'` — the player
+   * playing the card). `'chosen'` draws from the union of the players already
+   * picked in an EARLIER `players` slot of the same flow — for "choose a player;
+   * that player gives/discards a card from THEIR hand" cards (Compulsion #86,
+   * Intimidation #67, Suspicion #78). Requires the `players` slot to come first.
+   */
+  handFrom?: 'acting' | 'chosen';
   players?: 'opponents' | 'all'; // kind === 'player'
   numberRange?: [number, number]; // kind === 'number'
   options?: string[]; // kind === 'choice' → sets `option`
@@ -88,12 +96,22 @@ export function isSingleTarget(spec: ChoiceSpec): boolean {
 /** Look up static card data — the UI passes its CardDB-backed accessor. */
 export type CardLookup = (cardNumber: number) => CardData;
 
+/**
+ * Selections already gathered earlier in the current flow. Only the fields a
+ * later slot can depend on are needed (e.g. a `handFrom: 'chosen'` card slot
+ * reads the players picked in an earlier `players` slot).
+ */
+export interface SlotContext {
+  players?: PlayerId[];
+}
+
 /** Candidate targets for a slot, given the current board and acting player. */
 export function legalTargets(
   slot: ChoiceSlot,
   state: GameState,
   actingPlayer: PlayerId,
-  card: CardLookup
+  card: CardLookup,
+  ctx?: SlotContext
 ): { moods?: string[]; players?: PlayerId[]; cards?: number[]; colors?: Color[]; numbers?: number[]; options?: string[] } {
   switch (slot.kind) {
     case 'mood':
@@ -124,7 +142,12 @@ export function legalTargets(
     }
     case 'handCard': {
       const f = slot.hand ?? {};
-      const hand = state.hands[actingPlayer] ?? [];
+      // 'chosen' → the hand(s) of the player(s) picked in an earlier slot; else the
+      // acting player's own hand. Union covers multi-target cards (Suspicion #78);
+      // single-target cards (Compulsion #86, Intimidation #67) resolve to one hand.
+      const owners: PlayerId[] =
+        slot.handFrom === 'chosen' ? ctx?.players ?? [] : [actingPlayer];
+      const hand = owners.flatMap((owner) => state.hands[owner] ?? []);
       const ok = hand.filter((n) => {
         const data = card(n);
         if (f.valueIn && !f.valueIn.includes(data.value)) return false;
