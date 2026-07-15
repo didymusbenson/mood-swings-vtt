@@ -3,6 +3,17 @@
 > A running record of gameplay bugs found during card debugging and how each was
 > fixed. Each entry names the affected cards, the root cause, the fix (with the
 > files touched), and the tests that lock the behaviour in. Newest first.
+>
+> **Source** categorises how each bug was found:
+> - 🧑 **User-reported** — called out by the user during play/bug-bashing.
+> - 🔎 **Audit-reported** — surfaced proactively by cross-checking specs against
+>   effects, not (yet) hit in play.
+
+| ID | Card(s) | Source | Status |
+| --- | --- | --- | --- |
+| R-003 | Fury #91 | 🔎 Audit-reported | ✅ Fixed |
+| R-002 | Panic #48 + 5 siblings | 🧑 User-reported | ✅ Fixed |
+| R-001 | Corruption #60 + 3 siblings | 🧑 User-reported | ✅ Fixed |
 
 The targeting flow is the guided "pick your targets" panel that opens when a card
 needs choices before it resolves. It is driven entirely by declarative per-card
@@ -17,11 +28,11 @@ never honour (or skipped one it needs).
 
 ---
 
-## R-003 — Fury #91 offered non-highest moods (found by audit, not reported)
+## R-003 — Fury #91 offered non-highest moods
 
-**Found:** proactively, while auditing every remaining `from: 'any'` mood slot for
-the same over-offer class as R-002. Not user-reported — surfaced by cross-checking
-each spec against its effect.
+**Source:** 🔎 Audit-reported — surfaced proactively while auditing every remaining
+`from: 'any'` mood slot for the same over-offer class as R-002, by cross-checking
+each spec against its effect. Not hit in play.
 
 **Affected card:** #91 Fury — "each player discards one of their highest-value moods."
 
@@ -51,9 +62,9 @@ asserts both of p1's top moods and p2's [4] are offered, and neither lower mood 
 
 ## R-002 — "Choose their moods" cards offered every seat's moods
 
-**Reported:** Playing **Panic #48** as Player 1, choosing only Player 2, the mood
-picker still listed Player 1's moods. Only the chosen player's moods should be
-selectable.
+**Source:** 🧑 User-reported — playing **Panic #48** as Player 1, choosing only
+Player 2, the mood picker still listed Player 1's moods. Only the chosen player's
+moods should be selectable.
 
 **Affected cards (all shared the same shape):**
 
@@ -104,10 +115,10 @@ now that the scope depends on it.
 
 ## R-001 — Wrong option-branch still prompted for targets
 
-**Reported:** Playing **Corruption #60** and choosing the "double the win" branch
-still popped a "Choose up to two cards" prompt (from an empty discard pile),
-showing "No valid cards". The panel header also read "cards from your hand" when
-the source is the discard pile.
+**Source:** 🧑 User-reported — playing **Corruption #60** and choosing the "double
+the win" branch still popped a "Choose up to two cards" prompt (from an empty
+discard pile), showing "No valid cards". The panel header also read "cards from
+your hand" when the source is the discard pile.
 
 **Affected cards:**
 
