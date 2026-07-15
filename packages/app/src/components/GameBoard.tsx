@@ -732,9 +732,10 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
   const [discardOpen, setDiscardOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
 
-  // Preview open triggers: mouse hover opens the detail panel only after >1s; a
-  // touch/pen tap opens it instantly. `hoverPreview` returns the pointer handler;
-  // `endHover` cancels a pending timer when the pointer leaves early.
+  // Preview opens instantly on hover / touch / pen — no delay (the wait felt
+  // unintuitive). `hoverPreview` returns the pointer handler; `endHover` remains as a
+  // stable no-op hook for pointer-leave and flow-start callers (and cancels a pending
+  // timer if one is ever reintroduced).
   const hoverTimer = useRef<number | null>(null);
   const endHover = useCallback(() => {
     if (hoverTimer.current != null) {
@@ -743,13 +744,9 @@ export function GameBoard({ state, onAction, onNewGame }: GameBoardProps) {
     }
   }, []);
   const hoverPreview = useCallback(
-    (t: PreviewTarget | null) => (e: React.PointerEvent) => {
+    (t: PreviewTarget | null) => () => {
       endHover();
-      if (e.pointerType === 'mouse') {
-        hoverTimer.current = window.setTimeout(() => setPreview(t), 1000);
-      } else {
-        setPreview(t); // touch / pen: instant (mobile-friendly)
-      }
+      setPreview(t);
     },
     [endHover],
   );
