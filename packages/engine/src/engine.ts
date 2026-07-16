@@ -413,30 +413,37 @@ export class Engine {
         state.discardPlaysRemaining > 0;
       if (!canContinue) this.completeTurn(state, action.player);
     }
-    this.reconcileRevealed(state);
+    this.reconcileRevealed(prevState, state);
     return state;
   }
 
   /**
-   * Keep `revealed` honest after an action: a revealed card stays revealed only while a
-   * matching card is still in that hand. Any departure (played, discarded, given, passed,
-   * bottom-decked) drops the reveal — the hand's count of that card falls, so the excess
-   * revealed entry is pruned. Reveals otherwise persist indefinitely (across rounds) until
-   * the card leaves. Count-based, so with duplicate copies it errs toward keeping a reveal
-   * while any matching copy remains.
+   * Keep `revealed` honest after an action. A reveal is durable — it persists across
+   * rounds — but only while we remain CERTAIN the revealed card is still in the hand. If
+   * a copy of that card number left the hand this action (its count fell), that certainty
+   * is gone: the copy that left might be the revealed one, so the reveal is dropped
+   * entirely — even if an identical copy remains. (Reveal one of two, play either → the
+   * remaining one is no longer known.) Cards whose count is unchanged (or grew, via a draw
+   * or a returned mood) keep their reveals, capped to the live count.
    */
-  private reconcileRevealed(state: GameState): void {
+  private reconcileRevealed(prev: GameState, state: GameState): void {
+    const counts = (hand: CardNumber[] | undefined) => {
+      const m = new Map<number, number>();
+      for (const c of hand ?? []) m.set(c, (m.get(c) ?? 0) + 1);
+      return m;
+    };
     for (const pid of Object.keys(state.revealed) as PlayerId[]) {
       const rev = state.revealed[pid];
       if (!rev || rev.length === 0) continue;
-      const handCount = new Map<number, number>();
-      for (const c of state.hands[pid] ?? []) handCount.set(c, (handCount.get(c) ?? 0) + 1);
+      const now = counts(state.hands[pid]);
+      const before = counts(prev.hands[pid]);
       const used = new Map<number, number>();
       const kept: number[] = [];
       for (const c of rev) {
-        const cap = handCount.get(c) ?? 0;
+        const nowN = now.get(c) ?? 0;
+        if (nowN < (before.get(c) ?? 0)) continue; // a copy left → reveal is no longer certain
         const u = used.get(c) ?? 0;
-        if (u < cap) {
+        if (u < nowN) {
           kept.push(c);
           used.set(c, u + 1);
         }

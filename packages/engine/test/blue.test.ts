@@ -60,19 +60,21 @@ describe('blue cards', () => {
     expect(g.revealed.p2).toContain(44);
   });
 
-  it('a revealed card persists while in hand and is pruned once it leaves', () => {
+  it('a reveal persists until a copy of that card leaves the hand — then it is dropped', () => {
     const { e, s } = game(rig([5, 44], [44], 44)); // p1 hand: 5, then four 44s
-    s.revealed = { p1: [5, 44] };
-    // Playing a DIFFERENT card leaves both revealed cards in hand → both stay revealed.
-    let g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 44 });
-    expect(g.revealed.p1).toContain(5); // 5 still in hand → still revealed
-    expect(g.revealed.p1).toContain(44); // a 44 still in hand → still revealed
-    // Now play the revealed 5 → it leaves the hand → its reveal is pruned.
+    s.revealed = { p1: [5, 44] }; // one 5 and one 44 revealed
+    // Play a 44: a copy of 44 left, so it's no longer certain the revealed 44 is still in
+    // hand (there are others) → the 44 reveal is dropped. The 5 never moved → it stays.
+    const g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 44 });
+    expect(g.revealed.p1).toContain(5);
+    expect(g.revealed.p1 ?? []).not.toContain(44);
+
+    // Playing the revealed single card also removes its reveal.
     const { e: e2, s: s2 } = game(rig([5, 44], [44], 44));
     s2.revealed = { p1: [5] };
-    g = e2.apply(s2, { type: 'play', player: 'p1', card: 5 });
-    expect(g.hands.p1).not.toContain(5);
-    expect(g.revealed.p1 ?? []).not.toContain(5); // gone once it left the hand
+    const g2: GameState = e2.apply(s2, { type: 'play', player: 'p1', card: 5 });
+    expect(g2.hands.p1).not.toContain(5);
+    expect(g2.revealed.p1 ?? []).not.toContain(5);
   });
 
   it('#27 Ambivalence is [6] alone, [3] with two red/green moods', () => {

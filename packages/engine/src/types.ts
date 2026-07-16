@@ -180,8 +180,9 @@ export interface GameState {
    * Curiosity #33 / Paranoia #71 reveals, plus any mood that returns from play to a hand
    * (everyone saw which card went back). While a revealed card remains in the holder's
    * hand, redaction shows it face-up to opponents instead of a card back. It persists —
-   * across rounds — until the card leaves the hand (played, discarded, given, passed):
-   * the engine prunes it (see reconcileRevealed) the moment the hand no longer holds it.
+   * across rounds — until we can no longer be certain the revealed card is still there:
+   * the engine drops it (see reconcileRevealed) as soon as a copy of that card leaves the
+   * hand (played, discarded, given, passed), even if an identical copy remains.
    */
   revealed: Record<PlayerId, CardNumber[]>;
 
