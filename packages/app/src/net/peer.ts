@@ -13,6 +13,7 @@ import type { ChoiceRequest, ChoiceResponse } from './delegation.js';
 
 /** Messages exchanged over the DataChannel. JSON-encoded; must stay JSON-safe. */
 export type NetMsg =
+  | { t: 'join'; name: string } // joiner → host: my chosen player name (starts the match)
   | { t: 'hello'; seat: PlayerId } // host → joiner: the seat you are playing
   | { t: 'state'; view: GameState } // host → joiner: your redacted view
   | { t: 'action'; action: Action } // joiner → host: submit a play/pass

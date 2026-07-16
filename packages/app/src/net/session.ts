@@ -230,7 +230,7 @@ export class HostSession extends BaseSession {
       return;
     }
     this.conn = conn;
-    conn.on('open', () => this.startMatch(conn));
+    // The match doesn't begin until the joiner sends their name ({t:'join'}); see onData.
     conn.on('data', (d: unknown) => this.onData(d));
     conn.on('close', () => {
       this._status = 'lost';
@@ -275,6 +275,13 @@ export class HostSession extends BaseSession {
 
   private onData(d: unknown): void {
     const msg = d as NetMsg;
+    if (msg?.t === 'join') {
+      if (this.runner || !this.conn) return; // already started; ignore a duplicate join
+      const p2 = this.initial.players.find((p) => p.id === JOINER_SEAT);
+      if (p2) p2.name = (msg.name ?? '').trim() || 'Opponent';
+      this.startMatch(this.conn);
+      return;
+    }
     if (msg?.t === 'action') {
       if (!isValidInboundAction(msg.action)) return;
       // A joiner may only ever act as their own seat; the engine also re-checks turn.
@@ -380,6 +387,7 @@ export class JoinSession extends BaseSession {
   private readonly peer: Peer;
   private conn: DataConnection | null = null;
   private _localSeat: PlayerId = JOINER_SEAT;
+  private readonly name: string;
   // Set when we've sent a delegated action / answered a sub-choice and are waiting for
   // the host to resolve it; cleared when the next authoritative view arrives.
   private _awaitingResolve = false;
@@ -391,14 +399,17 @@ export class JoinSession extends BaseSession {
     return this._awaitingResolve && this._pendingChoice == null;
   }
 
-  constructor(code: string) {
+  constructor(code: string, name: string) {
     super();
+    this.name = name;
     this._roomCode = normaliseCode(code);
     this._status = 'connecting';
     this.peer = new Peer();
     this.peer.on('open', () => {
       const conn = this.peer.connect(roomPeerId(code), { serialization: 'json', reliable: true });
       this.conn = conn;
+      // Announce our name as soon as the channel opens — this is what starts the match.
+      conn.on('open', () => conn.send({ t: 'join', name: this.name } satisfies NetMsg));
       conn.on('data', (d: unknown) => this.onData(d));
       conn.on('close', () => {
         this._status = 'lost';

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type React from 'react';
 import { randomBoxDeck, validateCustomDeck, minDeckSize } from '@mood-swings/engine';
 import { db } from '../game/db.js';
 import type { DeckCounts } from '../game/deckModel.js';
@@ -18,6 +19,17 @@ interface StartScreenProps {
   onStart: (config: StartConfig) => void;
   /** Optional: return to the mode chooser (v2). Omitted in single-mode contexts. */
   onBack?: () => void;
+  /**
+   * 'goldfish' (default): two local names, "Start game". 'host': one name (your own —
+   * the joiner supplies theirs), "Create game", host tagline. The shared deck is always
+   * configured here (there is one deck both players draw from).
+   */
+  variant?: 'goldfish' | 'host';
+  /** Extra content rendered beneath the setup (the "join a game" panel in online mode). */
+  footer?: React.ReactNode;
+  /** Host variant: the single name, lifted so the join box can share it (one name field). */
+  name?: string;
+  onName?: (name: string) => void;
 }
 
 const MIN = minDeckSize(2);
@@ -33,9 +45,14 @@ function countsEqual(a: DeckCounts, b: DeckCounts): boolean {
   return true;
 }
 
-export function StartScreen({ onStart, onBack }: StartScreenProps) {
+export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, name, onName }: StartScreenProps) {
+  const isHost = variant === 'host';
   const [p1, setP1] = useState('Player 1');
   const [p2, setP2] = useState('Player 2');
+  // Host variant can have its single name lifted (so the join box shares it).
+  const controlled = isHost && name !== undefined && onName !== undefined;
+  const p1Value = controlled ? name : p1;
+  const setP1Value = controlled ? onName : setP1;
   const [tab, setTab] = useState<'random' | 'custom'>('random');
   const [showRules, setShowRules] = useState(false);
 
@@ -99,14 +116,16 @@ export function StartScreen({ onStart, onBack }: StartScreenProps) {
     setTab('random');
   };
 
-  const canStart = validation.ok && p1.trim().length > 0 && p2.trim().length > 0;
+  const canStart = validation.ok && p1Value.trim().length > 0 && (isHost || p2.trim().length > 0);
 
   const start = () => {
     if (!canStart) return;
     onStart({
       players: [
-        { id: 'p1', name: p1.trim() },
-        { id: 'p2', name: p2.trim() },
+        { id: 'p1', name: p1Value.trim() },
+        // Host: the joiner names themselves and it's synced on connect; this is just a
+        // placeholder until then. Goldfish: the second local player's name.
+        { id: 'p2', name: isHost ? 'Opponent' : p2.trim() },
       ],
       deck,
       seed,
@@ -127,23 +146,27 @@ export function StartScreen({ onStart, onBack }: StartScreenProps) {
         )}
         <Starburst className="start__burst" label="1st Ed." />
         <h1>Mood Swings</h1>
-        <p className="start__tag">Goldfish — two hands, one screen</p>
+        <p className="start__tag">
+          {isHost ? 'Host a game — share the room code to play' : 'Goldfish — two hands, one screen'}
+        </p>
         <button className="btn start__howto" onClick={() => setShowRules(true)}>
           How to Play
         </button>
       </header>
 
       <section className="panel">
-        <h2>Players</h2>
+        <h2>{isHost ? 'Your name' : 'Players'}</h2>
         <div className="start__names">
           <label>
-            Player 1
-            <input value={p1} onChange={(e) => setP1(e.target.value)} />
+            {isHost ? 'Name' : 'Player 1'}
+            <input value={p1Value} onChange={(e) => setP1Value(e.target.value)} />
           </label>
-          <label>
-            Player 2
-            <input value={p2} onChange={(e) => setP2(e.target.value)} />
-          </label>
+          {!isHost && (
+            <label>
+              Player 2
+              <input value={p2} onChange={(e) => setP2(e.target.value)} />
+            </label>
+          )}
         </div>
       </section>
 
@@ -190,9 +213,11 @@ export function StartScreen({ onStart, onBack }: StartScreenProps) {
           {tab === 'custom' && <span className="muted"> · min {MIN}</span>}
         </div>
         <button className="btn btn--primary" disabled={!canStart} onClick={start}>
-          Start game
+          {isHost ? 'Create game' : 'Start game'}
         </button>
       </footer>
+
+      {footer}
 
       {guardOpen && (
         <div className="dbx-modal__backdrop" onClick={() => setGuardOpen(false)} role="presentation">

@@ -1,21 +1,21 @@
 import { Starburst } from './Starburst.js';
 
-export type PlayMode = 'goldfish' | 'host' | 'join';
+export type PlayMode = 'goldfish' | 'online';
 
 interface ModeChooserProps {
   onPick: (mode: PlayMode) => void;
 }
 
 /**
- * The top-level entry point (v2): pick how to play before configuring a game.
+ * The top-level entry point (v2): pick how to play.
  *
- *   Goldfish  — one screen, one driver, both hands visible (the old hotseat, for
- *               testing card interactions solo).
- *   Host Game — host a networked 2-player game; share a room code with a friend.
- *   Join Game — enter a room code to join someone else's game.
+ *   Host or Join — networked two-player game. One page: create a new game (get a room
+ *                  code to share) or join a friend's with their code.
+ *   Goldfish     — one screen, one driver, both hands visible (the old hotseat, for
+ *                  practicing a deck / seeing how cards interact solo).
  *
- * "Vs Computer" is intentionally absent: the AI is deferred, so there is no button
- * for it until a brain exists (see net/agent.ts ComputerAgent).
+ * "Vs Computer" is intentionally absent: the AI is deferred, so there is no button for
+ * it until a brain exists (see net/agent.ts ComputerAgent).
  */
 export function ModeChooser({ onPick }: ModeChooserProps) {
   return (
@@ -26,20 +26,14 @@ export function ModeChooser({ onPick }: ModeChooserProps) {
       </div>
 
       <div className="modechooser">
-        <button className="modecard" onClick={() => onPick('host')}>
+        <button className="modecard" onClick={() => onPick('online')}>
           <span className="modecard__icon" aria-hidden>
             🎲
           </span>
-          <span className="modecard__title">Host Game</span>
-          <span className="modecard__desc">Start a two-player game and share a room code with a friend.</span>
-        </button>
-
-        <button className="modecard" onClick={() => onPick('join')}>
-          <span className="modecard__icon" aria-hidden>
-            🔗
+          <span className="modecard__title">Host or Join</span>
+          <span className="modecard__desc">
+            Play a friend online. Host a new game and share a room code, or join theirs with a code.
           </span>
-          <span className="modecard__title">Join Game</span>
-          <span className="modecard__desc">Enter a friend's room code to join their game.</span>
         </button>
 
         <button className="modecard modecard--secondary" onClick={() => onPick('goldfish')}>

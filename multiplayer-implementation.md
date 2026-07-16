@@ -35,13 +35,15 @@ pure `reduce(state, action) → state`, and everything new is a thin layer *arou
 | **Host Game (host)** | LocalHuman(p1) + RemoteHuman(p2) | host browser | on |
 | **Host Game (joiner)** | thin client, no engine | host browser | receives redacted views |
 
-### Networking (Host Game)
-Host-authoritative WebRTC over PeerJS's public broker. The host clicks **Host Game**,
-configures the deck, and gets a **6-character room code**. The opponent clicks **Join
-Game**, enters the code, and is dealt in. A `#room=CODE` deep link prefills the join
-screen. The host owns the engine and re-validates every action the joiner sends, so a
-spoofed or out-of-turn action is rejected. Hands stay hidden: the joiner only ever
-receives a view redacted for their seat.
+### Networking (Host or Join)
+Host-authoritative WebRTC over PeerJS's public broker. The menu has one online option,
+**Host or Join**, which opens a single page: *create a new game* on top (name yourself +
+configure the shared deck → get a **6-character room code**) and *join a game* beneath
+(enter a friend's code + your own name). Each player names only themselves — the joiner's
+name is sent to the host on connect (`{t:'join'}`), which is also what starts the match. A
+`#room=CODE` deep link opens this page with the code prefilled. The host owns the engine
+and re-validates every action the joiner sends, so a spoofed or out-of-turn action is
+rejected. Hands stay hidden: the joiner only ever receives a view redacted for their seat.
 
 ### Opponent-choice delegation
 Six cards contain a sub-choice that belongs to the *other* player (picking from a hidden

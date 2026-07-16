@@ -5,7 +5,7 @@ import { db } from './game/db.js';
 import { StartScreen, type StartConfig } from './components/StartScreen.js';
 import { GameBoard } from './components/GameBoard.js';
 import { ModeChooser, type PlayMode } from './components/ModeChooser.js';
-import { JoinScreen } from './components/JoinScreen.js';
+import { OnlineSetup } from './components/OnlineSetup.js';
 import { Lobby } from './components/Lobby.js';
 import { DelegatedChoiceOverlay } from './components/DelegatedChoiceOverlay.js';
 import { GoldfishSession, HostSession, JoinSession, type Session } from './net/session.js';
@@ -22,7 +22,7 @@ function roomFromHash(): string | null {
 export function App() {
   const engine = useMemo(() => new Engine(db), []);
   const deepLinkCode = useMemo(roomFromHash, []);
-  const [screen, setScreen] = useState<Screen>(deepLinkCode ? 'join' : 'menu');
+  const [screen, setScreen] = useState<Screen>(deepLinkCode ? 'online' : 'menu');
   const [session, setSession] = useState<Session | null>(null);
   // Setup-time error (bad deck, etc.); in-match/connection errors live on session.error.
   const [setupError, setSetupError] = useState<string | null>(null);
@@ -62,8 +62,8 @@ export function App() {
     [engine],
   );
 
-  const startJoin = useCallback((code: string) => {
-    setSession(new JoinSession(code));
+  const startJoin = useCallback((code: string, name: string) => {
+    setSession(new JoinSession(code, name));
     setSetupError(null);
   }, []);
 
@@ -102,10 +102,16 @@ export function App() {
     body = <ModeChooser onPick={setScreen} />;
   } else if (screen === 'goldfish') {
     body = <StartScreen onStart={startGoldfish} onBack={() => setScreen('menu')} />;
-  } else if (screen === 'host') {
-    body = <StartScreen onStart={startHost} onBack={() => setScreen('menu')} />;
   } else {
-    body = <JoinScreen onJoin={startJoin} onBack={() => setScreen('menu')} initialCode={deepLinkCode ?? ''} />;
+    // Host or Join, one page: shared name + create-game form on top, join box beneath.
+    body = (
+      <OnlineSetup
+        onHost={startHost}
+        onJoin={startJoin}
+        onBack={() => setScreen('menu')}
+        initialCode={deepLinkCode ?? ''}
+      />
+    );
   }
 
   return (
