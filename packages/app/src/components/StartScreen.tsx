@@ -2,12 +2,10 @@ import { useMemo, useState } from 'react';
 import type React from 'react';
 import { randomBoxDeck, validateCustomDeck, minDeckSize } from '@mood-swings/engine';
 import { db } from '../game/db.js';
-import type { DeckCounts } from '../game/deckModel.js';
-import { flatten, fromFlat, totalCards } from '../game/deckModel.js';
-import { saveDeck } from '../game/deckStorage.js';
+import { flatten } from '../game/deckModel.js';
+import { listDecks, loadDeckCounts, type SavedDeck } from '../game/deckStorage.js';
 import { Starburst } from './Starburst.js';
 import { HowToPlay } from './HowToPlay.js';
-import { Deckbuilder } from './deckbuilder/Deckbuilder.js';
 
 export interface StartConfig {
   players: { id: string; name: string }[];
@@ -30,6 +28,10 @@ interface StartScreenProps {
   /** Host variant: the single name, lifted so the join box can share it (one name field). */
   name?: string;
   onName?: (name: string) => void;
+  /** Open the standalone Deckbuilder seeded with the given deck (Edit in Deckbuilder). */
+  onOpenBuilder?: (deck: number[]) => void;
+  /** A custom deck handed back from the Deckbuilder ("Use this deck") to pre-select. */
+  initialDeck?: number[];
 }
 
 const MIN = minDeckSize(2);
@@ -38,14 +40,11 @@ function randomSeed(): number {
   return Math.floor(Math.random() * 1_000_000);
 }
 
-/** Value-equality for two deck count maps (same cards, same copies). */
-function countsEqual(a: DeckCounts, b: DeckCounts): boolean {
-  if (a.size !== b.size) return false;
-  for (const [k, v] of a) if (b.get(k) !== v) return false;
-  return true;
+function savedDeckSize(sd: SavedDeck): number {
+  return Object.values(sd.cards).reduce((a, b) => a + b, 0);
 }
 
-export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, name, onName }: StartScreenProps) {
+export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, name, onName, onOpenBuilder, initialDeck }: StartScreenProps) {
   const isHost = variant === 'host';
   const [p1, setP1] = useState('Player 1');
   const [p2, setP2] = useState('Player 2');
@@ -53,21 +52,19 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
   const controlled = isHost && name !== undefined && onName !== undefined;
   const p1Value = controlled ? name : p1;
   const setP1Value = controlled ? onName : setP1;
-  const [tab, setTab] = useState<'random' | 'custom'>('random');
+  const [tab, setTab] = useState<'random' | 'custom'>(initialDeck ? 'custom' : 'random');
   const [showRules, setShowRules] = useState(false);
 
   const [seed, setSeed] = useState<number>(() => randomSeed());
   const [randomDeck, setRandomDeck] = useState<number[]>(() => randomBoxDeck(db, seed).deck);
 
-  // Custom builder deck (a count map) + the last clean baseline for dirty tracking.
-  const [builderCounts, setBuilderCounts] = useState<DeckCounts>(() => new Map());
-  const [builderBaseline, setBuilderBaseline] = useState<DeckCounts>(() => new Map());
-  const [builderName, setBuilderName] = useState('Untitled deck');
-  const [guardOpen, setGuardOpen] = useState(false);
+  // Custom deck for the game: a saved deck the user picked, or a deck handed back from
+  // the Deckbuilder ("Use this deck"). Full editing lives on the standalone builder page.
+  const [savedDecks] = useState<SavedDeck[]>(() => listDecks());
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [customDeck, setCustomDeck] = useState<number[] | null>(initialDeck ?? null);
 
-  const dirty = !countsEqual(builderCounts, builderBaseline);
-
-  const deck = tab === 'random' ? randomDeck : flatten(builderCounts);
+  const deck = tab === 'random' ? randomDeck : customDeck ?? [];
   const validation = useMemo(() => validateCustomDeck(deck, 2), [deck]);
 
   const rerollRandom = () => {
@@ -80,40 +77,16 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
     setRandomDeck(randomBoxDeck(db, s).deck);
   };
 
-  const markClean = (counts: DeckCounts, name: string) => {
-    setBuilderBaseline(new Map(counts));
-    setBuilderName(name);
-  };
-
-  const viewInBuilder = () => {
-    const counts = fromFlat(randomDeck);
-    setBuilderCounts(counts);
-    setBuilderBaseline(new Map(counts));
-    setBuilderName('From random deck');
-    setTab('custom');
-  };
-
-  /** Guarded tab switch: leaving an unsaved, dirty custom build prompts first. */
-  const switchTab = (next: 'random' | 'custom') => {
-    if (tab === 'custom' && next === 'random' && dirty) {
-      setGuardOpen(true);
+  const selectSaved = (id: string) => {
+    if (!id) {
+      setSavedId(null);
+      setCustomDeck(null);
       return;
     }
-    setTab(next);
-  };
-
-  const guardSave = () => {
-    const name = window.prompt('Save deck as:', builderName)?.trim();
-    if (!name) return; // stay in the guard
-    saveDeck(name, builderCounts);
-    markClean(builderCounts, name);
-    setGuardOpen(false);
-    setTab('random');
-  };
-  const guardDiscard = () => {
-    setBuilderCounts(new Map(builderBaseline)); // revert to last clean
-    setGuardOpen(false);
-    setTab('random');
+    const sd = savedDecks.find((d) => d.id === id);
+    if (!sd) return;
+    setSavedId(id);
+    setCustomDeck(flatten(loadDeckCounts(sd).counts));
   };
 
   const canStart = validation.ok && p1Value.trim().length > 0 && (isHost || p2.trim().length > 0);
@@ -154,15 +127,16 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
     </header>
   );
 
-  // Deck tabs + content (Random deck / Deckbuilder). Shared by both variants.
+  // Deck tabs + content (Random deck / Custom deck). Shared by both variants. Full deck
+  // editing lives on the standalone Deckbuilder page, reached via "Edit in Deckbuilder".
   const deckContent = (
     <>
       <div className="tabs">
-        <button className={tab === 'random' ? 'tab is-active' : 'tab'} onClick={() => switchTab('random')}>
+        <button className={tab === 'random' ? 'tab is-active' : 'tab'} onClick={() => setTab('random')}>
           Random deck
         </button>
-        <button className={tab === 'custom' ? 'tab is-active' : 'tab'} onClick={() => switchTab('custom')}>
-          Deckbuilder
+        <button className={tab === 'custom' ? 'tab is-active' : 'tab'} onClick={() => setTab('custom')}>
+          Custom deck
         </button>
       </div>
 
@@ -177,14 +151,40 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
             <button className="btn" onClick={rerollRandom}>
               Reroll
             </button>
-            <button className="btn" onClick={viewInBuilder}>
-              View in deckbuilder
-            </button>
+            {onOpenBuilder && (
+              <button className="btn" onClick={() => onOpenBuilder(randomDeck)}>
+                Edit in Deckbuilder →
+              </button>
+            )}
             <span className="muted">{randomDeck.length} cards</span>
           </div>
         </div>
       ) : (
-        <Deckbuilder counts={builderCounts} db={db} onChange={setBuilderCounts} onClean={markClean} />
+        <div className="start__custom">
+          {savedDecks.length > 0 ? (
+            <label className="start__savedpick">
+              Saved deck
+              <select value={savedId ?? ''} onChange={(e) => selectSaved(e.target.value)}>
+                <option value="">Choose a saved deck…</option>
+                {savedDecks.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} ({savedDeckSize(d)})
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p className="muted">No saved decks yet — build one in the Deckbuilder.</p>
+          )}
+          <div className="start__customrow">
+            <span className="muted">{customDeck ? `${customDeck.length} cards selected` : 'No deck selected'}</span>
+            {onOpenBuilder && (
+              <button className="btn" onClick={() => onOpenBuilder(customDeck ?? [])}>
+                {customDeck ? 'Edit in Deckbuilder →' : 'Open Deckbuilder →'}
+              </button>
+            )}
+          </div>
+        </div>
       )}
     </>
   );
@@ -198,22 +198,6 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
         <span className="bad">{validation.errors.join(' ')}</span>
       )}
       {tab === 'custom' && <span className="muted"> · min {MIN}</span>}
-    </div>
-  );
-
-  const guardModal = guardOpen && (
-    <div className="dbx-modal__backdrop" onClick={() => setGuardOpen(false)} role="presentation">
-      <div className="dbx-modal dbx-guard" role="dialog" aria-modal="true" aria-label="Unsaved changes" onClick={(e) => e.stopPropagation()}>
-        <header className="dbx-modal__head">
-          <h3 className="dbx-modal__title">Unsaved changes</h3>
-        </header>
-        <p>You have unsaved changes to this deck ({totalCards(builderCounts)} cards). Save them before leaving?</p>
-        <div className="dbx-import__actions">
-          <button type="button" className="btn btn--primary" onClick={guardSave}>Save deck</button>
-          <button type="button" className="btn" onClick={guardDiscard}>Discard</button>
-          <button type="button" className="btn" onClick={() => setGuardOpen(false)}>Keep editing</button>
-        </div>
-      </div>
     </div>
   );
 
@@ -256,10 +240,7 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
           </section>
 
           <aside className="host-join">{footer}</aside>
-        </div>
-
-        {guardModal}
-      </div>
+        </div>      </div>
     );
   }
 
@@ -291,9 +272,6 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
         </button>
       </footer>
 
-      {footer}
-
-      {guardModal}
-    </div>
+      {footer}    </div>
   );
 }

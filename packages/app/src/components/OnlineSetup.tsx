@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { StartScreen, type StartConfig } from './StartScreen.js';
 import { JoinPanel } from './JoinPanel.js';
 
@@ -7,22 +6,30 @@ interface OnlineSetupProps {
   onJoin: (code: string, name: string) => void;
   onBack: () => void;
   initialCode?: string;
+  /** The single shared name (lifted to App so it survives a trip to the Deckbuilder). */
+  name: string;
+  onName: (name: string) => void;
+  /** Open the standalone Deckbuilder seeded with the current deck. */
+  onOpenBuilder?: (deck: number[]) => void;
+  /** A deck handed back from the Deckbuilder ("Use this deck") to pre-select. */
+  initialDeck?: number[];
 }
 
 /**
- * The single "Host or Join" page. Owns ONE name (used whether you host or join), renders
- * the create-game form (name + shared deck → "Create game") and, beneath it, the join
- * box (just a room code). Hosting uses the name for seat 1; joining sends it to the host.
+ * The single "Host or Join" page. One shared name (used whether you host or join) drives
+ * the create-game form (name + deck → "Create game") and, beneath it, the join box (room
+ * code). Hosting uses the name for seat 1; joining sends it to the host.
  */
-export function OnlineSetup({ onHost, onJoin, onBack, initialCode = '' }: OnlineSetupProps) {
-  const [name, setName] = useState('Player 1');
+export function OnlineSetup({ onHost, onJoin, onBack, initialCode = '', name, onName, onOpenBuilder, initialDeck }: OnlineSetupProps) {
   return (
     <StartScreen
       variant="host"
       name={name}
-      onName={setName}
+      onName={onName}
       onStart={onHost}
       onBack={onBack}
+      onOpenBuilder={onOpenBuilder}
+      initialDeck={initialDeck}
       footer={<JoinPanel name={name} onJoin={(code) => onJoin(code, name.trim() || 'Player 2')} initialCode={initialCode} />}
     />
   );

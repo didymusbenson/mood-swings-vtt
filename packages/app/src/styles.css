@@ -3417,3 +3417,86 @@ input:focus-visible {
     padding: 0.7rem 0.8rem;
   }
 }
+
+/* ---- shared modal fields (PromptModal / ConfirmModal) --------------------- */
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-family: var(--font-hand);
+  margin: 0.4rem 0 1rem;
+}
+.modal-field input {
+  font-family: var(--font-hand);
+  font-size: 1.1rem;
+  padding: 0.45rem 0.55rem;
+  border: 2px solid var(--ink);
+  border-radius: 11px 8px 11px 8px / 8px 11px 8px 11px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.modal-message {
+  margin: 0.4rem 0 1rem;
+  font-size: 1.05rem;
+}
+.btn--danger {
+  background: var(--c-red, #b23);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+/* ---- standalone Deckbuilder page ------------------------------------------ */
+.dbx-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.dbx-page__bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 1.1rem;
+  border-bottom: 2px solid var(--ink);
+}
+.dbx-page__title {
+  flex: 1;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-hand);
+  font-size: 1.7rem;
+}
+.dbx-page__spacer {
+  /* balances the Back button so the title stays centered when there's no CTA */
+  min-width: 88px;
+}
+
+/* ---- game-setup custom-deck tab (saved-deck picker) ----------------------- */
+.start__custom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.4rem 0.1rem;
+}
+.start__savedpick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-family: var(--font-hand);
+  min-width: 0;
+}
+.start__savedpick select {
+  font-family: var(--font-hand);
+  font-size: 1.05rem;
+  padding: 0.4rem 0.5rem;
+  border: 2px solid var(--ink);
+  border-radius: 11px 8px 11px 8px / 8px 11px 8px 11px;
+  background: var(--paper);
+  color: var(--ink);
+  max-width: 100%;
+}
+.start__customrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+}

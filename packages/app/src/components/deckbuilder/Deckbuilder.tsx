@@ -24,6 +24,7 @@ import { VisualList } from './views/VisualList.js';
 import { VisualDetailList } from './views/VisualDetailList.js';
 import { DeckListPanel } from './DeckListPanel.js';
 import { CardDetailModal } from './CardDetailModal.js';
+import { PromptModal, ConfirmModal } from '../Modal.js';
 
 interface DeckbuilderProps {
   counts: DeckCounts;
@@ -68,6 +69,8 @@ export function Deckbuilder({ counts, db, onChange, onClean }: DeckbuilderProps)
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [flash, setFlash] = useState<string | null>(null);
+  // Which name/confirm dialog is open (replaces window.prompt / window.confirm).
+  const [dialog, setDialog] = useState<'saveAs' | 'rename' | 'delete' | null>(null);
 
   // Reset to page 1 whenever the result set or layout changes.
   useEffect(() => setPage(1), [query, filters, sort, dir, view]);
@@ -107,9 +110,7 @@ export function Deckbuilder({ counts, db, onChange, onClean }: DeckbuilderProps)
 
   // --- deck manager ---
   const refresh = () => setDecks(listDecks());
-  const doSaveAs = () => {
-    const name = window.prompt('Save deck as:', deckName)?.trim();
-    if (!name) return;
+  const performSaveAs = (name: string) => {
     const sd = saveDeck(name, counts);
     setCurrentId(sd.id);
     setDeckName(sd.name);
@@ -118,7 +119,7 @@ export function Deckbuilder({ counts, db, onChange, onClean }: DeckbuilderProps)
     showFlash(`Saved “${sd.name}”.`);
   };
   const doSave = () => {
-    if (!currentId) return doSaveAs();
+    if (!currentId) return setDialog('saveAs');
     const sd = saveDeck(deckName, counts, currentId);
     refresh();
     onClean?.(counts, sd.name);
@@ -134,10 +135,8 @@ export function Deckbuilder({ counts, db, onChange, onClean }: DeckbuilderProps)
     onClean?.(loaded, sd.name);
     showFlash(dropped.length ? `Loaded “${sd.name}” (${dropped.length} unknown card(s) dropped).` : `Loaded “${sd.name}”.`);
   };
-  const doRename = () => {
+  const performRename = (name: string) => {
     if (!currentId) return;
-    const name = window.prompt('Rename deck:', deckName)?.trim();
-    if (!name) return;
     renameDeck(currentId, name);
     setDeckName(name);
     refresh();
@@ -153,8 +152,8 @@ export function Deckbuilder({ counts, db, onChange, onClean }: DeckbuilderProps)
       showFlash(`Duplicated as “${sd.name}”.`);
     }
   };
-  const doDelete = () => {
-    if (!currentId || !window.confirm(`Delete “${deckName}”?`)) return;
+  const performDelete = () => {
+    if (!currentId) return;
     deleteDeck(currentId);
     setCurrentId(null);
     refresh();
@@ -281,10 +280,10 @@ export function Deckbuilder({ counts, db, onChange, onClean }: DeckbuilderProps)
               ))}
             </select>
             <button type="button" className="btn" onClick={doSave}>Save</button>
-            <button type="button" className="btn" onClick={doSaveAs}>Save as</button>
-            <button type="button" className="btn" onClick={doRename} disabled={!currentId}>Rename</button>
+            <button type="button" className="btn" onClick={() => setDialog('saveAs')}>Save as</button>
+            <button type="button" className="btn" onClick={() => setDialog('rename')} disabled={!currentId}>Rename</button>
             <button type="button" className="btn" onClick={doDuplicate} disabled={!currentId}>Duplicate</button>
-            <button type="button" className="btn" onClick={doDelete} disabled={!currentId}>Delete</button>
+            <button type="button" className="btn" onClick={() => setDialog('delete')} disabled={!currentId}>Delete</button>
             <button type="button" className="btn" onClick={() => setImportOpen(true)}>Import</button>
             <button type="button" className="btn" onClick={doExportClipboard}>Export</button>
             <button type="button" className="btn" onClick={doExportDownload}>↓ .txt</button>
@@ -350,6 +349,46 @@ export function Deckbuilder({ counts, db, onChange, onClean }: DeckbuilderProps)
           onSet={(n) => onSet(modalCard.number, n)}
           onSub={() => onSub(modalCard.number)}
           onClose={() => setModalCard(null)}
+        />
+      )}
+
+      {dialog === 'saveAs' && (
+        <PromptModal
+          title="Save deck"
+          label="Deck name"
+          initialValue={deckName}
+          confirmLabel="Save"
+          onConfirm={(name) => {
+            performSaveAs(name);
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'rename' && (
+        <PromptModal
+          title="Rename deck"
+          label="New name"
+          initialValue={deckName}
+          confirmLabel="Rename"
+          onConfirm={(name) => {
+            performRename(name);
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'delete' && (
+        <ConfirmModal
+          title="Delete deck"
+          message={<>Delete “{deckName}”? This can’t be undone.</>}
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => {
+            performDelete();
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
         />
       )}
     </div>

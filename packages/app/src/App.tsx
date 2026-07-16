@@ -8,10 +8,14 @@ import { ModeChooser, type PlayMode } from './components/ModeChooser.js';
 import { OnlineSetup } from './components/OnlineSetup.js';
 import { Lobby } from './components/Lobby.js';
 import { DelegatedChoiceOverlay } from './components/DelegatedChoiceOverlay.js';
+import { DeckbuilderPage } from './components/DeckbuilderPage.js';
 import { GoldfishSession, HostSession, JoinSession, type Session } from './net/session.js';
 import { generateRoomCode } from './net/peer.js';
+import type { DeckCounts } from './game/deckModel.js';
+import { fromFlat } from './game/deckModel.js';
 
 type Screen = 'menu' | PlayMode;
+type SetupScreen = 'menu' | 'goldfish' | 'online';
 
 /** Read a `#room=CODE` deep link so a shared join URL lands straight on the join screen. */
 function roomFromHash(): string | null {
@@ -26,6 +30,14 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null);
   // Setup-time error (bad deck, etc.); in-match/connection errors live on session.error.
   const [setupError, setSetupError] = useState<string | null>(null);
+
+  // Deckbuilder navigation: where to return, what deck to seed it with, and the deck it
+  // hands back ("Use this deck") to the setup that opened it. The online name is lifted
+  // here so it survives a trip to the builder and back.
+  const [builderReturn, setBuilderReturn] = useState<SetupScreen>('menu');
+  const [builderInitial, setBuilderInitial] = useState<DeckCounts | undefined>(undefined);
+  const [carriedDeck, setCarriedDeck] = useState<number[] | null>(null);
+  const [onlineName, setOnlineName] = useState('Player 1');
 
   // Sessions are imperative objects that mutate their own view/status/error; force a
   // re-render whenever one notifies so React re-reads them.
@@ -70,11 +82,33 @@ export function App() {
   const leave = useCallback(() => {
     session?.teardown();
     setSession(null);
+    setCarriedDeck(null);
     setScreen('menu');
     setSetupError(null);
     // Drop a stale #room= so "New game" doesn't bounce back to join.
     if (window.location.hash) window.history.replaceState(null, '', window.location.pathname + window.location.search);
   }, [session]);
+
+  const goMenu = useCallback(() => {
+    setCarriedDeck(null);
+    setScreen('menu');
+  }, []);
+
+  /** Open the standalone Deckbuilder, seeded with a deck, remembering where to return. */
+  const openBuilder = useCallback((from: SetupScreen, deck: number[]) => {
+    setBuilderReturn(from);
+    setBuilderInitial(deck.length ? fromFlat(deck) : undefined);
+    setScreen('deckbuilder');
+  }, []);
+
+  const pickMode = useCallback((mode: PlayMode) => {
+    if (mode === 'deckbuilder') {
+      // Reached from the home menu: pure deck management, returns to the menu.
+      setBuilderReturn('menu');
+      setBuilderInitial(undefined);
+    }
+    setScreen(mode);
+  }, []);
 
   const view = session?.view ?? null;
   const error = setupError ?? session?.error ?? null;
@@ -99,17 +133,43 @@ export function App() {
     // A networked session with no view yet: host waiting / joiner connecting / lost.
     body = <Lobby session={session} onCancel={leave} />;
   } else if (screen === 'menu') {
-    body = <ModeChooser onPick={setScreen} />;
+    body = <ModeChooser onPick={pickMode} />;
+  } else if (screen === 'deckbuilder') {
+    body = (
+      <DeckbuilderPage
+        initialCounts={builderInitial}
+        onBack={() => setScreen(builderReturn)}
+        onUseDeck={
+          builderReturn === 'menu'
+            ? undefined
+            : (deck) => {
+                setCarriedDeck(deck);
+                setScreen(builderReturn);
+              }
+        }
+      />
+    );
   } else if (screen === 'goldfish') {
-    body = <StartScreen onStart={startGoldfish} onBack={() => setScreen('menu')} />;
+    body = (
+      <StartScreen
+        onStart={startGoldfish}
+        onBack={goMenu}
+        onOpenBuilder={(deck) => openBuilder('goldfish', deck)}
+        initialDeck={carriedDeck ?? undefined}
+      />
+    );
   } else {
     // Host or Join, one page: shared name + create-game form on top, join box beneath.
     body = (
       <OnlineSetup
         onHost={startHost}
         onJoin={startJoin}
-        onBack={() => setScreen('menu')}
+        onBack={goMenu}
         initialCode={deepLinkCode ?? ''}
+        name={onlineName}
+        onName={setOnlineName}
+        onOpenBuilder={(deck) => openBuilder('online', deck)}
+        initialDeck={carriedDeck ?? undefined}
       />
     );
   }

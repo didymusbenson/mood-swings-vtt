@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import type { CardData, CardDB, DeckValidation } from '@mood-swings/engine';
 import { minDeckSize } from '@mood-swings/engine';
 import type { DeckCounts } from '../../game/deckModel.js';
 import { totalCards, rarityBreakdown, colorBreakdown } from '../../game/deckModel.js';
 import { QuantityControl } from './QuantityControl.js';
+import { ConfirmModal } from '../Modal.js';
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'mythic'] as const;
 const COLOR_ORDER = ['white', 'blue', 'black', 'red', 'green'] as const;
@@ -21,6 +23,7 @@ interface DeckListPanelProps {
 /** The right-rail deck list: running total, breakdowns, validity, and the
  *  included moods with steppers. */
 export function DeckListPanel({ counts, db, onAdd, onSet, onSub, onClear, onOpen, validation }: DeckListPanelProps) {
+  const [confirmClear, setConfirmClear] = useState(false);
   const total = totalCards(counts);
   const min = minDeckSize(2);
   const rar = rarityBreakdown(counts, db);
@@ -36,9 +39,7 @@ export function DeckListPanel({ counts, db, onAdd, onSet, onSub, onClear, onOpen
         <button
           type="button"
           className="btn dbx-decklist__clear"
-          onClick={() => {
-            if (total === 0 || window.confirm('Clear the whole deck?')) onClear();
-          }}
+          onClick={() => setConfirmClear(true)}
           disabled={total === 0}
         >
           Clear
@@ -88,6 +89,20 @@ export function DeckListPanel({ counts, db, onAdd, onSet, onSub, onClear, onOpen
             );
           })}
         </ul>
+      )}
+
+      {confirmClear && (
+        <ConfirmModal
+          title="Clear deck"
+          message="Remove all cards from the current deck?"
+          confirmLabel="Clear"
+          danger
+          onConfirm={() => {
+            onClear();
+            setConfirmClear(false);
+          }}
+          onCancel={() => setConfirmClear(false)}
+        />
       )}
     </aside>
   );

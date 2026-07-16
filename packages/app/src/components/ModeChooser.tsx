@@ -1,6 +1,6 @@
 import { Starburst } from './Starburst.js';
 
-export type PlayMode = 'goldfish' | 'online';
+export type PlayMode = 'goldfish' | 'online' | 'deckbuilder';
 
 interface ModeChooserProps {
   onPick: (mode: PlayMode) => void;
@@ -43,6 +43,16 @@ export function ModeChooser({ onPick }: ModeChooserProps) {
           <span className="modecard__title">Goldfish</span>
           <span className="modecard__desc">
             Play both sides on one screen to practice a deck and see how cards interact.
+          </span>
+        </button>
+
+        <button className="modecard modecard--secondary" onClick={() => onPick('deckbuilder')}>
+          <span className="modecard__icon" aria-hidden>
+            🃏
+          </span>
+          <span className="modecard__title">Deckbuilder</span>
+          <span className="modecard__desc">
+            Build, import, and manage your decks. Saved decks are ready to pick when you play.
           </span>
         </button>
       </div>
