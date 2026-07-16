@@ -21,11 +21,16 @@ export function JoinPanel({ name, onJoin, initialCode = '' }: JoinPanelProps) {
 
   return (
     <section className="panel join-panel">
-      <h2>Join a game</h2>
-      <p className="muted">
-        Got a room code from a friend? Enter it to join their game as{' '}
-        <strong>{name.trim() || 'Player 2'}</strong>.
-      </p>
+      <div className="join-panel__head">
+        <span className="host-tag host-tag--join">Join</span>
+        <div className="join-panel__headtext">
+          <h2>Join a game</h2>
+          <p className="muted">
+            Got a room code from a friend? Enter it to join as{' '}
+            <strong>{name.trim() || 'Player 2'}</strong>.
+          </p>
+        </div>
+      </div>
       <div className="join-panel__fields">
         <label>
           Room code
@@ -42,7 +47,7 @@ export function JoinPanel({ name, onJoin, initialCode = '' }: JoinPanelProps) {
           />
         </label>
       </div>
-      <button className="btn btn--primary" disabled={!ready} onClick={submit}>
+      <button className="btn btn--primary join-panel__cta" disabled={!ready} onClick={submit}>
         Join game
       </button>
     </section>

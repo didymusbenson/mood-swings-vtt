@@ -3190,9 +3190,181 @@ input:focus-visible {
   pointer-events: none;
 }
 
-/* The "join a game" panel beneath the create-game form (Host or Join page). */
+/* ============================================================================
+   Host or Join lobby (StartScreen variant='host' only — scoped so none of
+   this leaks into the shared Goldfish layout)
+   ========================================================================== */
+/* Two mutually-exclusive choices laid out at a glance: a shared identity strip
+   spanning the top, then HOST (primary, wide) beside JOIN (compact sidebar). */
+.host-lobby {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(250px, 1fr);
+  grid-template-areas:
+    'you  you'
+    'main join';
+  gap: 1rem;
+  align-items: start;
+}
+/* Grid children default to min-width:auto (min-content); let them shrink so the
+   single-column collapse can fit narrow phones instead of overflowing/clipping. */
+.host-lobby > .panel,
+.host-join {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+/* Shared "Your name" strip — a thin horizontal bar, not a tall dead-space box. */
+.host-you {
+  grid-area: you;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 1rem;
+}
+.host-you__field {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-family: var(--font-hand);
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.host-you__lbl {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.host-you__field input {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+.host-you__note {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 0.9rem;
+}
+
+/* HOST column (primary). */
+.host-create {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.host-create__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  margin-bottom: 0.9rem;
+  min-width: 0;
+}
+.host-create__headtext {
+  min-width: 0;
+}
+.host-create__headtext h2 {
+  margin: 0;
+}
+.host-create__sub {
+  margin: 0.1rem 0 0;
+  font-family: var(--font-hand);
+  font-size: 0.92rem;
+}
+/* Create bar lives at the foot of the host card as a clear culminating action —
+   status on the left, a prominent primary CTA on the right. */
+.host-create__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1.5px dashed var(--line);
+}
+.host-create__cta {
+  font-size: 1.05rem;
+  padding: 0.5rem 1.5rem;
+}
+
+/* A hand-drawn tag that labels each choice ("Host" / "Join"). */
+.host-tag {
+  flex: none;
+  margin-top: 0.2rem;
+  font-family: var(--font-hand);
+  background: var(--accent);
+  color: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 9px 6px 8px 5px / 5px 8px 6px 9px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.9rem;
+  transform: rotate(-2deg);
+  box-shadow: 1px 1px 0 rgba(44, 42, 37, 0.5);
+}
+.host-tag--join {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* JOIN column (secondary choice). */
+.host-join {
+  grid-area: join;
+  position: relative;
+}
+/* A hand-scrawled "or" nestled in the gutter between the two choices. */
+@media (min-width: 821px) {
+  .host-join::before {
+    content: 'or';
+    position: absolute;
+    left: -0.5rem;
+    top: 1.3rem;
+    transform: translateX(-100%) rotate(-5deg);
+    font-family: var(--font-hand);
+    font-size: 1.15rem;
+    color: var(--muted);
+    background: var(--paper);
+    padding: 0 0.25rem;
+    z-index: 2;
+  }
+}
+
+/* The "join a game" panel (host sidebar). */
 .join-panel {
-  margin-top: 0.4rem;
+  margin-top: 0;
+}
+/* Seed row: wrap + shrinkable children so it fits narrow host layouts.
+   Scoped to .start--host so the shared Goldfish deck panel is untouched. */
+.start--host .start__seedrow {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.start--host .start__seedrow label {
+  min-width: 0;
+}
+.start--host .start__seedrow input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.join-panel__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  margin-bottom: 0.4rem;
+  min-width: 0;
+}
+.join-panel__headtext {
+  min-width: 0;
+}
+.join-panel__headtext h2 {
+  margin: 0;
+}
+.join-panel__headtext p {
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
 }
 .join-panel__fields {
   display: flex;
@@ -3205,8 +3377,43 @@ input:focus-visible {
   flex-direction: column;
   gap: 0.3rem;
   font-family: var(--font-hand);
+  width: 100%;
 }
 .join-panel .join__input {
   font-size: 1.4rem;
   letter-spacing: 0.2em;
+  width: 100%;
+}
+.join-panel__cta {
+  width: 100%;
+}
+
+/* No host input may exceed its container (belt-and-braces against overflow). */
+.start--host input {
+  max-width: 100%;
+}
+
+/* Stack to a single column on narrow screens. */
+@media (max-width: 820px) {
+  .host-lobby {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'you'
+      'main'
+      'join';
+  }
+}
+
+/* Very narrow phones: tighten the host page + card padding to reclaim width.
+   Scoped to the host page so Goldfish / mode chooser spacing is untouched. */
+@media (max-width: 480px) {
+  .start--host {
+    padding: 1rem 0.8rem;
+  }
+  .host-lobby > .panel {
+    padding: 0.8rem;
+  }
+  .host-you {
+    padding: 0.7rem 0.8rem;
+  }
 }

@@ -136,104 +136,164 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
     return <HowToPlay onBack={() => setShowRules(false)} />;
   }
 
+  const header = (
+    <header className="start__header">
+      {onBack && (
+        <button className="btn start__back" onClick={onBack}>
+          ← Back
+        </button>
+      )}
+      <Starburst className="start__burst" label="1st Ed." />
+      <h1>Mood Swings</h1>
+      <p className="start__tag">
+        {isHost ? 'Host a game — share the room code to play' : 'Goldfish — two hands, one screen'}
+      </p>
+      <button className="btn start__howto" onClick={() => setShowRules(true)}>
+        How to Play
+      </button>
+    </header>
+  );
+
+  // Deck tabs + content (Random deck / Deckbuilder). Shared by both variants.
+  const deckContent = (
+    <>
+      <div className="tabs">
+        <button className={tab === 'random' ? 'tab is-active' : 'tab'} onClick={() => switchTab('random')}>
+          Random deck
+        </button>
+        <button className={tab === 'custom' ? 'tab is-active' : 'tab'} onClick={() => switchTab('custom')}>
+          Deckbuilder
+        </button>
+      </div>
+
+      {tab === 'random' ? (
+        <div className="start__random">
+          <p>Generates a 45-card Secret Lair box collation (23 C / 14 U / 6 R / 2 M).</p>
+          <div className="start__seedrow">
+            <label>
+              Seed
+              <input type="number" value={seed} onChange={(e) => applySeed(Number(e.target.value) || 0)} />
+            </label>
+            <button className="btn" onClick={rerollRandom}>
+              Reroll
+            </button>
+            <button className="btn" onClick={viewInBuilder}>
+              View in deckbuilder
+            </button>
+            <span className="muted">{randomDeck.length} cards</span>
+          </div>
+        </div>
+      ) : (
+        <Deckbuilder counts={builderCounts} db={db} onChange={setBuilderCounts} onClean={markClean} />
+      )}
+    </>
+  );
+
+  const status = (
+    <div className="start__status">
+      <strong>{deck.length}</strong> cards ·{' '}
+      {validation.ok ? (
+        <span className="ok">valid</span>
+      ) : (
+        <span className="bad">{validation.errors.join(' ')}</span>
+      )}
+      {tab === 'custom' && <span className="muted"> · min {MIN}</span>}
+    </div>
+  );
+
+  const guardModal = guardOpen && (
+    <div className="dbx-modal__backdrop" onClick={() => setGuardOpen(false)} role="presentation">
+      <div className="dbx-modal dbx-guard" role="dialog" aria-modal="true" aria-label="Unsaved changes" onClick={(e) => e.stopPropagation()}>
+        <header className="dbx-modal__head">
+          <h3 className="dbx-modal__title">Unsaved changes</h3>
+        </header>
+        <p>You have unsaved changes to this deck ({totalCards(builderCounts)} cards). Save them before leaving?</p>
+        <div className="dbx-import__actions">
+          <button type="button" className="btn btn--primary" onClick={guardSave}>Save deck</button>
+          <button type="button" className="btn" onClick={guardDiscard}>Discard</button>
+          <button type="button" className="btn" onClick={() => setGuardOpen(false)}>Keep editing</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Host / online variant ────────────────────────────────────────────────
+  // A purpose-built lobby: one shared identity strip up top, then the two
+  // mutually-exclusive choices side by side — HOST (configure the deck + create
+  // a room) as the primary column, JOIN (a friend's code) as the compact
+  // sidebar. Collapses to a single column on narrow screens.
+  if (isHost) {
+    return (
+      <div className="start start--host">
+        {header}
+
+        <div className="host-lobby">
+          <section className="panel host-you">
+            <label className="host-you__field">
+              <span className="host-you__lbl">Your name</span>
+              <input value={p1Value} onChange={(e) => setP1Value(e.target.value)} />
+            </label>
+            <p className="host-you__note muted">Used whether you host a game or join a friend's.</p>
+          </section>
+
+          <section className="panel host-create">
+            <div className="host-create__head">
+              <span className="host-tag">Host</span>
+              <div className="host-create__headtext">
+                <h2>Host a game</h2>
+                <p className="host-create__sub muted">Set up the shared deck, then create a room and share the code.</p>
+              </div>
+            </div>
+
+            {deckContent}
+
+            <div className="host-create__foot">
+              {status}
+              <button className="btn btn--primary host-create__cta" disabled={!canStart} onClick={start}>
+                Create game
+              </button>
+            </div>
+          </section>
+
+          <aside className="host-join">{footer}</aside>
+        </div>
+
+        {guardModal}
+      </div>
+    );
+  }
+
+  // ── Goldfish variant (unchanged) ─────────────────────────────────────────
   return (
     <div className="start">
-      <header className="start__header">
-        {onBack && (
-          <button className="btn start__back" onClick={onBack}>
-            ← Back
-          </button>
-        )}
-        <Starburst className="start__burst" label="1st Ed." />
-        <h1>Mood Swings</h1>
-        <p className="start__tag">
-          {isHost ? 'Host a game — share the room code to play' : 'Goldfish — two hands, one screen'}
-        </p>
-        <button className="btn start__howto" onClick={() => setShowRules(true)}>
-          How to Play
-        </button>
-      </header>
+      {header}
 
       <section className="panel">
-        <h2>{isHost ? 'Your name' : 'Players'}</h2>
+        <h2>Players</h2>
         <div className="start__names">
           <label>
-            {isHost ? 'Name' : 'Player 1'}
+            Player 1
             <input value={p1Value} onChange={(e) => setP1Value(e.target.value)} />
           </label>
-          {!isHost && (
-            <label>
-              Player 2
-              <input value={p2} onChange={(e) => setP2(e.target.value)} />
-            </label>
-          )}
+          <label>
+            Player 2
+            <input value={p2} onChange={(e) => setP2(e.target.value)} />
+          </label>
         </div>
       </section>
 
-      <section className="panel">
-        <div className="tabs">
-          <button className={tab === 'random' ? 'tab is-active' : 'tab'} onClick={() => switchTab('random')}>
-            Random deck
-          </button>
-          <button className={tab === 'custom' ? 'tab is-active' : 'tab'} onClick={() => switchTab('custom')}>
-            Deckbuilder
-          </button>
-        </div>
-
-        {tab === 'random' ? (
-          <div className="start__random">
-            <p>Generates a 45-card Secret Lair box collation (23 C / 14 U / 6 R / 2 M).</p>
-            <div className="start__seedrow">
-              <label>
-                Seed
-                <input type="number" value={seed} onChange={(e) => applySeed(Number(e.target.value) || 0)} />
-              </label>
-              <button className="btn" onClick={rerollRandom}>
-                Reroll
-              </button>
-              <button className="btn" onClick={viewInBuilder}>
-                View in deckbuilder
-              </button>
-              <span className="muted">{randomDeck.length} cards</span>
-            </div>
-          </div>
-        ) : (
-          <Deckbuilder counts={builderCounts} db={db} onChange={setBuilderCounts} onClean={markClean} />
-        )}
-      </section>
+      <section className="panel">{deckContent}</section>
 
       <footer className="start__foot panel">
-        <div className="start__status">
-          <strong>{deck.length}</strong> cards ·{' '}
-          {validation.ok ? (
-            <span className="ok">valid</span>
-          ) : (
-            <span className="bad">{validation.errors.join(' ')}</span>
-          )}
-          {tab === 'custom' && <span className="muted"> · min {MIN}</span>}
-        </div>
+        {status}
         <button className="btn btn--primary" disabled={!canStart} onClick={start}>
-          {isHost ? 'Create game' : 'Start game'}
+          Start game
         </button>
       </footer>
 
       {footer}
 
-      {guardOpen && (
-        <div className="dbx-modal__backdrop" onClick={() => setGuardOpen(false)} role="presentation">
-          <div className="dbx-modal dbx-guard" role="dialog" aria-modal="true" aria-label="Unsaved changes" onClick={(e) => e.stopPropagation()}>
-            <header className="dbx-modal__head">
-              <h3 className="dbx-modal__title">Unsaved changes</h3>
-            </header>
-            <p>You have unsaved changes to this deck ({totalCards(builderCounts)} cards). Save them before leaving?</p>
-            <div className="dbx-import__actions">
-              <button type="button" className="btn btn--primary" onClick={guardSave}>Save deck</button>
-              <button type="button" className="btn" onClick={guardDiscard}>Discard</button>
-              <button type="button" className="btn" onClick={() => setGuardOpen(false)}>Keep editing</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {guardModal}
     </div>
   );
 }
