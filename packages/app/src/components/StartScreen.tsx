@@ -6,6 +6,7 @@ import { flatten } from '../game/deckModel.js';
 import { listDecks, loadDeckCounts, type SavedDeck } from '../game/deckStorage.js';
 import { Starburst } from './Starburst.js';
 import { HowToPlay } from './HowToPlay.js';
+import { ConfirmModal } from './Modal.js';
 
 export interface StartConfig {
   players: { id: string; name: string }[];
@@ -32,6 +33,8 @@ interface StartScreenProps {
   onOpenBuilder?: (deck: number[]) => void;
   /** A custom deck handed back from the Deckbuilder ("Use this deck") to pre-select. */
   initialDeck?: number[];
+  /** Host variant: start a local goldfish game (Playtest) with the same name + deck. */
+  onPlaytest?: (config: StartConfig) => void;
 }
 
 const MIN = minDeckSize(2);
@@ -44,10 +47,11 @@ function savedDeckSize(sd: SavedDeck): number {
   return Object.values(sd.cards).reduce((a, b) => a + b, 0);
 }
 
-export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, name, onName, onOpenBuilder, initialDeck }: StartScreenProps) {
+export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, name, onName, onOpenBuilder, initialDeck, onPlaytest }: StartScreenProps) {
   const isHost = variant === 'host';
   const [p1, setP1] = useState('Player 1');
   const [p2, setP2] = useState('Player 2');
+  const [confirmPlaytest, setConfirmPlaytest] = useState(false);
   // Host variant can have its single name lifted (so the join box shares it).
   const controlled = isHost && name !== undefined && onName !== undefined;
   const p1Value = controlled ? name : p1;
@@ -91,18 +95,22 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
 
   const canStart = validation.ok && p1Value.trim().length > 0 && (isHost || p2.trim().length > 0);
 
+  const buildConfig = (p2Name: string): StartConfig => ({
+    players: [
+      { id: 'p1', name: p1Value.trim() },
+      { id: 'p2', name: p2Name },
+    ],
+    deck,
+    seed,
+  });
+
+  // Host: the joiner names themselves on connect, so seat 2 is just a placeholder here.
   const start = () => {
-    if (!canStart) return;
-    onStart({
-      players: [
-        { id: 'p1', name: p1Value.trim() },
-        // Host: the joiner names themselves and it's synced on connect; this is just a
-        // placeholder until then. Goldfish: the second local player's name.
-        { id: 'p2', name: isHost ? 'Opponent' : p2.trim() },
-      ],
-      deck,
-      seed,
-    });
+    if (canStart) onStart(buildConfig(isHost ? 'Opponent' : p2.trim()));
+  };
+  // Playtest = a local goldfish game; seat 2 is auto-named "Player 2".
+  const startPlaytest = () => {
+    if (canStart) onPlaytest?.(buildConfig('Player 2'));
   };
 
   if (showRules) {
@@ -119,7 +127,7 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
       <Starburst className="start__burst" label="1st Ed." />
       <h1>Mood Swings</h1>
       <p className="start__tag">
-        {isHost ? 'Host a game — share the room code to play' : 'Goldfish — two hands, one screen'}
+        {isHost ? 'Host a friend, join a game, or playtest both sides' : 'Goldfish — two hands, one screen'}
       </p>
       <button className="btn start__howto" onClick={() => setShowRules(true)}>
         How to Play
@@ -224,8 +232,8 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
             <div className="host-create__head">
               <span className="host-tag">Host</span>
               <div className="host-create__headtext">
-                <h2>Host a game</h2>
-                <p className="host-create__sub muted">Set up the shared deck, then create a room and share the code.</p>
+                <h2>Start a game</h2>
+                <p className="host-create__sub muted">Set the shared deck, then host a room to share — or playtest both sides yourself.</p>
               </div>
             </div>
 
@@ -233,14 +241,40 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
 
             <div className="host-create__foot">
               {status}
-              <button className="btn btn--primary host-create__cta" disabled={!canStart} onClick={start}>
-                Create game
-              </button>
+              <div className="host-create__actions">
+                <button className="btn btn--primary host-create__cta" disabled={!canStart} onClick={start}>
+                  Host Game
+                </button>
+                {onPlaytest && (
+                  <button
+                    className="btn host-create__playtest"
+                    disabled={!canStart}
+                    onClick={() => setConfirmPlaytest(true)}
+                    title="Play both sides yourself on this screen"
+                  >
+                    Playtest
+                  </button>
+                )}
+              </div>
             </div>
           </section>
 
           <aside className="host-join">{footer}</aside>
-        </div>      </div>
+        </div>
+
+        {confirmPlaytest && (
+          <ConfirmModal
+            title="Playtest"
+            message="Start a goldfish game testing both players?"
+            confirmLabel="Start playtest"
+            onConfirm={() => {
+              setConfirmPlaytest(false);
+              startPlaytest();
+            }}
+            onCancel={() => setConfirmPlaytest(false)}
+          />
+        )}
+      </div>
     );
   }
 

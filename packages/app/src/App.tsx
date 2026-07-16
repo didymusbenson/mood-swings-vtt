@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import type React from 'react';
 import { Engine } from '@mood-swings/engine';
 import { db } from './game/db.js';
-import { StartScreen, type StartConfig } from './components/StartScreen.js';
+import { type StartConfig } from './components/StartScreen.js';
 import { GameBoard } from './components/GameBoard.js';
 import { ModeChooser, type PlayMode } from './components/ModeChooser.js';
 import { OnlineSetup } from './components/OnlineSetup.js';
@@ -15,7 +15,7 @@ import type { DeckCounts } from './game/deckModel.js';
 import { fromFlat } from './game/deckModel.js';
 
 type Screen = 'menu' | PlayMode;
-type SetupScreen = 'menu' | 'goldfish' | 'online';
+type SetupScreen = 'menu' | 'online';
 
 /** Read a `#room=CODE` deep link so a shared join URL lands straight on the join screen. */
 function roomFromHash(): string | null {
@@ -149,21 +149,14 @@ export function App() {
         }
       />
     );
-  } else if (screen === 'goldfish') {
-    body = (
-      <StartScreen
-        onStart={startGoldfish}
-        onBack={goMenu}
-        onOpenBuilder={(deck) => openBuilder('goldfish', deck)}
-        initialDeck={carriedDeck ?? undefined}
-      />
-    );
   } else {
-    // Host or Join, one page: shared name + create-game form on top, join box beneath.
+    // The Play screen: one shared name + deck, then Host Game / Playtest, with the join
+    // box beneath. Goldfish (Playtest) reuses the same config with seat 2 auto-named.
     body = (
       <OnlineSetup
         onHost={startHost}
         onJoin={startJoin}
+        onPlaytest={startGoldfish}
         onBack={goMenu}
         initialCode={deepLinkCode ?? ''}
         name={onlineName}

@@ -1,21 +1,17 @@
 import { Starburst } from './Starburst.js';
 
-export type PlayMode = 'goldfish' | 'online' | 'deckbuilder';
+export type PlayMode = 'online' | 'deckbuilder';
 
 interface ModeChooserProps {
   onPick: (mode: PlayMode) => void;
 }
 
 /**
- * The top-level entry point (v2): pick how to play.
+ * The top-level entry point (v2): two choices.
  *
- *   Host or Join — networked two-player game. One page: create a new game (get a room
- *                  code to share) or join a friend's with their code.
- *   Goldfish     — one screen, one driver, both hands visible (the old hotseat, for
- *                  practicing a deck / seeing how cards interact solo).
- *
- * "Vs Computer" is intentionally absent: the AI is deferred, so there is no button for
- * it until a brain exists (see net/agent.ts ComputerAgent).
+ *   Play        — set up a game: host a friend online, join with a code, or playtest
+ *                 both sides yourself (goldfish).
+ *   Deckbuilder — build, import, and manage your decks.
  */
 export function ModeChooser({ onPick }: ModeChooserProps) {
   return (
@@ -30,19 +26,9 @@ export function ModeChooser({ onPick }: ModeChooserProps) {
           <span className="modecard__icon" aria-hidden>
             🎲
           </span>
-          <span className="modecard__title">Host or Join</span>
+          <span className="modecard__title">Play</span>
           <span className="modecard__desc">
-            Play a friend online. Host a new game and share a room code, or join theirs with a code.
-          </span>
-        </button>
-
-        <button className="modecard modecard--secondary" onClick={() => onPick('goldfish')}>
-          <span className="modecard__icon" aria-hidden>
-            🐟
-          </span>
-          <span className="modecard__title">Goldfish</span>
-          <span className="modecard__desc">
-            Play both sides on one screen to practice a deck and see how cards interact.
+            Host a friend online, join with a room code, or playtest both sides yourself.
           </span>
         </button>
 

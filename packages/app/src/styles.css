@@ -3568,3 +3568,15 @@ input:focus-visible {
     height: auto;
   }
 }
+
+/* ---- Play screen: Host Game + Playtest actions ---------------------------- */
+.host-create__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+.host-create__playtest {
+  /* secondary to Host Game, but clearly a real action */
+  font-size: 1rem;
+}
