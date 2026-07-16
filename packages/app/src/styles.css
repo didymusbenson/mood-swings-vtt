@@ -3500,3 +3500,71 @@ input:focus-visible {
   align-items: center;
   gap: 0.8rem;
 }
+
+/* ---- standalone Deckbuilder page: fill the viewport as a proper app layout --
+   The Deckbuilder was originally built for an ~800px embedded panel; on its own
+   full-screen page it must fill the height instead of floating a short card list
+   with dead space below. These rules are scoped to `.dbx-page` only. */
+.dbx-page {
+  height: 100vh;
+  overflow: hidden; /* inner regions scroll, not the page */
+}
+.dbx-page .dbx {
+  flex: 1;
+  min-height: 0;
+  padding: 0.7rem 1.2rem 0.9rem;
+  gap: 0.7rem;
+}
+/* The browser + deck rail row fills the remaining height; each scrolls internally. */
+.dbx-page .dbx-body {
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+  gap: 1.1rem;
+}
+.dbx-page .dbx-browser {
+  max-height: none;
+  min-height: 0;
+  height: 100%;
+  /* Contain a too-wide table (narrow screens) inside the pane rather than the page. */
+  overflow: auto;
+}
+.dbx-page .dbx-decklist {
+  position: static;
+  max-height: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Header/breakdown stay put; only the card list inside the rail scrolls. */
+.dbx-page .dbx-decklist__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* Use the extra horizontal room: let the rules-text column breathe. */
+.dbx-page .dbx-table__text {
+  max-width: min(48vw, 60rem);
+}
+
+/* Narrow screens: stack the deck rail under the browser, let the page scroll. */
+@media (max-width: 720px) {
+  .dbx-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+  .dbx-page .dbx-body {
+    display: flex;
+    flex-direction: column;
+  }
+  .dbx-page .dbx-browser {
+    height: auto;
+    max-height: 60vh;
+  }
+  .dbx-page .dbx-decklist {
+    height: auto;
+  }
+}
