@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { LogEntry, ScoreBreakdown } from '@mood-swings/engine';
 import { kindStyle, visibleMessage } from '../game/log.js';
+import { formatLog, logFilename } from '../game/logExport.js';
 
 interface ActivityLogProps {
   log: LogEntry[];
@@ -47,6 +48,7 @@ function RoundScore({ scores }: { scores: ScoreBreakdown[] }) {
  * round header.
  */
 export function ActivityLog({ log, viewerId }: ActivityLogProps) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   // Which rounds have their score explanation expanded (collapsed by default).
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -61,9 +63,34 @@ export function ActivityLog({ log, viewerId }: ActivityLogProps) {
     return map;
   }, [log]);
 
+  // On open (mount), jump to the newest entry.
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // On a new entry, follow the newest — but ONLY when the reader is already at
+  // the bottom. The log is now a deliberately-opened read view, so scrolling
+  // back through history shouldn't be yanked to the bottom when the opponent
+  // acts mid-read.
+  useEffect(() => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+    const nearBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 80;
+    if (nearBottom) endRef.current?.scrollIntoView({ block: 'end' });
   }, [log.length]);
+
+  const onExport = () => {
+    const blob = new Blob([formatLog(log)], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = logFilename();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const toggle = (round: number) =>
     setExpanded((cur) => {
@@ -75,8 +102,19 @@ export function ActivityLog({ log, viewerId }: ActivityLogProps) {
 
   return (
     <div className="panel log">
-      <h3>Activity log</h3>
-      <div className="log__scroll">
+      <div className="log__head">
+        <h3>Activity log</h3>
+        <button
+          type="button"
+          className="log__export"
+          onClick={onExport}
+          disabled={log.length === 0}
+          title="Download the activity log as a text file"
+        >
+          ⭳ Export
+        </button>
+      </div>
+      <div className="log__scroll" ref={scrollRef}>
         <ol className="log__list">
           {log.map((entry, i) => {
             const prev = log[i - 1];

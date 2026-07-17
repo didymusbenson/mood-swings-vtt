@@ -62,7 +62,7 @@ export function PreviewPane({
     <aside className={`preview${floating ? ' preview--floating' : ''}`} tabIndex={0} aria-label="Card preview">
       <span className="preview__tape preview__tape--l" aria-hidden />
       <span className="preview__tape preview__tape--r" aria-hidden />
-      <h3 className="preview__label">Preview</h3>
+      <h3 className="preview__label">Card Preview</h3>
       {target ? (
         <PreviewBody target={target} state={state} />
       ) : (

@@ -380,6 +380,9 @@ input:focus-visible {
   min-height: var(--card-h);
   border-radius: inherit;
   overflow: hidden;
+  /* Size query container so the corner value-die can scale as a fraction of the
+     card (via cqw), tracking the die printed in the art at every card size. */
+  container-type: inline-size;
 }
 .card__photo img {
   width: 100%;
@@ -387,15 +390,26 @@ input:focus-visible {
   object-fit: cover;
   display: block;
 }
+/* The pip-die overlaid on the corner of an art card sits directly over the die
+   printed in the card scan (~16% of the card width, inset ~8% from the right and
+   ~4% from the top). BOTH its size and its inset are expressed in cqw (via the
+   .card__photo query container) so the overlay tracks the printed die at every
+   card size — large preview and small tiles alike — rather than a fixed px
+   size/position that only lines up at one scale and lets the printed die peek
+   out from underneath elsewhere. */
 .card__die--overlay {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  background: rgba(246, 242, 231, 0.9);
+  top: 3.5cqw;
+  right: 5.5cqw;
+  background: rgba(246, 242, 231, 0.92);
   border: 1.5px solid var(--ink);
   border-radius: 8px;
-  padding: 1px 3px;
+  padding: 0.5cqw 1cqw;
   box-shadow: 1px 1px 0 rgba(44, 42, 37, 0.4);
+}
+.card__die--overlay .die {
+  width: 18cqw;
+  height: 18cqw;
 }
 .card__art-flag {
   position: absolute;
@@ -676,15 +690,8 @@ input:focus-visible {
   width: 1.15em;
   height: 1.15em;
 }
-.card--tile .card__die--overlay {
-  top: 3px;
-  right: 3px;
-  padding: 0 2px;
-}
-.card--tile .card__die--overlay .die {
-  width: 1.05em;
-  height: 1.05em;
-}
+/* No tile-specific overlay-die position/size: the cqw-based rule above already
+   scales with the card, so tiles and the preview share one proportional rule. */
 .card__art--tile {
   flex: 1;
   height: auto;
@@ -778,10 +785,13 @@ input:focus-visible {
   overflow: hidden;
 }
 
-/* Three columns: left rail (Previewer) / center (play) / right rail (log). */
+/* Two columns: play area (fills) / right rail. The rail hosts a single shared
+   column that swaps between the Preview (default) and the Activity Log — see
+   docs/features/preview-log-update.md. Dropping the old dedicated left preview
+   rail hands its width back to the battlefield. */
 .board {
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 0.6rem;
   min-height: 0;
   min-width: 0;
@@ -1729,6 +1739,68 @@ input:focus-visible {
 }
 
 /* ============================================================================
+   Right rail: the shared Preview / Log column with its tab switch.
+   ========================================================================== */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  gap: 0.5rem;
+}
+/* A paper segmented control. Two states only (Preview | Log), so tabs — not a
+   single flip-toggle — so the current view and the alternative both read at a
+   glance. Hidden while a flow pins the column to Preview. */
+.sidebar__tabs {
+  flex: none;
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.25rem;
+  background: var(--paper-2);
+  border: 2px solid var(--line-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+.sidebar__tab {
+  flex: 1;
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: var(--font-hand);
+  font-size: 1rem;
+  color: var(--ink-soft);
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.sidebar__tab:hover {
+  color: var(--ink);
+}
+.sidebar__tab.is-on {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+.sidebar__tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* The active view fills the rest of the rail; Preview/Log both stretch to it. */
+.sidebar__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar__body > .preview,
+.sidebar__body > .log {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ============================================================================
    Preview pane (taped index card)
    ========================================================================== */
 .preview {
@@ -1878,11 +1950,46 @@ input:focus-visible {
   border-radius: 4px 10px 10px 4px;
   box-shadow: var(--shadow);
 }
+.log__head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
 .log h3 {
   font-family: var(--font-display);
   font-size: 1.35rem;
   color: var(--ink-soft);
   margin-bottom: 0.4rem;
+}
+/* Export the log (diagnostic / post-game review). A quiet ghost button so it
+   doesn't compete with the log content. */
+.log__export {
+  flex: none;
+  appearance: none;
+  font-family: var(--font-hand);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.log__export:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: var(--paper-2);
+}
+.log__export:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.log__export:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .log__scroll {
   overflow-y: auto;
