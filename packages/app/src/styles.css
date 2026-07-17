@@ -130,6 +130,52 @@ body {
     120px 120px;
 }
 
+/* ============================================================================
+   Scrollbars — tint the browser chrome to match the paper skin instead of the
+   default OS grey. Two engines to satisfy:
+
+   • Chromium / WebKit (Chrome, Edge, Safari) get the ::-webkit-scrollbar
+     pseudo-elements below — a slim ink pill on a transparent track. The thumb's
+     transparent border + background-clip:padding-box insets it from the edges
+     so it reads as a pencil mark and blends over any panel colour.
+   • Firefox has no pseudo-elements, so it gets the standard scrollbar-width /
+     scrollbar-color properties. We scope those to `@supports not
+     selector(::-webkit-scrollbar)` on purpose: in Chromium 121+ setting
+     scrollbar-color on an element makes it IGNORE the ::-webkit rules, so
+     applying them globally would flatten our styling back to the plain default.
+   ========================================================================== */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-soft);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:active {
+  background: var(--ink);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Paper grain + soft vignette overlay (non-interactive). */
 .app {
   position: relative;
