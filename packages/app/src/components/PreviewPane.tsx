@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { CardData, GameState, Mood, WouldBeChoices } from '@mood-swings/engine';
 import { Card, DiceValue } from './Card.js';
 import { handWouldBe, moodProvenance } from '../game/value.js';
@@ -58,13 +59,29 @@ export function PreviewPane({
   /** Lift the pane above an open modal's scrim so it stays visible while reading. */
   floating?: boolean;
 }) {
+  // "View printed card": hide every app-added overlay (the computed value die on
+  // the art, the would-be / computed region) so the clean printed scan shows.
+  const [printedOnly, setPrintedOnly] = useState(false);
   return (
     <aside className={`preview${floating ? ' preview--floating' : ''}`} tabIndex={0} aria-label="Card preview">
       <span className="preview__tape preview__tape--l" aria-hidden />
       <span className="preview__tape preview__tape--r" aria-hidden />
-      <h3 className="preview__label">Card Preview</h3>
+      <div className="preview__head">
+        <h3 className="preview__label">Card Preview</h3>
+        {target && (
+          <button
+            type="button"
+            className={`preview__toggle${printedOnly ? ' is-on' : ''}`}
+            aria-pressed={printedOnly}
+            onClick={() => setPrintedOnly((v) => !v)}
+            title={printedOnly ? 'Show the computed value and details' : 'Hide overlays and show the printed card'}
+          >
+            {printedOnly ? 'Show details' : 'View printed card'}
+          </button>
+        )}
+      </div>
       {target ? (
-        <PreviewBody target={target} state={state} />
+        <PreviewBody target={target} state={state} printedOnly={printedOnly} />
       ) : (
         <p className="preview__empty muted">Hover, focus, or drag a card to preview it here.</p>
       )}
@@ -72,7 +89,7 @@ export function PreviewPane({
   );
 }
 
-function PreviewBody({ target, state }: { target: PreviewTarget; state: GameState }) {
+function PreviewBody({ target, state, printedOnly }: { target: PreviewTarget; state: GameState; printedOnly: boolean }) {
   const { card } = target;
 
   // --- Resolve the dynamic (top) region + the headline value/glow. ---
@@ -101,10 +118,10 @@ function PreviewBody({ target, state }: { target: PreviewTarget; state: GameStat
 
   return (
     <div className="preview__body">
-      <Card card={card} mood={target.mood} value={headline} computed={computed} large showArt />
+      <Card card={card} mood={target.mood} value={headline} computed={computed} large showArt plainArt={printedOnly} />
 
-      {/* TOP — dynamic game-state details. */}
-      {(prov || (wb && wb.objective && wb.value != null)) && (
+      {/* TOP — dynamic game-state details. Hidden in "View printed card" mode. */}
+      {!printedOnly && (prov || (wb && wb.objective && wb.value != null)) && (
         <div className="preview__state">
           {prov ? (
             <>

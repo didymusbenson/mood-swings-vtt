@@ -44,6 +44,12 @@ interface CardProps {
   /** Large, non-interactive rendering for the preview pane. */
   large?: boolean;
   /**
+   * Show the card art with NO app-added overlays (value pip-die, suppressed /
+   * flipped flags) — the clean printed card. Drives the preview's "View printed
+   * card" toggle. Only affects the art face (`hasArt`).
+   */
+  plainArt?: boolean;
+  /**
    * Compact board tile: coloured frame + name + value pip-die (or the art with
    * its die overlay) and NO rules text. The full rules live in the Previewer.
    */
@@ -281,6 +287,7 @@ export function Card({
   tile,
   faceDown,
   entering,
+  plainArt,
 }: CardProps) {
   const { src, onError } = useCardImage(card);
   const headline = value ?? card.value;
@@ -291,6 +298,9 @@ export function Card({
   const classes = [
     'card',
     `card--${card.color}`,
+    // A mood in play (has live/computed state) vs. a hand card / plain read.
+    // Lets the in-play value die read larger than the hand's (see styles.css).
+    mood ? 'card--mood' : '',
     hasArt ? 'card--art' : 'card--frame',
     faceDown ? 'card--back' : '',
     compact ? 'card--compact' : '',
@@ -332,12 +342,18 @@ export function Card({
       ) : hasArt ? (
         <div className="card__photo">
           <img src={src!} alt={card.name} loading="lazy" onError={onError} />
-          {/* A pip-die overlay keeps the value legible even over the official art. */}
-          <span className="card__die card__die--overlay" title={`${card.dieColor} die`}>
-            <DiceValue value={headline} dieColor={card.dieColor} computed={computed} />
-          </span>
-          {suppressed && <span className="card__art-flag">suppressed</span>}
-          {secondaryActive && <span className="card__art-flag card__art-flag--alt">flipped</span>}
+          {/* App-added overlays (value die + flags). Suppressed via `plainArt` so
+              the preview's "View printed card" toggle shows the clean scan. */}
+          {!plainArt && (
+            <>
+              {/* A pip-die overlay keeps the value legible even over the official art. */}
+              <span className="card__die card__die--overlay" title={`${card.dieColor} die`}>
+                <DiceValue value={headline} dieColor={card.dieColor} computed={computed} />
+              </span>
+              {suppressed && <span className="card__art-flag">suppressed</span>}
+              {secondaryActive && <span className="card__art-flag card__art-flag--alt">flipped</span>}
+            </>
+          )}
         </div>
       ) : tile ? (
         <TileFace card={card} headline={headline} mood={mood} computed={computed} />
