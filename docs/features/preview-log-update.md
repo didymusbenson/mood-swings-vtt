@@ -10,51 +10,64 @@ single shared column where the log currently lives. Today `GameBoard.tsx`
 renders them as separate left/right panels in a three-column grid
 (`.board { grid-template-columns: 264px minmax(0, 1fr) 300px; }` in
 `styles.css`). Under this change, the left preview column goes away; the
-preview becomes the top item in a vertical stack on the right, with the
-activity log below it.
+**Preview** occupies the right-hand column at full detail by default, and
+the **Activity Log** becomes a fly-up panel anchored to the bottom of that
+same column, layered over the preview rather than pushing it around.
 
 ## Brief (captured)
 
-- New right-hand stack, top to bottom: **`PreviewComponent`**, then
-  **`ActivityComponent`**.
-- **Preview** appears by default in its own space at the top of the stack
-  and populates with card info as today (image, name, color, value,
-  rarity, rules text, etc. — see current `PreviewPane.tsx` fields).
-- Preview has a **toggle/accordion control** for level of detail, with (at
-  least) three levels:
-  - **Image only**
-  - **Image + description** (current full detail — the default)
-  - **Hidden** (preview collapses out of the way entirely)
-- **Activity Log** is the next item in the stack, directly below the
-  preview.
-  - The log **scrolls independently** within its own region — it does not
-    scroll the whole right-hand column.
-  - When the preview is fully expanded, the log is **pushed down** (not
-    overlapped) — the preview always renders completely visible above it.
-  - Shrinking the preview (via the detail-level control) gives the log
-    more vertical room; setting the preview to **hidden** gives the log
-    the most space.
-- Net effect: one column replaces the current two, and the player controls
-  the preview/log space trade-off directly via the preview's detail
-  toggle instead of two independently-sized panels.
+- New right-hand column: **`PreviewComponent`** fills the column at full
+  detail (image, name, color, value, rarity, rules text, etc. — as today's
+  `PreviewPane.tsx`) by default. The preview's own content/detail level is
+  **not** toggled by the player — it always shows full detail when a card
+  is being previewed.
+- **`ActivityComponent`** (the log) lives in the same column as a
+  **fly-up**: collapsed, it sits docked to the bottom of the column (a
+  slim strip/handle), leaving the preview fully visible above it. Expanded
+  (dragged/tapped/toggled upward), it rises to **cover some or all of the
+  preview area**, as an overlay on top of the preview rather than
+  resizing or displacing it.
+  - The player controls how far up it rises — partial (covering only the
+    bottom portion of the preview) or full (covering the whole column) —
+    to read as much log as they want at a given moment.
+  - When expanded, the log scrolls within itself as it does today.
+  - Collapsing it back down returns the preview to full, unobstructed
+    visibility.
+- **Auto behavior during overlays:** when a card-play flow or other
+  full-board overlay is active (e.g. `TargetOverlay`/`pc.flow`), the log
+  fly-up is automatically **hidden or collapsed** so it doesn't compete
+  with or obscure that overlay. Once the overlay dismisses, the log
+  **returns to whatever position it was in before** (collapsed or
+  expanded) rather than resetting to a default.
+- Net effect: the preview is always the "resting state" of the column,
+  fully visible and undiminished; the log is an on-demand layer the player
+  pulls up only when they want to consult it, and it gets out of the way
+  automatically during moments (overlays) where it would otherwise
+  conflict with more important on-screen information.
 
 ## Related
 
 - `packages/app/src/components/GameBoard.tsx` — current three-column
   layout (`PreviewPane` left, `playfield` center, `ActivityLog` right);
-  becomes a two-column layout (`playfield`, merged right stack).
+  becomes a two-column layout (`playfield`, merged right column with the
+  log fly-up layered over the preview).
 - `packages/app/src/components/PreviewPane.tsx` — current preview
-  rendering logic; source of the "image + description" full-detail view.
+  rendering logic; stays at full detail, is not gated behind a toggle
+  under this design. Also has a `floating` mode (used during
+  targeting/`TargetOverlay` to show live would-be values) that needs to
+  keep working underneath/alongside the fly-up.
 - `packages/app/src/components/ActivityLog.tsx` / `packages/app/src/game/log.ts`
-  — current log rendering and data.
+  — current log rendering and data; becomes the fly-up's content, same
+  independent-scroll behavior as today.
 - `packages/app/src/styles.css` — `.board` grid-template-columns (line
   ~782) and the narrow-viewport single-column collapse (line ~2407)
-  will both need updating for the new two-column layout.
-- No existing accordion/collapsible/disclosure component exists in
-  `packages/app/src` today (closest analog is the show/hide `Modal.tsx`,
-  which isn't an inline pattern) — this feature likely needs a small new
-  primitive rather than reusing something in place, unless one is
-  introduced by another feature first.
+  will both need updating for the new two-column layout with a layered
+  (not stacked) log.
+- No existing overlay/drawer/"fly-up" component exists in
+  `packages/app/src` today (closest analogs are the show/hide `Modal.tsx`
+  and `PreviewPane`'s own `floating` positioning) — this feature likely
+  needs a new primitive for a draggable/toggleable bottom-anchored
+  overlay with partial and full extents.
 - `mobile-responsive.md` — the narrow-viewport single-column board layout
   may interact with this change; worth cross-checking during refinement.
 
@@ -65,23 +78,35 @@ bleed into other features.)_
 
 ### Things Claude wants to ask about
 
-- Detail-level control: accordion (expand/collapse in place), a
-  segmented toggle (Image / Image+Desc / Hidden), or a small icon button
-  that cycles through the three states?
-- Is the detail level a per-session UI preference (resets each game) or
-  persisted (e.g. local storage, tying into `settings.md`)?
-- When the preview is "hidden," does it disappear completely (log takes
-  the full column) or collapse to a minimal header/placeholder that can
-  be re-expanded?
-- Does hovering/selecting a card while the preview is hidden or
-  image-only temporarily auto-expand it, or does the player have to
-  manually toggle it back?
-- Fixed height for "image only" mode, or does it size to the image's
-  natural aspect ratio?
+- Expand/collapse interaction: drag handle (touch/mouse drag on the
+  fly-up's edge), a tap/click toggle between fixed collapsed/expanded
+  states, or both (tap to fully expand, drag for partial)?
+- How many discrete positions does the fly-up support — just
+  collapsed/expanded, or a continuous/partial range the player can stop
+  at anywhere in between?
+- Does the collapsed strip show anything (e.g. the latest log entry, an
+  unread-entries badge) so the player can tell something happened without
+  expanding it, or is it a plain closed handle?
+- While the log is expanded and covering the preview, if the player
+  hovers/selects a new card to preview, does the log auto-collapse to
+  reveal it, or does the new preview content just wait underneath until
+  the player collapses the log themselves?
+- "Returns to whatever position it was in before" after an overlay
+  dismisses — does that mean literally the same expand/collapse state, or
+  always back to collapsed (safest default, resting state = preview
+  visible)?
+- Interaction with `PreviewPane`'s existing `floating` mode during
+  targeting (`TargetOverlay`) — is the log fly-up force-collapsed for the
+  full duration of that flow, and does floating-preview z-index stacking
+  need to change relative to the fly-up?
 - Any change to the existing `CardDetailModal.tsx` (full-card modal)
   behavior, or does that remain a separate, unrelated affordance?
 - Right-hand column target width now that it no longer competes with a
   separate 264px left preview panel — same ~300px, or does it change?
-- Mobile/narrow-viewport behavior: does the merged stack still collapse
-  into the single-column board layout the same way the two separate
-  panels do today?
+- Mobile/narrow-viewport behavior: does a bottom-anchored fly-up over the
+  preview still make sense at the width where `mobile-responsive.md`
+  currently caps both panels at 360px, or does mobile need a different
+  pattern (e.g. a full-screen log sheet)?
+- Accessibility: keyboard/focus handling for expanding, collapsing, and
+  reading the log without a mouse-drag gesture; screen-reader
+  announcement when the log auto-collapses/reappears around an overlay.
