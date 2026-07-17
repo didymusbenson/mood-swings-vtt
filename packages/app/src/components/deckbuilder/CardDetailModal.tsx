@@ -30,7 +30,7 @@ export function CardDetailModal({ card, count, onAdd, onSet, onSub, onClose }: C
   return (
     <div className="dbx-modal__backdrop" onClick={onClose} role="presentation">
       <div
-        className="dbx-modal"
+        className="dbx-modal dbx-modal--wide"
         role="dialog"
         aria-modal="true"
         aria-label={card.name}
