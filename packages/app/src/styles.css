@@ -2750,9 +2750,13 @@ input:focus-visible {
 /* Decision modal — "Playing {CARDNAME}" left rail with the live computed value. */
 .overlay__panel--playing {
   display: flex;
-  gap: 1rem;
+  gap: 1.4rem;
   align-items: flex-start;
-  max-width: min(94vw, 860px);
+  /* Roomier, matching the wider card-detail modal: a min-width keeps short
+     popups (e.g. "No valid moods") from collapsing to a cramped sliver, and the
+     larger preview column below gives the played card a bigger image. */
+  max-width: min(94vw, 900px);
+  min-width: min(90vw, 600px);
 }
 .overlay__main {
   min-width: 0;
@@ -2760,7 +2764,7 @@ input:focus-visible {
 }
 .overlay__playing {
   flex: none;
-  width: calc(var(--card-w) + 1.2rem);
+  width: 220px;
   display: flex;
   flex-direction: column;
   align-items: center;
