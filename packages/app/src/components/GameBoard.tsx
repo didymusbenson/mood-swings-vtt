@@ -503,8 +503,17 @@ function slotNoun(slot: ChoiceSlot, plural: boolean): string {
       return plural ? 'moods in play' : 'a mood in play';
     case 'player':
       return plural ? 'players' : 'a player';
-    case 'handCard':
-      return plural ? 'cards from your hand' : 'a card from your hand';
+    case 'handCard': {
+      // Name the pile the slot actually enumerates: the discard (Corruption #60,
+      // Cynicism #62), a chosen player's hand (Intimidation #67), or your own.
+      const source =
+        slot.cardsFrom === 'discard'
+          ? 'the discard pile'
+          : slot.cardsFrom === 'chosen'
+            ? 'their hand'
+            : 'your hand';
+      return plural ? `cards from ${source}` : `a card from ${source}`;
+    }
     case 'color':
       return plural ? 'colors' : 'a color';
     case 'number':

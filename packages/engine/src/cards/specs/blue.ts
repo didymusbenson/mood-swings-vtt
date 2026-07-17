@@ -9,7 +9,7 @@ import { registerSpec } from '../choice-spec.js';
 registerSpec(28, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 2, players: 'all', label: 'Choose up to two players', optional: true },
-    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any', valueParity: 'odd' }, selfTargetable: true, label: 'Choose which odd-value mood each returns', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'chosen', valueParity: 'odd' }, selfTargetable: true, label: 'Choose which odd-value mood each returns', optional: true },
   ],
 });
 
@@ -74,7 +74,7 @@ registerSpec(40, {
 registerSpec(41, {
   slots: [
     { key: 'option', kind: 'choice', min: 0, max: 1, options: ['one', 'all'], label: 'Return one mood or all (optional)', optional: true },
-    { key: 'moods', kind: 'mood', min: 0, max: 1, mood: { from: 'any', colorIn: ['red', 'green'] }, label: 'Choose a red/green mood (if "one")', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 1, mood: { from: 'any', colorIn: ['red', 'green'] }, label: 'Choose a red/green mood (if "one")', optional: true, showWhen: { option: ['one'] } },
   ],
 });
 
@@ -95,7 +95,7 @@ registerSpec(46, {
 registerSpec(48, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 2, players: 'all', label: 'Choose up to two players', optional: true },
-    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any' }, label: 'Choose which mood each returns', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'chosen' }, label: 'Choose which mood each returns', optional: true },
   ],
 });
 

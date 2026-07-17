@@ -18,13 +18,34 @@ export type TargetKind = 'mood' | 'player' | 'handCard' | 'color' | 'number' | '
 
 /** Filter over moods in play (serializable). Values use current (stabilised) value. */
 export interface MoodFilter {
-  from?: 'own' | 'opponent' | 'any'; // relative to the acting player (default 'any')
+  /**
+   * Which players' moods this slot enumerates, relative to the acting player
+   * (default `'any'`):
+   *   - `'own'`      — the acting player's moods.
+   *   - `'opponent'` — every other player's moods.
+   *   - `'chosen'`   — the moods of the player(s) picked in an EARLIER `players`
+   *                    slot of this flow, for "choose player(s); one of THEIR moods
+   *                    each" cards (Panic #48, Malice #68, and the per-player
+   *                    return/discard cards #7/#28/#76/#101). Needs the `players`
+   *                    slot first; offers nothing until a player is chosen, mirroring
+   *                    `cardsFrom: 'chosen'` for hand slots.
+   *   - `'any'`      — every mood in play.
+   */
+  from?: 'own' | 'opponent' | 'chosen' | 'any';
   minValue?: number;
   maxValue?: number;
   colorIn?: Color[];
   hasSecondary?: boolean;
   /** Only moods whose current value is odd (Anxiety #28) / even (Spite #76). */
   valueParity?: 'odd' | 'even';
+  /**
+   * Only each owner's highest-current-value mood(s) — the moods tied for that
+   * player's maximum (Fury #91: "each player discards one of their highest-value
+   * moods"). Enforced per owner within the slot's scope, so a lower mood is never
+   * offered (its pick would be silently ignored by the effect, which only ever
+   * discards a top mood). Ties are all offered, so the player picks which top mood.
+   */
+  highestPerOwner?: boolean;
   /**
    * Cap on the SUM of the current values of the moods selected together in this
    * slot (Anger #80: "total value [5] or less"). Not a per-candidate filter — it
@@ -67,6 +88,17 @@ export interface ChoiceSlot {
   numberRange?: [number, number]; // kind === 'number'
   options?: string[]; // kind === 'choice' → sets `option`
   /**
+   * Gate this slot on the value chosen in an EARLIER `option` slot of the flow.
+   * The slot is only presented when `choices.option` is one of these values; the
+   * flow skips it otherwise. Used by "choose one" cards whose follow-up target
+   * applies to only one branch — Corruption #60 ('cards' recovers discards, but
+   * the 'wins' branch takes no cards), Guilt #14 / Hesitation #41 / Contempt #59
+   * ('one' picks a mood, but 'all' takes none). A slot with no `showWhen` always
+   * applies, so Avoidance #29 / Confusion #31 (whose pass slot applies to both
+   * left and right) are unaffected.
+   */
+  showWhen?: { option: string[] };
+  /**
    * kind === 'mood': this is an `afterPlaying` slot whose "choose a mood" may pick the
    * mood being played (it is already in play by then). The flow offers the played mood
    * as an extra candidate (SELF_TARGET) whenever it passes the slot's filter — checked
@@ -100,6 +132,18 @@ export function registerSpec(cardNumber: number, spec: ChoiceSpec): void {
 
 export function specFor(cardNumber: number): ChoiceSpec | undefined {
   return specByNumber.get(cardNumber);
+}
+
+/**
+ * Does a slot apply given the choices gathered so far in the flow? A slot with a
+ * `showWhen` gate is only presented when the earlier `option` selection matches
+ * (Corruption #60's discard-recovery slot is skipped on the double-win branch).
+ * `option` is the value picked in the flow's `option` slot (null if not yet /
+ * never chosen); it is compared as a string so numeric options still match.
+ */
+export function slotApplies(slot: ChoiceSlot, option: string | number | null): boolean {
+  if (!slot.showWhen) return true;
+  return option != null && slot.showWhen.option.includes(String(option));
 }
 
 /** True if the card offers no interactive targets (just play it). */
@@ -182,7 +226,11 @@ export function legalTargets(
           ? state.moods[actingPlayer] ?? []
           : f.from === 'opponent'
             ? state.players.filter((p) => p.id !== actingPlayer).flatMap((p) => state.moods[p.id] ?? [])
-            : allMoods(state);
+            : f.from === 'chosen'
+              // Only the moods of the player(s) picked in the earlier `players` slot;
+              // empty until one is chosen (Panic #48 must not offer other seats' moods).
+              ? (ctx?.players ?? []).flatMap((pid) => state.moods[pid] ?? [])
+              : allMoods(state);
       const ok = scope.filter((m) => {
         if (!moodValuePasses(f, m.currentValue)) return false;
         const data = card(resolveCardNumber(m));
@@ -191,7 +239,15 @@ export function legalTargets(
         if (f.hasSecondary && !data.secondaryValue) return false;
         return true;
       });
-      return { moods: ok.map((m) => m.uid) };
+      // Fury #91: keep only each owner's top-value mood(s), so a non-highest pick
+      // (which the effect would ignore) is never offered. Ties are all kept.
+      const kept = f.highestPerOwner
+        ? ok.filter((m) => {
+            const max = Math.max(...ok.filter((o) => o.owner === m.owner).map((o) => o.currentValue));
+            return m.currentValue === max;
+          })
+        : ok;
+      return { moods: kept.map((m) => m.uid) };
     }
     case 'player': {
       const ids = state.players.map((p) => p.id);

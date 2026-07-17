@@ -48,7 +48,7 @@ registerSpec(89, {
 
 // #91 Fury — each player discards one of their highest-value moods.
 registerSpec(91, {
-  slots: [{ key: 'moods', kind: 'mood', min: 0, max: 5, mood: { from: 'any' }, label: "Choose each player's highest mood to discard", optional: true }],
+  slots: [{ key: 'moods', kind: 'mood', min: 0, max: 5, mood: { from: 'any', highestPerOwner: true }, label: "Choose each player's highest mood to discard", optional: true }],
 });
 
 // #94 Hostility — may discard one of your black/green moods; if so, discard up to
@@ -87,7 +87,7 @@ registerSpec(100, {
 registerSpec(101, {
   slots: [
     { key: 'players', kind: 'player', min: 0, max: 2, players: 'all', label: 'Choose up to two players', optional: true },
-    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'any', maxValue: 3 }, selfTargetable: true, label: 'Choose which [3]-or-less mood each discards', optional: true },
+    { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'chosen', maxValue: 3 }, selfTargetable: true, label: 'Choose which [3]-or-less mood each discards', optional: true },
   ],
 });
 

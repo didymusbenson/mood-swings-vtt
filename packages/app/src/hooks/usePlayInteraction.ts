@@ -20,6 +20,7 @@ import {
   isSingleTarget,
   firstBoardSlot,
   playedMoodQualifies,
+  slotApplies,
   queries,
   SELF_TARGET,
   type ChoiceSlot,
@@ -300,12 +301,16 @@ export function usePlayInteraction(
         const copied = f.sel.copy != null ? specFor(f.sel.copy)?.slots ?? [] : [];
         spec = { slots: [...f.spec.slots.slice(0, f.slotIndex + 1), ...copied] };
       }
+      // Advance to the next slot that applies. Slots gated on an earlier `option`
+      // choice (Corruption #60's discard-recovery slot) are skipped when their
+      // branch wasn't chosen — so picking the double-win never prompts for cards.
+      let next = f.slotIndex + 1;
+      while (next < spec.slots.length && !slotApplies(spec.slots[next]!, f.sel.option)) next++;
       // In a networked game the last slot of a delegated card belongs to the OTHER
       // seat(s); the active player stops one slot early and submits a partial action,
       // and the host collects the delegated slot from the right player(s).
       const lastForMe = delegate && isDelegated(f.card) ? spec.slots.length - 2 : spec.slots.length - 1;
-      const isLast = f.slotIndex >= lastForMe;
-      if (isLast) {
+      if (next > lastForMe) {
         onAction({
           type: 'play',
           player: me,
@@ -315,7 +320,7 @@ export function usePlayInteraction(
         });
         setFlow(null);
       } else {
-        setFlow({ ...f, spec, slotIndex: f.slotIndex + 1 });
+        setFlow({ ...f, spec, slotIndex: next });
       }
     },
     [me, onAction, delegate],
