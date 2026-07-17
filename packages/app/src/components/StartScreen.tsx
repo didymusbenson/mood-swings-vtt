@@ -4,6 +4,7 @@ import { randomBoxDeck, validateCustomDeck, minDeckSize } from '@mood-swings/eng
 import { db } from '../game/db.js';
 import { flatten } from '../game/deckModel.js';
 import { listDecks, loadDeckCounts, type SavedDeck } from '../game/deckStorage.js';
+import { PRESET_DECKS, presetFlat, presetById } from '../game/presetDecks.js';
 import { Starburst } from './Starburst.js';
 import { HowToPlay } from './HowToPlay.js';
 import { ConfirmModal } from './Modal.js';
@@ -81,15 +82,24 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
     setRandomDeck(randomBoxDeck(db, s).deck);
   };
 
-  const selectSaved = (id: string) => {
-    if (!id) {
+  // Option values are namespaced so prebuilt-test-deck ids can't collide with a
+  // user's saved-deck ids: `preset:<id>` vs the bare saved-deck id.
+  const selectSaved = (value: string) => {
+    if (!value) {
       setSavedId(null);
       setCustomDeck(null);
       return;
     }
-    const sd = savedDecks.find((d) => d.id === id);
+    if (value.startsWith('preset:')) {
+      const preset = presetById(value.slice('preset:'.length));
+      if (!preset) return;
+      setSavedId(value);
+      setCustomDeck(presetFlat(preset));
+      return;
+    }
+    const sd = savedDecks.find((d) => d.id === value);
     if (!sd) return;
-    setSavedId(id);
+    setSavedId(value);
     setCustomDeck(flatten(loadDeckCounts(sd).counts));
   };
 
@@ -169,21 +179,28 @@ export function StartScreen({ onStart, onBack, variant = 'goldfish', footer, nam
         </div>
       ) : (
         <div className="start__custom">
-          {savedDecks.length > 0 ? (
-            <label className="start__savedpick">
-              Saved deck
-              <select value={savedId ?? ''} onChange={(e) => selectSaved(e.target.value)}>
-                <option value="">Choose a saved deck…</option>
-                {savedDecks.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} ({savedDeckSize(d)})
+          <label className="start__savedpick">
+            Deck
+            <select value={savedId ?? ''} onChange={(e) => selectSaved(e.target.value)}>
+              <option value="">Choose a deck…</option>
+              <optgroup label="Test decks (prebuilt)">
+                {PRESET_DECKS.map((d) => (
+                  <option key={d.id} value={`preset:${d.id}`} title={d.description}>
+                    {d.name}
                   </option>
                 ))}
-              </select>
-            </label>
-          ) : (
-            <p className="muted">No saved decks yet — build one in the Deckbuilder.</p>
-          )}
+              </optgroup>
+              {savedDecks.length > 0 && (
+                <optgroup label="Saved decks">
+                  {savedDecks.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({savedDeckSize(d)})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </label>
           <div className="start__customrow">
             <span className="muted">{customDeck ? `${customDeck.length} cards selected` : 'No deck selected'}</span>
             {onOpenBuilder && (
