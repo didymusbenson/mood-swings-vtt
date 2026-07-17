@@ -390,24 +390,26 @@ input:focus-visible {
   object-fit: cover;
   display: block;
 }
+/* The pip-die overlaid on the corner of an art card sits directly over the die
+   printed in the card scan (~16% of the card width, inset ~8% from the right and
+   ~4% from the top). BOTH its size and its inset are expressed in cqw (via the
+   .card__photo query container) so the overlay tracks the printed die at every
+   card size — large preview and small tiles alike — rather than a fixed px
+   size/position that only lines up at one scale and lets the printed die peek
+   out from underneath elsewhere. */
 .card__die--overlay {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  background: rgba(246, 242, 231, 0.9);
+  top: 3.5cqw;
+  right: 5.5cqw;
+  background: rgba(246, 242, 231, 0.92);
   border: 1.5px solid var(--ink);
   border-radius: 8px;
-  padding: 1px 3px;
+  padding: 0.5cqw 1cqw;
   box-shadow: 1px 1px 0 rgba(44, 42, 37, 0.4);
 }
-/* The pip-die overlaid on the corner of an art card sits directly over the die
-   printed in the card scan. Size it as a fraction of the card width (cqw, via
-   the .card__photo query container) so it scales with the card and fully covers
-   the printed die — on the large preview as well as the small tiles — rather
-   than staying a fixed size that the printed die peeks out from underneath. */
 .card__die--overlay .die {
-  width: 20cqw;
-  height: 20cqw;
+  width: 18cqw;
+  height: 18cqw;
 }
 .card__art-flag {
   position: absolute;
@@ -688,11 +690,8 @@ input:focus-visible {
   width: 1.15em;
   height: 1.15em;
 }
-.card--tile .card__die--overlay {
-  top: 3px;
-  right: 3px;
-  padding: 0 2px;
-}
+/* No tile-specific overlay-die position/size: the cqw-based rule above already
+   scales with the card, so tiles and the preview share one proportional rule. */
 .card__art--tile {
   flex: 1;
   height: auto;
