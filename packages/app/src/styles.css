@@ -401,6 +401,13 @@ input:focus-visible {
   position: absolute;
   top: 3.5cqw;
   right: 5.5cqw;
+  /* Center the die within the box. Without this the box is a block whose inline
+     die sits on the text baseline, leaving descender space below it (the die
+     reads as pushed up / off-centre). */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
   background: rgba(246, 242, 231, 0.92);
   border: 1.5px solid var(--ink);
   border-radius: 8px;
