@@ -15,6 +15,7 @@ import { useGameEvents } from '../hooks/useGameEvents.js';
 import { usePlayInteraction, type PlayController } from '../hooks/usePlayInteraction.js';
 import { useHandOrder } from '../hooks/useHandOrder.js';
 import { useHandDrag, type HandDragApi } from '../hooks/useHandDrag.js';
+import { useCardImage } from '../hooks/useCardImage.js';
 
 interface GameBoardProps {
   state: GameState;
@@ -398,6 +399,27 @@ function PlayerEdge({ player, state, ctx, pos }: { player: PlayerState; state: G
   );
 }
 
+/**
+ * The mini-card shown as the discard pile's top-of-stack indicator: the top
+ * card's actual art, cropped to the chip. Falls back to the coloured-border
+ * monogram if the card has no image or the art fails to load — same policy as
+ * the full card faces. Rendered as a plain <img> (not <Card>) because the pile
+ * is itself a <button> and buttons can't nest.
+ */
+function DiscardTop({ cardId }: { cardId: number }) {
+  const card = db.get(cardId);
+  const { src, onError } = useCardImage(card);
+  return (
+    <span className={`discard-card discard-card--${card.color}`}>
+      {src ? (
+        <img className="discard-card__img" src={src} alt={card.name} onError={onError} />
+      ) : (
+        <span className="discard-card__mono">{card.name.charAt(0)}</span>
+      )}
+    </span>
+  );
+}
+
 /** Deck stack + discard pile column at the battlefield's left edge (F3). */
 function PileColumn({ state, ctx }: { state: GameState; ctx: PanelCtx }) {
   const { openDiscard } = ctx;
@@ -430,9 +452,7 @@ function PileColumn({ state, ctx }: { state: GameState; ctx: PanelCtx }) {
           {top == null ? (
             <span className="pile__empty muted">empty</span>
           ) : (
-            <span className={`discard-card discard-card--${db.get(top).color}`}>
-              <span className="discard-card__mono">{db.get(top).name.charAt(0)}</span>
-            </span>
+            <DiscardTop key={top} cardId={top} />
           )}
         </div>
         <span className="pile__count">Discard · {state.discard.length}</span>
