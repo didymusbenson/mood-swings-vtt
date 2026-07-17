@@ -9,72 +9,85 @@ Merge the two dedicated right-hand-side panels — the card **Preview**
 single shared column where the log currently lives. Today `GameBoard.tsx`
 renders them as separate left/right panels in a three-column grid
 (`.board { grid-template-columns: 264px minmax(0, 1fr) 300px; }` in
-`styles.css`). Under this change, the left preview column goes away; the
-**Preview** occupies the right-hand column at full detail, undiminished,
-at all times. The **Activity Log** is no longer a panel at all — it's
-summoned on demand via a **FAB (floating action button)**, which opens the
-log as a transient overlay rather than living in any fixed layout slot.
+`styles.css`), and the log occupies a full permanent vertical slice of the
+screen even though the game state it reflects is already visible on the
+battlefield.
+
+**Reframing (post-iteration-3):** the Activity Log is **not a first-class,
+gameplay-necessary element**. Everything it shows is already observable
+live on the board; its actual jobs are (1) diagnostic/export for later
+review and (2) letting a player catch up if they lost track of something
+earlier in the match. Neither job requires the log to be always-on or
+always-visible. Given that, the design goal is simpler than earlier
+iterations assumed: give the **Preview** its own full, dedicated,
+undiminished real estate (nothing should letterbox the battlefield for
+both things at once), and make the **Log** merely *available and usable*
+on demand — it does not need simultaneous visibility with the preview,
+ambient presence, or a permanent layout slot.
 
 ## Brief (captured)
 
-- New right-hand column: **`PreviewComponent`** fills the column at full
-  detail (image, name, color, value, rarity, rules text, etc. — as today's
-  `PreviewPane.tsx`) at all times. The preview is never toggled, shrunk,
-  or covered by the log under this design.
-- **`ActivityComponent`** (the log) is invoked via a **FAB** — a small
-  floating circular/pill button (likely bottom-right of the board or
-  bottom-right of the preview column) — rather than occupying a docked
-  strip or column slot.
-  - Tapping/clicking the FAB opens the log as an overlay (e.g. a
-    bottom sheet, side drawer, or popover anchored to the FAB) on top of
-    the board/preview.
-  - Dismissing it (tap the FAB again, tap outside, or an explicit close)
-    returns the board to its normal state — preview fully visible, no log
-    on screen.
-  - The FAB itself can carry a lightweight ambient signal (e.g. a badge
-    or pulse) so the player can tell something happened in the log
-    without opening it.
-- **Auto behavior during overlays:** if the log overlay happens to be open
+- Right-hand column is **Preview by default**: `PreviewComponent` fills
+  it at full detail (image, name, color, value, rarity, rules text, etc.
+  — as today's `PreviewPane.tsx`), same as prior iterations.
+- The **Log is not simultaneously visible with the Preview** — since it's
+  a diagnostic/catch-up tool, not something needed moment-to-moment, it's
+  acceptable for viewing it to temporarily replace the preview rather
+  than compete with it for space. This is the key difference from
+  iterations 1–3: there is no attempt to show both at once, no shrink, no
+  cover-while-preserving-preview-underneath, no badge/notification
+  system to maintain awareness of it.
+- Simplest form (per the original "consolidate to one panel" framing):
+  a single small **switch/button in the column** (e.g. a `Preview | Log`
+  tab pair, or a lightweight "View Log" / "Back to Preview" toggle) swaps
+  the column's content between the two. Whichever is active fills the
+  full column; there's no partial/simultaneous state to manage.
+  - Default state on entering/resuming a game: Preview.
+  - The Log view should support what its actual jobs require: scrolling
+    through history, and (per its diagnostic use case) some path to
+    **export** the log — not just an in-app scroll view.
+- Auto behavior during overlays: if the Log is the active column view
   when a card-play flow or other full-board overlay (e.g.
-  `TargetOverlay`/`pc.flow`) needs to appear, the log overlay is
-  dismissed automatically so it doesn't compete with it. The FAB itself
-  (as an always-present affordance) remains visible/available throughout.
-- Net effect: the preview keeps its full, permanent column with zero
-  contention — nothing ever displaces or covers it. The log stops being a
-  persistent layout element altogether and becomes a discrete,
-  momentary/on-demand action, closer to a notifications or history
-  drawer than a panel.
+  `TargetOverlay`/`pc.flow`) needs the Preview (e.g. for live would-be
+  values), the column should return to Preview — consistent with Preview
+  being the column's real, permanent job and Log being a temporary detour
+  from it.
+- Net effect: one column, one clear default occupant (Preview, always
+  full and undiminished when active), and a simple, low-mechanism way to
+  step away to the Log and back — no drag gestures, no layering, no FAB,
+  no persistent partial-visibility state to design or maintain.
+- Mobile/narrow-viewport is explicitly **out of scope for this
+  iteration** — to be addressed separately.
 
 ## Related
 
 - `packages/app/src/components/GameBoard.tsx` — current three-column
   layout (`PreviewPane` left, `playfield` center, `ActivityLog` right);
-  becomes a two-column layout (`playfield`, permanent full-detail
-  preview column) plus a FAB rendered somewhere over the board that
-  summons the log on demand.
+  becomes a two-column layout (`playfield`, single right column) whose
+  right column renders either `PreviewComponent` or `ActivityComponent`
+  based on a simple local view-state (`'preview' | 'log'`), plus the
+  small switch control itself.
 - `packages/app/src/components/PreviewPane.tsx` — current preview
-  rendering logic; stays at full detail, permanently, with no
-  contention from the log under this design. Also has a `floating` mode
-  (used during targeting/`TargetOverlay` to show live would-be values)
-  — unaffected by the log's overlay since the log is no longer
-  positioned relative to the preview at all.
+  rendering logic; unchanged in content/detail, just becomes the
+  column's default view. Its `floating` mode (used during
+  targeting/`TargetOverlay`) is the trigger for forcing the column back
+  to Preview if the Log happened to be active.
 - `packages/app/src/components/ActivityLog.tsx` / `packages/app/src/game/log.ts`
-  — current log rendering and data; becomes the content of the
-  FAB-triggered overlay, same independent-scroll behavior as today.
+  — current log rendering and data; becomes the column's alternate view.
+  Export functionality (per the diagnostic use case) is new — `log.ts`
+  would need a serialization path (e.g. to JSON or plain text) that the
+  Log view's export action calls.
 - `packages/app/src/styles.css` — `.board` grid-template-columns (line
-  ~782) and the narrow-viewport single-column collapse (line ~2407)
-  simplify somewhat since the log no longer needs a reserved column or
-  row at all — it needs positioning for the FAB itself plus its overlay.
-- No existing FAB, bottom-sheet/drawer, or popover-from-button component
-  exists in `packages/app/src` today (closest analog is the show/hide
-  `Modal.tsx`, which is centered/full-board rather than anchored to a
-  trigger) — this is a new interaction primitive for the codebase.
-- `mobile-responsive.md` — FABs are a well-established mobile pattern,
-  so this direction may actually simplify the narrow-viewport story
-  relative to earlier iterations; still worth cross-checking during
-  refinement, especially FAB placement so it doesn't collide with other
-  bottom-anchored controls (e.g. hand cards, the Pass button visible in
-  the current board screenshot).
+  ~782) simplifies to two columns instead of three; the right column's
+  internal content swap needs no new grid/overlay rules, just conditional
+  rendering within the existing ~300px slot.
+- No existing tab/segmented-control component exists in
+  `packages/app/src` today — this is the one small new UI primitive this
+  iteration needs, notably simpler than the drag/overlay/FAB primitives
+  earlier iterations required.
+- `mobile-responsive.md` — explicitly deferred; the narrow-viewport
+  single-column collapse (currently at `styles.css` line ~2407) is left
+  as-is for now and revisited separately.
 
 ## Open questions / to refine
 
@@ -83,39 +96,32 @@ bleed into other features.)_
 
 ### Things Claude wants to ask about
 
-- FAB placement: bottom-right of the whole board, bottom-right of the
-  preview column specifically, or somewhere else — and how does it avoid
-  colliding with existing bottom-anchored UI (hand cards, the **Pass**
-  button, player score/turn indicator)?
-- Overlay shape when the FAB is tapped: bottom sheet (slides up from
-  bottom, board width or column width), side drawer (slides in from the
-  right), or a popover anchored directly above/beside the FAB? Each has
-  different implications for how much of the board/preview it covers.
-- Does opening the log overlay dim/block interaction with the rest of the
-  board (modal-like, similar to `Modal.tsx`), or can the player still act
-  on the board (hover cards, etc.) while it's open?
-- Ambient signal on the FAB (badge/pulse for new entries) — what counts
-  as "new" (since last open), and does it clear immediately on open or
-  after the player actually scrolls to see the newest entry?
-- Auto-dismiss when a full-board overlay (`TargetOverlay`/`pc.flow`)
-  needs to appear — does the log overlay closing while the player is
-  mid-read feel abrupt, and should there be any transition/warning, or is
-  instant dismissal fine given it was only open briefly by nature of the
-  FAB pattern?
-- Does the FAB replace the log entirely, or is there still a compact
-  "recent activity" indicator elsewhere (e.g. a one-line toast for the
-  newest entry) so players get log info without needing to open anything?
+- Switch control shape: a two-tab pill (`Preview | Log`) always visible
+  at the top of the column, or a single icon button that flips between
+  "View Log" and "Back to Preview" labels/icons? Tabs make both
+  destinations discoverable at a glance; a single flip-button is more
+  compact.
+- Does the switch/tab live inside the column (competing with the ~300px
+  width for its own space) or as a small control just above/outside it?
+- When the column auto-returns to Preview because a `TargetOverlay`/flow
+  needs it while Log was active, does that feel abrupt to a player who
+  was mid-read? Does it need any transition, or is instant-switch
+  acceptable given the Log is explicitly non-critical to gameplay?
+- After such an auto-return, does the column stay on Preview afterward,
+  or does it snap back to Log once the flow ends (i.e., is "Log was
+  active" state preserved across a forced interruption)?
+- Export format/mechanism for the diagnostic use case — plain text,
+  JSON, copy-to-clipboard, file download? Is this a button inside the Log
+  view, or tied into a different existing affordance?
+- Does switching to Log pause/freeze anything about the live game state,
+  or is it purely a read-only view over `state.log` that updates live
+  even while displayed (i.e., if the opponent acts while you're viewing
+  Log, does it update in place)?
+- Any persistence of which view (Preview/Log) is active — e.g. does
+  switching to Log stay sticky across a re-render/turn change, or does it
+  always reset to Preview at some natural boundary (new turn, new game)?
 - Any change to the existing `CardDetailModal.tsx` (full-card modal)
-  behavior/precedent this FAB-and-overlay pattern should follow for
-  consistency?
-- Right-hand column width now that it's solely the preview's — does it
-  stay ~300px, shrink, or grow now that it no longer needs to
-  accommodate log content at all?
-- Mobile/narrow-viewport behavior: does the FAB and its overlay work as
-  the primary (or only) log affordance on mobile too, replacing the
-  separate stacked `.log` panel `mobile-responsive.md` currently
-  describes?
-- Accessibility: FAB needs a clear label/`aria-label` ("Open activity
-  log"), keyboard operability (focus, Enter/Space to open, Escape to
-  close), and focus management (does focus move into the overlay on open
-  and return to the FAB on close)?
+  behavior, or does that remain a separate, unrelated affordance?
+- Confirmed out of scope for this iteration: mobile/narrow-viewport
+  behavior — revisit `mobile-responsive.md` separately once this design
+  is settled for desktop.
