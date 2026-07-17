@@ -418,16 +418,29 @@ input:focus-visible {
   height: 16cqw;
 }
 /* Mood in play: the current value is the number that matters (it changes as
-   other moods modify it), so let it POP — a die noticeably larger than the
-   printed one, lifted with a stronger shadow. */
+   other moods modify it), so make it POP — a large die that spills PAST the
+   card's top-right corner. To let it escape, the mood card and its photo stop
+   clipping (the art image keeps its rounded corners via its own radius); the
+   tableau is given a little breathing room (below) so the spill isn't re-clipped
+   by the scroll container. */
+.card--mood.card--art,
+.card--tile.card--mood {
+  overflow: visible;
+}
+.card--mood .card__photo {
+  overflow: visible;
+}
+.card--mood .card__photo img {
+  border-radius: inherit;
+}
 .card--tile.card--mood .card__die--overlay {
-  top: 2cqw;
-  right: 3cqw;
-  box-shadow: 1px 1px 0 rgba(44, 42, 37, 0.5), 0 3px 9px rgba(44, 42, 37, 0.34);
+  top: -7cqw;
+  right: -7cqw;
+  box-shadow: 1px 1px 0 rgba(44, 42, 37, 0.5), 0 4px 11px rgba(44, 42, 37, 0.42);
 }
 .card--tile.card--mood .card__die--overlay .die {
-  width: 27cqw;
-  height: 27cqw;
+  width: 30cqw;
+  height: 30cqw;
 }
 .card__art-flag {
   position: absolute;
@@ -1229,7 +1242,9 @@ input:focus-visible {
   min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 0.1rem;
+  /* Room above/right of the tiles so an in-play mood's value die can spill past
+     its top-right corner without being re-clipped by this scroll container. */
+  padding: 0.55rem 0.5rem 0.1rem 0;
   align-items: flex-start;
 }
 .tableau__empty {
