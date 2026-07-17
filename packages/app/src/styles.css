@@ -380,6 +380,9 @@ input:focus-visible {
   min-height: var(--card-h);
   border-radius: inherit;
   overflow: hidden;
+  /* Size query container so the corner value-die can scale as a fraction of the
+     card (via cqw), tracking the die printed in the art at every card size. */
+  container-type: inline-size;
 }
 .card__photo img {
   width: 100%;
@@ -396,6 +399,15 @@ input:focus-visible {
   border-radius: 8px;
   padding: 1px 3px;
   box-shadow: 1px 1px 0 rgba(44, 42, 37, 0.4);
+}
+/* The pip-die overlaid on the corner of an art card sits directly over the die
+   printed in the card scan. Size it as a fraction of the card width (cqw, via
+   the .card__photo query container) so it scales with the card and fully covers
+   the printed die — on the large preview as well as the small tiles — rather
+   than staying a fixed size that the printed die peeks out from underneath. */
+.card__die--overlay .die {
+  width: 20cqw;
+  height: 20cqw;
 }
 .card__art-flag {
   position: absolute;
@@ -680,10 +692,6 @@ input:focus-visible {
   top: 3px;
   right: 3px;
   padding: 0 2px;
-}
-.card--tile .card__die--overlay .die {
-  width: 1.05em;
-  height: 1.05em;
 }
 .card__art--tile {
   flex: 1;
