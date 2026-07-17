@@ -1,6 +1,35 @@
 # Feature: Preview / Log Panel Merge
 
-> **Status:** Stub — brief captured, not yet refined.
+> **Status:** Implemented (desktop). Mobile deferred — see Open questions.
+
+## Implementation notes
+
+Shipped as iteration 4 (the single-column view switch):
+
+- `.board` drops from three columns to two — `minmax(0, 1fr) 300px` in
+  `styles.css` — handing the old 264px left preview rail's width back to
+  the battlefield.
+- New `components/BoardSidebar.tsx` owns the right rail: a `Preview | Log`
+  tab pair (`.sidebar__tabs`) over a body that renders **either** the
+  `PreviewPane` (default) **or** the `ActivityLog` — never both. `GameBoard`
+  now renders one `<BoardSidebar>` in place of the separate `<PreviewPane>`
+  and `<ActivityLog>`.
+- **Float pinning:** while a targeting flow or the discard inspector is open
+  (`floating = !!pc.flow || discardOpen`), the tabs are hidden and the column
+  is pinned to the Preview (which keeps its existing `preview--floating` lift
+  above the scrim). Entering a flow resets the view to Preview and leaves it
+  there afterward — Preview is the resting state, so a forced interruption
+  doesn't snap back to a Log the player had wandered into.
+- **Export** (`game/logExport.ts`, `formatLog`): the Log view gained a quiet
+  Export button that downloads a round-grouped plain-text transcript
+  (`mood-swings-log.txt`); score entries expand into their per-mood
+  breakdown. Disabled when the log is empty.
+- **Auto-scroll refinement:** the log jumps to newest on open, but on a new
+  entry only follows if the reader is already near the bottom — so scrolling
+  back through history isn't yanked away when the opponent acts mid-read.
+- Verified end-to-end by driving the running app: two-column layout, tab
+  swap, preview population, flow-pin (tabs hide + preview floats), and a
+  real Export download with correct contents. `logExport` is unit-tested.
 
 ## Summary
 

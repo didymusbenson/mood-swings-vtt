@@ -6,8 +6,8 @@ import { db } from '../game/db.js';
 import { handWouldBe, moodComputed } from '../game/value.js';
 import { assignAvatars } from '../game/avatars.js';
 import { Card, CardBack, Die, DiceValue } from './Card.js';
-import { PreviewPane, type PreviewTarget } from './PreviewPane.js';
-import { ActivityLog } from './ActivityLog.js';
+import { type PreviewTarget } from './PreviewPane.js';
+import { BoardSidebar } from './BoardSidebar.js';
 import { Starburst } from './Starburst.js';
 import { RulesModal } from './RulesModal.js';
 import { Cinematic, PassIndicator } from './Cinematic.js';
@@ -911,14 +911,14 @@ export function GameBoard({ state, onAction, onNewGame, localSeat, viewerSeat, d
       </header>
 
       <div className="board">
-        <PreviewPane target={previewTarget} state={state} floating={!!pc.flow || discardOpen} />
-        {/* Center column, three stacked bands (F5): opponent edge / battlefield / your edge. */}
+        {/* Left column, three stacked bands (F5): opponent edge / battlefield / your edge. */}
         <div className="playfield">
           <PlayerEdge player={top} state={state} ctx={ctx} pos="top" />
           <Battlefield state={state} ctx={ctx} top={top} bottom={bottom} dragging={dragging} fieldOver={fieldOver} gameOver={gameOver} />
           <PlayerEdge player={bottom} state={state} ctx={ctx} pos="bottom" />
         </div>
-        <ActivityLog log={state.log} />
+        {/* Right column: Preview (default) / Activity Log, swapped via a tab. */}
+        <BoardSidebar target={previewTarget} state={state} log={state.log} floating={!!pc.flow || discardOpen} />
       </div>
 
       <TargetOverlay pc={pc} state={state} ctx={ctx} />
