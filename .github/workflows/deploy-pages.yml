@@ -15,7 +15,7 @@ name: Deploy app to GitHub Pages
 
 on:
   push:
-    branches: [claude/v2-deployment-strategy-iorlce]
+    branches: [main, claude/v2-deployment-strategy-iorlce]
   workflow_dispatch:
 
 # Least-privilege token plus the OIDC id-token the deploy-pages action needs.
