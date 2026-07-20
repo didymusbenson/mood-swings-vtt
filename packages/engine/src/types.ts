@@ -116,6 +116,7 @@ export type LogKind =
   | 'discard'
   | 'return'
   | 'bottomdeck'
+  | 'reveal'
   | 'suppress'
   | 'steal'
   | 'give'

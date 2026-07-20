@@ -51,6 +51,23 @@ describe('formatLog', () => {
     );
   });
 
+  it('round-trips a public reveal line into the exported transcript', () => {
+    const log: LogEntry[] = [
+      { round: 1, message: 'Bottom card revealed: Anger', kind: 'reveal' },
+      { round: 1, message: 'Alice reveals Faith', kind: 'reveal', actor: 'p1' },
+    ];
+    expect(formatLog(log)).toBe(
+      [
+        'Mood Swings — activity log',
+        '',
+        'Round 1',
+        '  Bottom card revealed: Anger',
+        '  Alice reveals Faith',
+        '',
+      ].join('\n'),
+    );
+  });
+
   it('handles an empty log without throwing', () => {
     expect(formatLog([])).toBe('Mood Swings — activity log\n\n');
   });

@@ -111,6 +111,8 @@ describe('effect-gap closures', () => {
   it('#36 Doubt bans the revealed cards\' colour for the next round only', () => {
     const { e, s } = game(rig([36, 83], [126])); // Doubt + a red card to reveal
     let g = e.apply(s, { type: 'play', player: 'p1', card: 36, choices: { cards: [83] } });
+    // The revealed card is logged publicly under the dedicated 'reveal' kind.
+    expect(g.log.some((l) => l.kind === 'reveal' && /reveals Boredom/.test(l.message) && !l.private)).toBe(true);
     expect(g.pendingBannedColors).toContain('red');
     expect(g.bannedColors).not.toContain('red'); // staged, not yet active
     g = e.apply(g, { type: 'pass', player: 'p2' }); // p1 (Doubt [2]) wins round 1, leads round 2

@@ -54,10 +54,28 @@ describe('blue cards', () => {
   it('#33 Curiosity publicly reveals a card from the chosen hand', () => {
     const { e, s } = game(rig([33], [44], 44)); // p2's hand is all #44, so the reveal is deterministic
     const g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 33, choices: { players: ['p2'] } });
-    // A public (non-private) log line records what was revealed…
-    expect(g.log.some((l) => /reveals/.test(l.message) && !l.private)).toBe(true);
+    // A public (non-private) log line records what was revealed, under the dedicated kind…
+    expect(g.log.some((l) => l.kind === 'reveal' && /reveals/.test(l.message) && !l.private)).toBe(true);
     // …and it's marked revealed so redaction keeps it face-up while it stays in hand.
     expect(g.revealed.p2).toContain(44);
+  });
+
+  it('#36 Doubt emits a public reveal line per revealed card (kind reveal)', () => {
+    // p1 hand: [36 Doubt, 83 Boredom, 5, 5, 5]. Reveal both 83 and one 5.
+    const { e, s } = game(rig([36, 83], [], 5));
+    const g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 36, choices: { cards: [83, 5] } });
+    const reveals = g.log.filter((l) => l.kind === 'reveal' && /reveals/.test(l.message) && !l.private);
+    expect(reveals.some((l) => /Boredom/.test(l.message))).toBe(true);
+    expect(reveals.some((l) => /Complacency/.test(l.message))).toBe(true);
+  });
+
+  it('setup reveals the bottom card of the deck as one public reveal line', () => {
+    const { s } = game(rig([44], [5], 5)); // deterministic filler → known bottom card
+    const bottomName = db.get(s.deck[s.deck.length - 1]!).name;
+    const reveals = s.log.filter((l) => l.kind === 'reveal');
+    expect(reveals).toHaveLength(1); // nothing else has happened yet
+    expect(reveals[0]!.message).toBe(`Bottom card revealed: ${bottomName}`);
+    expect(reveals[0]!.private).toBeUndefined(); // public game event, shown to everyone
   });
 
   it('a reveal persists until a copy of that card leaves the hand — then it is dropped', () => {
@@ -253,5 +271,16 @@ describe('blue cards', () => {
     expect(g.moods.p2!.some((m) => m.uid === victim)).toBe(false); // Conviction bottom-decked it
     expect(g.deck[g.deck.length - 1]).toBe(5); // #5 went to the bottom of the deck
     expect(g.hands.p2!.length).toBe(p2HandBefore + 1); // its owner drew
+  });
+
+  // F-2 resolution safety net: the effect guard must no-op on a <2-mood target even
+  // if the target-enumeration filter is bypassed (network/desync/forced choice).
+  it('#43 Indecisiveness fizzles safely (no return) if forced onto a 1-mood opponent', () => {
+    const { e, s } = game(rig([43], [44], 44));
+    s.moods.p2 = [mkMood(44, 'p2')]; // p2 controls exactly ONE mood
+    const p2HandBefore = s.hands.p2!.length;
+    const g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 43, choices: { players: ['p2'] } });
+    expect(g.moods.p2).toHaveLength(1); // mood not returned to hand
+    expect(g.hands.p2!.length).toBe(p2HandBefore); // hand size unchanged
   });
 });

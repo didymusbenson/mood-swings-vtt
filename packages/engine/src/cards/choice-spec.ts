@@ -61,6 +61,21 @@ export interface HandFilter {
   colorIn?: Color[];
 }
 
+/**
+ * Filter over player seats, evaluated against current board state (serializable).
+ * Lets a `player` slot express board-conditioned eligibility so an ineligible seat
+ * is never enumerated (the effect body's guard stays as a resolution safety net).
+ */
+export interface PlayerFilter {
+  /**
+   * Only players controlling at least this many moods in play (Cruelty #61,
+   * Indecisiveness #43, Malice #68 — "two or more moods"). Counts `state.moods[id]`.
+   */
+  minMoods?: number;
+  /** Only players controlling strictly more moods than the acting player (Pride #22). */
+  moreMoodsThanActor?: boolean;
+}
+
 export interface ChoiceSlot {
   key: ChoiceKey;
   kind: TargetKind;
@@ -85,6 +100,7 @@ export interface ChoiceSlot {
    */
   cardsFrom?: 'acting' | 'chosen' | 'discard';
   players?: 'opponents' | 'all'; // kind === 'player'
+  player?: PlayerFilter; // kind === 'player' — board-conditioned eligibility
   numberRange?: [number, number]; // kind === 'number'
   options?: string[]; // kind === 'choice' → sets `option`
   /**
@@ -250,8 +266,19 @@ export function legalTargets(
       return { moods: kept.map((m) => m.uid) };
     }
     case 'player': {
-      const ids = state.players.map((p) => p.id);
-      return { players: slot.players === 'opponents' ? ids.filter((id) => id !== actingPlayer) : ids };
+      const f = slot.player ?? {};
+      const base = state.players.map((p) => p.id);
+      const scoped = slot.players === 'opponents' ? base.filter((id) => id !== actingPlayer) : base;
+      // Count moods in play (matches the effect guards' `ctx.moodsOf(id).length`;
+      // suppression leaves moods in `state.moods`, so counts agree with resolution).
+      const actorMoods = (state.moods[actingPlayer] ?? []).length;
+      const ok = scoped.filter((id) => {
+        const n = (state.moods[id] ?? []).length;
+        if (f.minMoods != null && n < f.minMoods) return false;
+        if (f.moreMoodsThanActor && n <= actorMoods) return false;
+        return true;
+      });
+      return { players: ok };
     }
     case 'handCard': {
       const f = slot.hand ?? {};

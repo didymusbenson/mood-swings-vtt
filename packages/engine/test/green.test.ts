@@ -5,6 +5,7 @@ import { Engine } from '../src/engine.js';
 import { loadCardDB, type RawCard } from '../src/data.js';
 import type { CardDB } from '../src/cards/registry.js';
 import type { GameState, Mood, PlayerId } from '../src/types.js';
+import { redactFor } from '../src/redact.js';
 import '../src/cards/green.js';
 import '../src/cards/blue.js'; // Fear #38 (used to bounce Hope out of play)
 
@@ -226,6 +227,20 @@ describe('green cards', () => {
     expect(g.round).toBe(2);
     expect(g.activePlayer).toBe('p1');
     expect(hasDiscardGrant(g)).toBe(true); // recurring: Grace re-grants at turn start
+  });
+
+  it('#118 Fascination publicly reveals the given card and keeps it face-up for the recipient', () => {
+    // p1 hand: [118 Fascination, 44 Indifference (blue), fillers]. Give 44 to p2.
+    const { e, s } = game(rig([118, 44], []));
+    const g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 118, choices: { cards: [44], players: ['p2'] } });
+    // One public reveal line naming the given card, under the dedicated kind.
+    expect(g.log.some((l) => l.kind === 'reveal' && /reveals Indifference/.test(l.message) && !l.private)).toBe(true);
+    // The card moved to p2's hand…
+    expect(g.hands.p2).toContain(44);
+    // …and stays publicly revealed there (4b), so redaction shows it face-up to p1.
+    expect(g.revealed.p2).toContain(44);
+    const p1View = redactFor(g, 'p1');
+    expect(p1View.hands.p2).toContain(44);
   });
 
   it('#121 Grace\'s discard play is REFUSED for a card sharing no colour with your moods', () => {

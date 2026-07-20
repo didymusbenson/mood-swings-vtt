@@ -54,7 +54,7 @@ registerSpec(15, { slots: [{ key: 'players', kind: 'player', min: 1, max: 1, pla
 registerSpec(20, { slots: [{ key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'opponent' }, label: 'Suppress up to two moods', optional: true }] });
 
 // #22 Pride — choose a player who has more moods than you.
-registerSpec(22, { slots: [{ key: 'players', kind: 'player', min: 0, max: 1, players: 'opponents', label: 'Choose a player with more moods', optional: true }] });
+registerSpec(22, { slots: [{ key: 'players', kind: 'player', min: 0, max: 1, players: 'opponents', player: { moreMoodsThanActor: true }, label: 'Choose a player with more moods', optional: true }] });
 
 // #23 Repentance — choose a value; suppress all other moods with it.
 registerSpec(23, { slots: [{ key: 'option', kind: 'number', min: 0, max: 1, numberRange: [0, 12], label: 'Choose a value', optional: true }] });

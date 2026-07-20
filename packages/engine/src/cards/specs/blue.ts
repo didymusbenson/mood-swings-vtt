@@ -83,7 +83,7 @@ registerSpec(42, { slots: [{ key: 'colors', kind: 'color', min: 1, max: 1, label
 
 // #43 Indecisiveness — any number of 2+-mood opponents each return a random mood.
 registerSpec(43, {
-  slots: [{ key: 'players', kind: 'player', min: 0, max: 8, players: 'opponents', label: 'Choose opponents (optional)', optional: true }],
+  slots: [{ key: 'players', kind: 'player', min: 0, max: 8, players: 'opponents', player: { minMoods: 2 }, label: 'Choose opponents (optional)', optional: true }],
 });
 
 // #46 Neurosis — To play: return one or more of your moods to hand.

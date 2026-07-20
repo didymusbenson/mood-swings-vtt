@@ -43,4 +43,14 @@ describe('kindStyle', () => {
   it('falls back to a neutral style for an unknown/missing kind', () => {
     expect(kindStyle(undefined).accent).toBe('neutral');
   });
+
+  it('maps the reveal kind to a distinct icon and event accent', () => {
+    const style = kindStyle('reveal');
+    expect(style.accent).toBe('event');
+    // The reveal icon must be distinct from every other kind's icon.
+    const others = (['play', 'pass', 'draw', 'discard', 'return', 'bottomdeck', 'suppress', 'steal', 'give', 'score', 'round', 'game', 'info'] as const).map(
+      (k) => kindStyle(k).icon,
+    );
+    expect(others).not.toContain(style.icon);
+  });
 });

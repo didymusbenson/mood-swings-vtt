@@ -149,8 +149,13 @@ registerEffects(118, {
     const hand = ctx.state.hands[ctx.me]!;
     const i = hand.indexOf(c);
     if (i < 0) return;
+    ctx.reveal(ctx.me, c); // public reveal line before giving the card away
     hand.splice(i, 1);
     (ctx.state.hands[p] ??= []).push(c);
+    // The card was revealed publicly, so it stays face-up in the recipient's hand
+    // (redactHand would otherwise conceal it). reconcileRevealed keeps it (the
+    // recipient's count for c grew), so no stale entry is dropped.
+    (ctx.state.revealed[p] ??= []).push(c);
     ctx.self.data.boost = true;
   },
 });

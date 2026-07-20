@@ -201,6 +201,7 @@ registerEffects(36, {
     const revealed = (ctx.choices.cards ?? []).filter((c) => hand.includes(c));
     if (revealed.length === 0) return;
     for (const c of revealed) {
+      ctx.reveal(ctx.me, c); // public reveal line (+ marks revealed) before it leaves the hand
       hand.splice(hand.indexOf(c), 1);
       ctx.state.deck.push(c);
     }

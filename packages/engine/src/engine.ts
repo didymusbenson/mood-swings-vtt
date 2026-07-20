@@ -128,6 +128,13 @@ export class Engine {
     // is just the base play — but keeps the turn-start path in one place).
     this.resetTurn(state);
     this.stabilise(state);
+    // Rules: reveal the bottom card of the deck at setup. It is public to everyone
+    // (game-setup event, no actor). Log-only — the bottom card is in no hand, so
+    // state.revealed (a per-hand map) is not touched.
+    const bottom = state.deck[state.deck.length - 1];
+    if (bottom != null) {
+      this.logPush(state, `Bottom card revealed: ${this.db.get(bottom).name}`, 'reveal');
+    }
     return state;
   }
 
@@ -373,7 +380,7 @@ export class Engine {
       reveal: (holder, card) => {
         // A reveal is public: everyone sees which card it was. Log it, and record it so
         // redaction can keep it face-up in the holder's hand while it stays there.
-        push(`${pname(holder)} reveals ${db.get(card).name}`, 'info');
+        push(`${pname(holder)} reveals ${db.get(card).name}`, 'reveal');
         (state.revealed[holder] ??= []).push(card);
       },
     };

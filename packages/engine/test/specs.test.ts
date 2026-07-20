@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { loadCardDB, type RawCard } from '../src/data.js';
-import { specFor, legalTargets, playedMoodQualifies, slotApplies, SELF_TARGET, type ChoiceSlot } from '../src/cards/choice-spec.js';
+import { specFor, legalTargets, isLegalDrop, playedMoodQualifies, slotApplies, SELF_TARGET, type ChoiceSlot } from '../src/cards/choice-spec.js';
 import type { GameState, Mood } from '../src/types.js';
 import '../src/cards/index.js'; // registers all effects + specs
 
@@ -358,6 +358,64 @@ describe('card target specs', () => {
     });
     it('an opponent-only slot never accepts the (own) played mood', () => {
       expect(playedMoodQualifies(arrog, d('white'), 2)).toBe(false);
+    });
+  });
+
+  // F-2: a board-conditioned `player` slot must not enumerate ineligible seats.
+  // Board: p1 (actor) has 1 mood, p2 has 2, p3 has 1.
+  describe('player-slot board predicates (minMoods / moreMoodsThanActor)', () => {
+    const board = {
+      players: [
+        { id: 'p1', name: 'P1', roundsWon: 0 },
+        { id: 'p2', name: 'P2', roundsWon: 0 },
+        { id: 'p3', name: 'P3', roundsWon: 0 },
+      ],
+      hands: { p1: [], p2: [], p3: [] },
+      moods: {
+        p1: [mk(5, 'p1a', 'p1', 3)], // 1 mood
+        p2: [mk(5, 'p2a', 'p2', 3), mk(5, 'p2b', 'p2', 3)], // 2 moods
+        p3: [mk(44, 'p3a', 'p3', 3)], // 1 mood
+      },
+    } as unknown as GameState;
+
+    const players = (num: number, me = 'p1') => legalTargets(specFor(num)!.slots[0]!, board, me, look).players;
+
+    it('Cruelty #61 (opponents, ≥2 moods) offers only the 2+-mood opponent', () => {
+      expect(specFor(61)!.slots[0]!.player).toMatchObject({ minMoods: 2 });
+      const legal = players(61);
+      expect(legal).toContain('p2'); // 2 moods → eligible
+      expect(legal).not.toContain('p3'); // 1 mood → NOT offered (the F-2 bug)
+      expect(legal).not.toContain('p1'); // self excluded (opponents)
+    });
+
+    it('Indecisiveness #43 (opponents, ≥2 moods) offers only the 2+-mood opponent', () => {
+      const legal = players(43);
+      expect(legal).toContain('p2');
+      expect(legal).not.toContain('p3');
+      expect(legal).not.toContain('p1');
+    });
+
+    it('Malice #68 (all, ≥2 moods) offers a 2+-mood self but not a 1-mood player', () => {
+      // Acting as p2 (who has 2 moods): p2 self is eligible (players:'all'); p1/p3 (1 mood) not.
+      const legal = players(68, 'p2');
+      expect(legal).toContain('p2'); // 2+-mood self is offered
+      expect(legal).not.toContain('p1'); // 1 mood
+      expect(legal).not.toContain('p3'); // 1 mood
+    });
+
+    it('Pride #22 (opponents, more moods than actor) offers only opponents ahead of the actor', () => {
+      expect(specFor(22)!.slots[0]!.player).toMatchObject({ moreMoodsThanActor: true });
+      // Actor p1 has 1 mood: p2 (2 > 1) eligible; p3 (1, equal) not.
+      const legal = players(22);
+      expect(legal).toContain('p2');
+      expect(legal).not.toContain('p3');
+      expect(legal).not.toContain('p1');
+    });
+
+    it('isLegalDrop mirrors legalTargets for a filtered player slot (Cruelty #61)', () => {
+      expect(isLegalDrop(61, 'p2', 'player', board, 'p1', look)).toBe(true); // 2 moods
+      expect(isLegalDrop(61, 'p3', 'player', board, 'p1', look)).toBe(false); // 1 mood
+      expect(isLegalDrop(61, 'p1', 'player', board, 'p1', look)).toBe(false); // self (opponents)
     });
   });
 });

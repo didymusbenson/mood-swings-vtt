@@ -96,6 +96,33 @@ describe('redactFor', () => {
     expect(p1View.log.some((e) => e.message === 'Ada drew Anger')).toBe(true); // owner still sees it
   });
 
+  it('keeps public reveal lines verbatim for every viewer (reveals are never private)', () => {
+    // Every reveal in the game is public — the log line must survive redaction for
+    // all seats, and the setup bottom-card reveal is emitted for everyone too.
+    const { state } = game(riggedDeck([A], [B], A));
+    state.log.push({ round: 1, message: 'Bo reveals Anger', kind: 'reveal' });
+
+    for (const seat of ['p1', 'p2'] as const) {
+      const view = redactFor(state, seat);
+      expect(view.log.some((e) => e.message === 'Bo reveals Anger' && !e.private)).toBe(true);
+      // The setup bottom-card reveal (also kind 'reveal') is public to all viewers.
+      const bottom = view.log.find((e) => e.kind === 'reveal' && e.message.startsWith('Bottom card revealed:'));
+      expect(bottom, `bottom-card reveal visible to ${seat}`).toBeTruthy();
+      expect(bottom!.private).toBeUndefined();
+    }
+  });
+
+  it('keeps Fascination-given revealed cards face-up in the recipient hand (4b)', () => {
+    const { state } = game(riggedDeck([A], [B], A));
+    // Simulate Fascination giving a publicly-revealed A to p2: it enters p2's hand
+    // and is recorded in state.revealed[p2] so redaction shows it face-up.
+    state.hands.p2 = [B, A];
+    state.revealed = { p2: [A] };
+    const p1View = redactFor(state, 'p1');
+    expect(p1View.hands.p2.filter((c) => c === A)).toHaveLength(1); // the given card shows
+    expect(p1View.hands.p2.filter(isHidden)).toHaveLength(state.hands.p2.length - 1);
+  });
+
   it('passes public board/flow fields through untouched', () => {
     const { engine, state } = game(riggedDeck([A], [B], A));
     const s: GameState = engine.apply(state, { type: 'play', player: 'p1', card: A });

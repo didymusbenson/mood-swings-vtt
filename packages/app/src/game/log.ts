@@ -36,6 +36,7 @@ const KIND_STYLES: Record<LogKind, KindStyle> = {
   discard: { icon: '✕', accent: 'loss' },
   return: { icon: '↩', accent: 'loss' },
   bottomdeck: { icon: '⬇', accent: 'loss' },
+  reveal: { icon: '◎', accent: 'event' },
   suppress: { icon: '⊘', accent: 'bad' },
   steal: { icon: '⇄', accent: 'bad' },
   give: { icon: '⇦', accent: 'gain' },

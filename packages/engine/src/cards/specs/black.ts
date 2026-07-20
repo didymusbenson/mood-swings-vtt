@@ -54,7 +54,7 @@ registerSpec(60, {
 
 // #61 Cruelty — any number of 2+-mood opponents each discard a random mood.
 registerSpec(61, {
-  slots: [{ key: 'players', kind: 'player', min: 0, max: 8, players: 'opponents', label: 'Choose opponents (optional)', optional: true }],
+  slots: [{ key: 'players', kind: 'player', min: 0, max: 8, players: 'opponents', player: { minMoods: 2 }, label: 'Choose opponents (optional)', optional: true }],
 });
 
 // #62 Cynicism — may move a discard card into an opponent's hand to become [6].
@@ -86,7 +86,7 @@ registerSpec(67, {
 // #68 Malice — a chosen 2+-mood player picks two of their moods; those + colour-matches discard.
 registerSpec(68, {
   slots: [
-    { key: 'players', kind: 'player', min: 1, max: 1, players: 'all', label: 'Choose a player with 2+ moods' },
+    { key: 'players', kind: 'player', min: 1, max: 1, players: 'all', player: { minMoods: 2 }, label: 'Choose a player with 2+ moods' },
     { key: 'moods', kind: 'mood', min: 0, max: 2, mood: { from: 'chosen' }, label: 'That player chooses two of their moods', optional: true },
   ],
 });

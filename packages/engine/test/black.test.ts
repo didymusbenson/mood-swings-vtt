@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { Engine } from '../src/engine.js';
 import { loadCardDB, type RawCard } from '../src/data.js';
 import type { CardDB } from '../src/cards/registry.js';
-import type { GameState } from '../src/types.js';
+import type { GameState, Mood, PlayerId } from '../src/types.js';
 import { legalDiscardPlays } from '../src/queries.js';
 import '../src/cards/black.js';
 
@@ -28,6 +28,14 @@ const game = (deck: number[]) => {
 /** Play a full 2-player round where both players each play one card / pass. */
 function findMood(g: GameState, player: 'p1' | 'p2', card: number) {
   return g.moods[player]!.find((m) => m.card === card);
+}
+
+let uid = 0;
+function mkMood(card: number, owner: PlayerId): Mood {
+  return {
+    uid: `t${uid++}`, card, owner, stolenFrom: null, usingSecondary: false,
+    suppressed: 'none', suppressedBy: null, copyOf: null, currentValue: 0, data: {},
+  };
 }
 
 describe('black cards', () => {
@@ -206,5 +214,32 @@ describe('black cards', () => {
     g = e.apply(g, { type: 'play', player: 'p1', card: 74 });
     expect(g.discard.length).toBe(1);
     expect(findMood(g, 'p1', 74)!.currentValue).toBe(2);
+  });
+
+  it('#71 Paranoia publicly reveals a card under the dedicated reveal kind', () => {
+    // p2 hand is all Apathy so the random reveal is deterministic.
+    const { e, s } = game(rig([71], [55], 55));
+    const g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 71, choices: { players: ['p2'] } });
+    expect(g.log.some((l) => l.kind === 'reveal' && /reveals Apathy/.test(l.message) && !l.private)).toBe(true);
+  });
+
+  // F-2 resolution safety net: even if the target-enumeration filter is bypassed
+  // (network/desync/forced choice), the effect guard must no-op on a <2-mood target.
+  it('#61 Cruelty fizzles safely (no discard) if forced onto a 1-mood opponent', () => {
+    const { e, s } = game(rig([61], [55]));
+    s.moods.p2 = [mkMood(55, 'p2')]; // p2 controls exactly ONE mood
+    const discardBefore = s.discard.length;
+    const g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 61, choices: { players: ['p2'] } });
+    expect(g.moods.p2).toHaveLength(1); // mood not discarded
+    expect(g.discard.length).toBe(discardBefore); // nothing added to the discard pile
+  });
+
+  it('#68 Malice fizzles safely (no discard) if forced onto a 1-mood player', () => {
+    const { e, s } = game(rig([68], [55]));
+    s.moods.p2 = [mkMood(55, 'p2')]; // chosen player controls only ONE mood
+    const discardBefore = s.discard.length;
+    const g: GameState = e.apply(s, { type: 'play', player: 'p1', card: 68, choices: { players: ['p2'] } });
+    expect(g.moods.p2).toHaveLength(1); // not discarded
+    expect(g.discard.length).toBe(discardBefore);
   });
 });
