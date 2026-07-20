@@ -15,7 +15,10 @@ name: Deploy app to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/v2-deployment-strategy-iorlce]
+    # `claude/prebuilt-decks-setup-script-2f3et5` is temporarily included so the
+    # prebuilt-deck suite + playtest-fix batch can be acceptance-tested on the live
+    # URL before merging to main. Remove it from this list once merged.
+    branches: [main, claude/v2-deployment-strategy-iorlce, claude/prebuilt-decks-setup-script-2f3et5]
   workflow_dispatch:
 
 # Least-privilege token plus the OIDC id-token the deploy-pages action needs.
