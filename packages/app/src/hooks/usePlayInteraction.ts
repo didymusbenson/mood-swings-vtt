@@ -10,7 +10,7 @@
 // All target legality comes from the engine's per-card spec metadata
 // (specFor / legalTargets / isLegalDrop / …) — never from parsing rules text.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Action, Choices, GameState } from '@mood-swings/engine';
 import {
   specFor,
@@ -39,6 +39,13 @@ interface Selections {
   moods: string[];
   players: string[];
   cards: number[];
+  /**
+   * The indices into the current `handCard` slot's enumerated candidate list
+   * (`legalNow.cards`) that are selected. Kept in lockstep with `cards` (the resolved
+   * collector numbers) so two identical copies in one zone are independently selectable
+   * (F-5) — `cards` alone can't distinguish duplicate numbers. UI-only; never dispatched.
+   */
+  cardIdx: number[];
   colors: string[];
   option: string | number | null;
   /** Creativity #32: the card number being copied (from the chosen mood). */
@@ -48,7 +55,7 @@ interface Selections {
 }
 
 const emptySelections = (): Selections => ({
-  moods: [], players: [], cards: [], colors: [], option: null, copy: null, copyUid: null,
+  moods: [], players: [], cards: [], cardIdx: [], colors: [], option: null, copy: null, copyUid: null,
 });
 
 /** Current (stabilised) value of an in-play mood by uid — 0 if not found. */
@@ -91,6 +98,9 @@ export interface PlayController {
 
   /** Active player may act right now (their turn, awaiting a play). */
   canAct: boolean;
+  /** Can the player spend a play on a HAND card right now? False when the only remaining
+   *  budget is discard-only (Grief/Angst/Harmony/Grace) — the hand is then dimmed (F-1). */
+  canPlayHand: boolean;
   me: string;
 
   // ----- Manual selection (pre-play) -----
@@ -122,9 +132,12 @@ export interface PlayController {
   playerHighlighted: (pid: string) => boolean;
   playerSelected: (pid: string) => boolean;
   onPlayerClick: (pid: string) => void;
-  handCardHighlighted: (card: number) => boolean;
-  handCardSelected: (card: number) => boolean;
-  onHandCardClick: (card: number) => void;
+  /** Is this rendered hand card (owned by `owner`) a legal target for the current slot? Zone-scoped (F-3). */
+  handCardHighlighted: (card: number, owner: string) => boolean;
+  /** Is the overlay-fan candidate at `index` (into `legalNow.cards`) selected? Index-keyed (F-5). */
+  handCardSelected: (index: number) => boolean;
+  /** In a `handCard` flow, toggle the candidate at `index`; outside a flow (no index), tap-to-select. */
+  onHandCardClick: (card: number, index?: number) => void;
 
   // ----- Drag & drop (pointer-driven; see useHandDrag) -----
   dragCard: number | null;
@@ -179,11 +192,65 @@ function assembleChoices(sel: Selections): Choices {
 }
 
 /** Toggle a value in a bounded selection list (single-max slots replace). */
-function toggleBounded<T>(list: T[], value: T, max: number): T[] {
+export function toggleBounded<T>(list: T[], value: T, max: number): T[] {
   if (list.includes(value)) return list.filter((v) => v !== value);
   if (list.length < max) return [...list, value];
   if (max === 1) return [value];
   return list; // at capacity for a multi-select — ignore extra clicks
+}
+
+/**
+ * A "pooled, one-per-chosen-player" target slot: a `mood`/`handCard` slot sourced from
+ * the player(s) picked in an earlier `players` slot (Suspicion #78, Spite #76, Panic #48,
+ * Foresight #7, Anxiety #28, Shock #101, Malice #68). Its `max` is the POOLED cap across
+ * all chosen players, not a per-selection bound.
+ */
+export function isChosenPooledSlot(slot: ChoiceSlot): boolean {
+  return (
+    (slot.kind === 'handCard' && slot.cardsFrom === 'chosen') ||
+    (slot.kind === 'mood' && slot.mood?.from === 'chosen')
+  );
+}
+
+/**
+ * The effective selection cap for a slot (F-6). A pooled "one per chosen player" slot is
+ * capped at the number of chosen players (`min(slot.max, #chosen)`), so the picker can't
+ * over-select past what the effect consumes. Only applies when the preceding `players`
+ * slot is genuinely multi (`max > 1`) — this GUARDS Malice #68, a real "choose two" from a
+ * SINGLE chosen player (its players slot is `max:1`), whose `max:2` must stand. Every other
+ * slot keeps its declared `max`.
+ */
+export function pooledMax(slot: ChoiceSlot, spec: ChoiceSpec, chosenPlayers: number): number {
+  const multiPlayerFlow = spec.slots.some((s) => s.kind === 'player' && s.max > 1);
+  if (isChosenPooledSlot(slot) && multiPlayerFlow) {
+    return Math.min(slot.max, Math.max(1, chosenPlayers));
+  }
+  return slot.max;
+}
+
+/**
+ * A slot whose choice is FORCED — the flow must not let the player "skip" past it as if
+ * opting out, and (when there is a single legal candidate) may pre-select it. Two cases:
+ *   - genuinely mandatory (`min > 0`, not `optional`); or
+ *   - a pooled `from:'chosen'` follow-up once at least one player is chosen — the effect is
+ *     committed to fire for each chosen player, so its `min:0` is only "the engine may pick
+ *     for you", never "no effect" (F-7a).
+ */
+export function isForcedSlot(slot: ChoiceSlot, chosenPlayers: number): boolean {
+  const mandatory = slot.min > 0 && !slot.optional;
+  const forcedChosen = isChosenPooledSlot(slot) && chosenPlayers > 0;
+  return mandatory || forcedChosen;
+}
+
+/** The candidate list for the current slot's kind (null for non-target slots). */
+function slotCandidates(
+  slot: ChoiceSlot,
+  legal: ReturnType<typeof legalTargets> | null,
+): string[] | number[] | null {
+  if (slot.kind === 'mood' || slot.kind === 'copy') return legal?.moods ?? null;
+  if (slot.kind === 'player') return legal?.players ?? null;
+  if (slot.kind === 'handCard') return legal?.cards ?? null;
+  return null; // color / number / choice always have selectable options
 }
 
 export function usePlayInteraction(
@@ -278,6 +345,14 @@ export function usePlayInteraction(
     () => (canAct && !flow ? queries.legalDiscardPlays(state, me, db) : []),
     [canAct, flow, state, me],
   );
+  // Whether a HAND card can be played right now — false when the only remaining budget is
+  // discard-only (Grief/Angst/Harmony/Grace). Gates the begin-play entry points below and
+  // dims the hand in the board, so a discard-only play can't walk the hand-card flow only to
+  // be rejected at dispatch (F-1).
+  const canPlayHand = useMemo(
+    () => canAct && !flow && queries.canPlayFromHand(state, me),
+    [canAct, flow, state, me],
+  );
   const beginDiscardPlay = useCallback(
     (card: number) => {
       if (!canAct || flow) return;
@@ -326,6 +401,51 @@ export function usePlayInteraction(
     [me, onAction, delegate],
   );
 
+  // Auto-resolve a slot that offers no real decision, so a forced choice never soft-locks and
+  // a one-option pick isn't busywork. Runs whenever the current slot / its legal candidates
+  // change; `autoRef` keys each (card, slotIndex) so it acts at most once per slot entry
+  // (letting the player freely de-select an auto-picked target afterwards):
+  //   - a FORCED slot (mandatory `min>0`, or a committed `from:'chosen'` follow-up) with an
+  //     EMPTY candidate set auto-advances — treated as satisfied with no selection. This
+  //     preserves "mandatory WHEN ABLE": Malice #68 with no 2+-mood player, Betrayal #56 with
+  //     no own mood, Guile #40 with no opponent mood, or a chosen player with no qualifying
+  //     mood/card, all advance instead of trapping the flow (the engine no-ops on empty).
+  //   - a forced slot with EXACTLY ONE candidate pre-selects it (F-7a): Spite #76 targeting a
+  //     player with a single even mood, or a single-opponent player slot, is already picked.
+  const autoRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!flow || !currentSlot || !legalNow) {
+      autoRef.current = null;
+      return;
+    }
+    const cands = slotCandidates(currentSlot, legalNow);
+    if (!cands) return; // color / number / choice always resolvable — never auto-stepped
+    if (!isForcedSlot(currentSlot, flow.sel.players.length)) return;
+    const key = `${flow.card}:${flow.slotIndex}`;
+    if (autoRef.current === key) return;
+
+    if (cands.length === 0) {
+      autoRef.current = key;
+      finishOrAdvance(flow);
+      return;
+    }
+    if (cands.length === 1) {
+      autoRef.current = key;
+      const only = cands[0]!;
+      setFlow((f) => {
+        if (!f) return f;
+        if (currentSlot.kind === 'handCard') {
+          if (f.sel.cardIdx.length > 0) return f;
+          return { ...f, sel: { ...f.sel, cardIdx: [0], cards: [only as number] } };
+        }
+        // mood / copy / player all record a uid/id string
+        if (f.sel.moods.includes(only as string) || f.sel.players.includes(only as string)) return f;
+        if (currentSlot.kind === 'player') return { ...f, sel: { ...f.sel, players: [only as string] } };
+        return { ...f, sel: { ...f.sel, moods: [only as string] } };
+      });
+    }
+  }, [flow, currentSlot, legalNow, finishOrAdvance]);
+
   const confirm = useCallback(() => {
     if (!flow || !currentSlot) return;
     if (countForSlot(currentSlot, flow.sel) < currentSlot.min) return;
@@ -338,7 +458,7 @@ export function usePlayInteraction(
     const sel: Selections = { ...flow.sel };
     if (currentSlot.key === 'moods') sel.moods = [];
     else if (currentSlot.key === 'players') sel.players = [];
-    else if (currentSlot.key === 'cards') sel.cards = [];
+    else if (currentSlot.key === 'cards') { sel.cards = []; sel.cardIdx = []; }
     else if (currentSlot.key === 'colors') sel.colors = [];
     else if (currentSlot.key === 'option') sel.option = null;
     else if (currentSlot.key === 'copy') { sel.copy = null; sel.copyUid = null; }
@@ -372,10 +492,10 @@ export function usePlayInteraction(
   );
   const selectCard = useCallback(
     (card: number) => {
-      if (!canAct || flow) return;
+      if (!canAct || flow || !canPlayHand) return; // discard-only budget → hand not selectable (F-1)
       setSelectedCard((cur) => (cur === card ? null : card));
     },
-    [canAct, flow],
+    [canAct, flow, canPlayHand],
   );
 
   // --- Board target clicks (only meaningful inside the flow) ---
@@ -397,7 +517,11 @@ export function usePlayInteraction(
         const total = flow.sel.moods.reduce((s, u) => s + moodValue(state, u), 0);
         if (total + moodValue(state, uid) > cap) return;
       }
-      setFlow((f) => (f ? { ...f, sel: { ...f.sel, moods: toggleBounded(f.sel.moods, uid, currentSlot.max) } } : f));
+      setFlow((f) =>
+        f
+          ? { ...f, sel: { ...f.sel, moods: toggleBounded(f.sel.moods, uid, pooledMax(currentSlot, f.spec, f.sel.players.length)) } }
+          : f,
+      );
     },
     [flow, currentSlot, legalNow, state],
   );
@@ -412,10 +536,20 @@ export function usePlayInteraction(
   );
 
   const onHandCardClick = useCallback(
-    (card: number) => {
+    (card: number, index?: number) => {
       if (flow && currentSlot && currentSlot.kind === 'handCard') {
-        if (!legalNow?.cards?.includes(card)) return;
-        setFlow((f) => (f ? { ...f, sel: { ...f.sel, cards: toggleBounded(f.sel.cards, card, currentSlot.max) } } : f));
+        // Select by INDEX into the enumerated candidate list, not by collector number, so two
+        // identical copies in one zone are independently selectable (F-5). `cards` (the resolved
+        // numbers that get dispatched) is kept in lockstep with `cardIdx`.
+        const cands = legalNow?.cards ?? [];
+        if (index == null || index < 0 || index >= cands.length) return;
+        setFlow((f) => {
+          if (!f) return f;
+          const max = pooledMax(currentSlot, f.spec, f.sel.players.length);
+          const nextIdx = toggleBounded(f.sel.cardIdx, index, max);
+          const nextCards = nextIdx.map((j) => cands[j]!);
+          return { ...f, sel: { ...f.sel, cardIdx: nextIdx, cards: nextCards } };
+        });
         return;
       }
       selectCard(card);
@@ -445,20 +579,32 @@ export function usePlayInteraction(
   );
   const playerSelected = useCallback((pid: string) => !!flow?.sel.players.includes(pid), [flow]);
 
+  // A rendered hand card (owned by `owner`) is a legal `handCard` target only when the
+  // current slot's SOURCE PILE is that hand — otherwise a same-numbered copy in another zone
+  // must not light up (F-3). Discard-sourced slots live only in the overlay fan, never a hand.
   const handCardHighlighted = useCallback(
-    (card: number) => !!(flow && currentSlot?.kind === 'handCard' && legalNow?.cards?.includes(card)),
-    [flow, currentSlot, legalNow],
+    (card: number, owner: string) => {
+      if (!flow || currentSlot?.kind !== 'handCard') return false;
+      if (!legalNow?.cards?.includes(card)) return false;
+      const from = currentSlot.cardsFrom ?? 'acting';
+      if (from === 'discard') return false;
+      if (from === 'chosen') return flow.sel.players.includes(owner);
+      return owner === me; // 'acting'
+    },
+    [flow, currentSlot, legalNow, me],
   );
-  const handCardSelected = useCallback((card: number) => !!flow?.sel.cards.includes(card), [flow]);
+  // Selection is keyed by candidate INDEX (into `legalNow.cards`), owned by the overlay fan
+  // (the single source of truth for handCard picks — F-5), so duplicate numbers stay distinct.
+  const handCardSelected = useCallback((index: number) => !!flow?.sel.cardIdx.includes(index), [flow]);
 
   // --- Drag & drop ---
   const beginDrag = useCallback(
     (card: number) => {
-      if (!canAct || flow) return;
+      if (!canAct || flow || !canPlayHand) return; // discard-only budget → hand not draggable (F-1)
       setSelectedCard(null);
       setDragCard(card);
     },
-    [canAct, flow],
+    [canAct, flow, canPlayHand],
   );
   const endDrag = useCallback(() => setDragCard(null), []);
 
@@ -467,14 +613,16 @@ export function usePlayInteraction(
   const playToField = useCallback(
     (card: number) => {
       setDragCard(null);
+      if (!queries.canPlayFromHand(state, me)) return; // discard-only budget → no hand play (F-1)
       beginPlay(card); // no specific target → immediate or open flow at slot 0
     },
-    [beginPlay],
+    [beginPlay, state, me],
   );
 
   const playToMood = useCallback(
     (card: number, uid: string) => {
       setDragCard(null);
+      if (!queries.canPlayFromHand(state, me)) return; // discard-only budget → no hand play (F-1)
       if (!isLegalDrop(card, uid, 'mood', state, me, cardLookup)) return; // snap back
       const spec = specFor(card)!;
       if (isSingleTarget(spec)) {
@@ -491,6 +639,7 @@ export function usePlayInteraction(
   const playToPlayer = useCallback(
     (card: number, pid: string) => {
       setDragCard(null);
+      if (!queries.canPlayFromHand(state, me)) return; // discard-only budget → no hand play (F-1)
       if (!isLegalDrop(card, pid, 'player', state, me, cardLookup)) return; // snap back
       const spec = specFor(card)!;
       if (isSingleTarget(spec)) {
@@ -520,14 +669,25 @@ export function usePlayInteraction(
     [dragCard, state, me],
   );
 
-  const slotProgress = flow && currentSlot ? { count: countForSlot(currentSlot, flow.sel), min: currentSlot.min, max: currentSlot.max } : null;
+  const slotProgress = flow && currentSlot
+    ? { count: countForSlot(currentSlot, flow.sel), min: currentSlot.min, max: pooledMax(currentSlot, flow.spec, flow.sel.players.length) }
+    : null;
   const canConfirm = !!(flow && currentSlot && countForSlot(currentSlot, flow.sel) >= currentSlot.min);
-  const canSkip = !!(flow && currentSlot && (currentSlot.optional || currentSlot.min === 0));
+  // Skip is offered only when the slot is a genuine "may" opt-out. A forced follow-up slot
+  // (a `from:'chosen'` mood/handCard with players already chosen) is committed to fire per
+  // chosen player — skipping it would misleadingly read as "no effect", so suppress it (F-7a).
+  const canSkip = !!(
+    flow &&
+    currentSlot &&
+    (currentSlot.optional || currentSlot.min === 0) &&
+    !isForcedSlot(currentSlot, flow.sel.players.length)
+  );
 
   return {
     mode,
     setMode,
     canAct,
+    canPlayHand,
     me,
     selectedCard,
     isSelected,

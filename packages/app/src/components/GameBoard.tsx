@@ -213,7 +213,7 @@ function HandRow({ player, state, ctx, pos }: { player: PlayerState; state: Game
 
   // Both play modes are always available: outside a targeting flow, a card can be
   // tapped to select (manual) or dragged to play/reorder.
-  const canDragHand = isOwn && isActive && pc.flow == null;
+  const canDragHand = isOwn && isActive && pc.flow == null && pc.canPlayHand;
 
   const handChildren: React.ReactNode[] = [];
   order.forEach((card, idx) => {
@@ -240,17 +240,19 @@ function HandRow({ player, state, ctx, pos }: { player: PlayerState; state: Game
       return;
     }
     const flowHandSlot = pc.flow != null && pc.currentSlot?.kind === 'handCard';
-    const targetLegal = flowHandSlot && pc.handCardHighlighted(card);
-    const interactive = isOwn && isActive && (pc.flow == null ? true : flowHandSlot && targetLegal);
+    // Zone-scoped: a same-numbered copy in another zone must not light up (F-3).
+    const targetLegal = flowHandSlot && pc.handCardHighlighted(card, pid);
+    // Outside a flow the hand is interactive only when a HAND play is actually available
+    // (discard-only budget dims it — F-1). During a `handCard` flow the hand row is a
+    // read-only, zone-scoped highlight; selection happens in the overlay fan (F-5), so the
+    // row itself is never clickable.
+    const interactive = isOwn && isActive && (pc.flow == null ? pc.canPlayHand : flowHandSlot && targetLegal);
     // A face-up card in an opponent's hand is one they publicly revealed (Curiosity).
     const revealedByOpponent = !isOwn;
-    // During a targeting flow, hand-card targets are surfaced in the overlay, so
-    // here we only need tap-to-select (drag hook handles it) outside a flow.
-    const clickable = interactive && pc.flow != null;
-    // A playable hand card (the active player's, outside a flow) is actionable →
-    // show its objective would-be value with the computed glow. Cards being read
-    // (the idle opponent hand) keep their printed die.
-    const playable = isOwn && isActive && pc.flow == null;
+    // A playable hand card (the active player's, outside a flow, with a hand play available)
+    // is actionable → show its objective would-be value with the computed glow. Cards being
+    // read (the idle opponent hand) keep their printed die.
+    const playable = isOwn && isActive && pc.flow == null && pc.canPlayHand;
     const wb = playable ? handWouldBe(state, pid, card) : null;
     const showWb = !!(wb && wb.objective && wb.value != null);
     const preview: PreviewTarget = { card: db.get(card), handOwner: playable ? pid : undefined };
@@ -275,7 +277,6 @@ function HandRow({ player, state, ctx, pos }: { player: PlayerState; state: Game
           disabled={!interactive}
           selected={isOwn && isActive && pc.isSelected(card)}
           highlighted={!!targetLegal}
-          targetSelected={flowHandSlot && pc.handCardSelected(card)}
           pointerDraggable={canDragHand}
           // Tap / click / drag all begin with pointer-down, so forcing the preview
           // here makes every one of them an immediate preview trigger (hover is the
@@ -293,7 +294,8 @@ function HandRow({ player, state, ctx, pos }: { player: PlayerState; state: Game
           onPointerEnter={ctx.hoverPreview(preview)}
           onPointerLeave={ctx.endHover}
           onFocus={() => setPreview(preview)}
-          onClick={clickable ? () => pc.onHandCardClick(card) : undefined}
+          // Hand-card selection is owned by the drag hook (tap-to-select) outside a flow and by
+          // the overlay fan during a `handCard` flow (F-5) — the hand row itself never selects.
         />
       </div>,
     );
@@ -333,7 +335,29 @@ function ActionSlot({ pc, state }: { pc: PlayController; state: GameState }) {
     return <div className="actionslot actionslot--empty" aria-hidden />;
   }
 
+  // Name the source of the remaining play budget, not just "extra mood" (F-1). A discard-only
+  // budget (Grief/Angst/Harmony/Grace) has the hand dimmed, so the hint must point at the pile.
+  const hand = pc.canPlayHand;
+  const discard = pc.legalDiscardCards.length > 0;
   const playedExtra = (state.playedThisTurn?.length ?? 0) > 0;
+  let hint: string;
+  let hintOk = false;
+  if (hand && discard) {
+    hint = 'Extra play — from your hand or the discard pile.';
+    hintOk = true;
+  } else if (!hand && discard) {
+    hint = 'A mood is playable from the discard pile — open the pile to play.';
+    hintOk = true;
+  } else if (!hand && !discard) {
+    // A budget exists (still the active turn) but nothing is playable — e.g. the discard
+    // emptied or every remaining discard card is banned. Nudge to Pass.
+    hint = 'No playable moods — Pass.';
+  } else if (playedExtra) {
+    hint = 'Extra mood granted — play another or Pass.';
+    hintOk = true;
+  } else {
+    hint = 'Tap or drag a card to play.';
+  }
   return (
     <div className="actionslot">
       {pc.selectedCard != null ? (
@@ -349,9 +373,7 @@ function ActionSlot({ pc, state }: { pc: PlayController; state: GameState }) {
           </button>
         </>
       ) : (
-        <span className={`actionslot__hint ${playedExtra ? 'ok' : 'muted'}`}>
-          {playedExtra ? 'Extra mood granted — play another or Pass.' : 'Tap or drag a card to play.'}
-        </span>
+        <span className={`actionslot__hint ${hintOk ? 'ok' : 'muted'}`}>{hint}</span>
       )}
       <button className="btn btn--pass" onClick={() => pc.onPass()}>
         Pass
@@ -545,11 +567,16 @@ function slotNoun(slot: ChoiceSlot, plural: boolean): string {
   }
 }
 
-/** Big header wording derived from the current slot's kind + min/max (F4). */
-function chooseHeading(slot: ChoiceSlot): string {
-  if (slot.max <= 1) return `Choose ${slotNoun(slot, false)}`;
-  if (slot.min === slot.max) return `Choose ${numWord(slot.min)} ${slotNoun(slot, true)}`;
-  return `Choose up to ${numWord(slot.max)} ${slotNoun(slot, true)}`;
+/**
+ * Big header wording derived from the current slot's kind + min/max (F4). `max` is the
+ * EFFECTIVE cap (the controller's pooled max — F-6), not the slot's raw pooled `max`, so a
+ * "one per chosen player" slot with a single chosen player reads "Choose a card…", not
+ * "Choose up to eight…".
+ */
+function chooseHeading(slot: ChoiceSlot, max: number = slot.max): string {
+  if (max <= 1) return `Choose ${slotNoun(slot, false)}`;
+  if (slot.min === max) return `Choose ${numWord(slot.min)} ${slotNoun(slot, true)}`;
+  return `Choose up to ${numWord(max)} ${slotNoun(slot, true)}`;
 }
 
 /** Find a mood object (and its owner) by uid, across all seats. */
@@ -587,9 +614,11 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
     wonderColor: (sel.colors[0] as Color | undefined),
   });
   const showValue = wb.objective && wb.value != null;
+  // Effective cap for wording — the controller's pooled max (F-6), not the raw slot max.
+  const heading = chooseHeading(slot, pc.slotProgress?.max ?? slot.max);
 
   return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-label={chooseHeading(slot)}>
+    <div className="overlay" role="dialog" aria-modal="true" aria-label={heading}>
       <div className="overlay__scrim" />
       <div className="overlay__panel overlay__panel--playing">
         <aside className="overlay__playing">
@@ -606,7 +635,7 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
           )}
         </aside>
         <div className="overlay__main">
-        <h2 className="overlay__title">{chooseHeading(slot)}</h2>
+        <h2 className="overlay__title">{heading}</h2>
         {slot.label && <p className="overlay__sub">{slot.label}</p>}
         {pc.slotProgress && pc.slotProgress.max > 1 && (
           <p className="overlay__count">
@@ -687,8 +716,8 @@ function TargetOverlay({ pc, state, ctx }: { pc: PlayController; state: GameStat
                   <Card
                     card={db.get(card)}
                     tile
-                    targetSelected={pc.handCardSelected(card)}
-                    onClick={() => pc.onHandCardClick(card)}
+                    targetSelected={pc.handCardSelected(i)}
+                    onClick={() => pc.onHandCardClick(card, i)}
                     onPointerEnter={() => ctx.setPreview({ card: db.get(card) })}
                   />
                 </div>

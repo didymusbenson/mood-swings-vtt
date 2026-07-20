@@ -23,9 +23,7 @@ export function legalDiscardPlays(state: GameState, player: PlayerId, db: CardDB
   const permitsMelancholy = (state.moods[player] ?? []).some(
     (m) => effectsFor(resolveCardNumber(m)).permitsPlayFromDiscard != null,
   );
-  const hasNormalPlay =
-    state.playsRemaining > 0 ||
-    state.conditionalGrants.some((g) => (g.from ?? 'hand') === 'hand');
+  const hasNormalPlay = canPlayFromHand(state, player);
   const discardColorGrants = state.conditionalGrants.filter(
     (g) => g.from === 'discard' && g.constraint.kind === 'colorSharedWithControllerMoods',
   );
@@ -44,6 +42,21 @@ export function legalDiscardPlays(state: GameState, player: PlayerId, db: CardDB
 /** True if the player can start any discard-sourced play right now. */
 export function canPlayFromDiscard(state: GameState, player: PlayerId, db: CardDB): boolean {
   return legalDiscardPlays(state, player, db).length > 0;
+}
+
+/**
+ * True if the player can spend a play on a HAND card right now — either the base
+ * unconditional play (`playsRemaining`) or a hand-sourced conditional grant. A
+ * player whose only remaining budget is discard-only (Grief/Angst/Harmony grants,
+ * Grace's `from: 'discard'` grant) returns false here, so the UI can dim the hand
+ * and name the source. Coarse (colour-agnostic): a specific constrained hand grant
+ * may still be rejected per-card at dispatch — the engine remains the authority.
+ */
+export function canPlayFromHand(state: GameState, player: PlayerId): boolean {
+  return (
+    state.playsRemaining > 0 ||
+    state.conditionalGrants.some((g) => (g.from ?? 'hand') === 'hand')
+  );
 }
 
 export function resolveCardNumber(mood: Mood): number {
